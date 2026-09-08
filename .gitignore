@@ -1,0 +1,39 @@
+# Dependencies
+vendor/
+node_modules/
+
+# Build output
+dist/
+bin/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Labuh specific
+.worktrees/
+web/
+tmp/
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
