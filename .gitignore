@@ -28,7 +28,6 @@ Thumbs.db
 
 # Labuh specific
 .worktrees/
-web/
 tmp/
 logs/
 *.log

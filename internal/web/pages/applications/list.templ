@@ -1,0 +1,230 @@
+package applications
+
+import (
+	"github.com/faiq/labuh/internal/models"
+)
+
+templ ApplicationsListPage(apps []*models.Application) {
+	<div>
+		<div class="flex justify-between items-center mb-6">
+			<h1 class="text-3xl font-bold text-gray-900">Applications</h1>
+			<a href="/applications/create" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">New Application</a>
+		</div>
+		<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+			<table class="min-w-full divide-y divide-gray-200">
+				<thead class="bg-gray-50">
+					<tr>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Port</th>
+						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+					</tr>
+				</thead>
+				<tbody class="bg-white divide-y divide-gray-200">
+					if len(apps) == 0 {
+						<tr>
+							<td colspan="5" class="px-6 py-4 text-center text-gray-500">No applications yet</td>
+						</tr>
+					} else {
+						for _, app := range apps {
+							<tr>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="text-sm font-medium text-gray-900">{ app.Name }</div>
+									<div class="text-sm text-gray-500">{ app.Slug }</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ app.SourceType }</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+										{ app.Status }
+									</span>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ app.AppPort }</td>
+								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+									<a href={ templ.SafeURL("/applications/" + app.ID) } class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+									<a href={ templ.SafeURL("/applications/" + app.ID + "/deploy") } class="text-green-600 hover:text-green-900 mr-3">Deploy</a>
+								</td>
+							</tr>
+						}
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+templ ApplicationDetailPage(app *models.Application, deployments []*models.Deployment, envVars []*models.AppEnvVar) {
+	<div>
+		<div class="flex justify-between items-center mb-6">
+			<div>
+				<h1 class="text-3xl font-bold text-gray-900">{ app.Name }</h1>
+				<p class="text-gray-600 mt-1">{ app.Slug }</p>
+			</div>
+			<div class="flex gap-2">
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/start") } method="post" class="inline">
+					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Start</button>
+				</form>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/stop") } method="post" class="inline">
+					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Stop</button>
+				</form>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/restart") } method="post" class="inline">
+					<button type="submit" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700">Restart</button>
+				</form>
+				<a href={ templ.SafeURL("/applications/" + app.ID + "/deploy") } class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Deploy</a>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<h2 class="text-xl font-bold text-gray-900 mb-4">Application Info</h2>
+				<dl class="space-y-3">
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Status</dt>
+						<dd class="text-gray-900">{ app.Status }</dd>
+					</div>
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Source Type</dt>
+						<dd class="text-gray-900">{ app.SourceType }</dd>
+					</div>
+					if app.RepositoryURL != nil {
+						<div class="flex justify-between">
+							<dt class="text-gray-600">Repository</dt>
+							<dd class="text-gray-900">{ *app.RepositoryURL }</dd>
+						</div>
+					}
+					if app.DockerImage != nil {
+						<div class="flex justify-between">
+							<dt class="text-gray-600">Image</dt>
+							<dd class="text-gray-900">{ *app.DockerImage }</dd>
+						</div>
+					}
+					<div class="flex justify-between">
+						<dt class="text-gray-600">App Port</dt>
+						<dd class="text-gray-900">{ app.AppPort }</dd>
+					</div>
+					if app.ContainerID != nil {
+						<div class="flex justify-between">
+							<dt class="text-gray-600">Container ID</dt>
+							<dd class="text-gray-900 font-mono text-sm">{ *app.ContainerID }</dd>
+						</div>
+					}
+				</dl>
+			</div>
+
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<h2 class="text-xl font-bold text-gray-900 mb-4">Environment Variables</h2>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars") } method="post" class="mb-4 flex gap-2">
+					<input type="text" name="key" placeholder="KEY" class="border border-gray-300 rounded px-2 py-1 text-sm w-32" required>
+					<input type="text" name="value" placeholder="value" class="border border-gray-300 rounded px-2 py-1 text-sm flex-1" required>
+					<label class="flex items-center text-sm">
+						<input type="checkbox" name="is_secret" class="mr-1">
+						Secret
+					</label>
+					<button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Add</button>
+				</form>
+				<table class="min-w-full divide-y divide-gray-200">
+					<thead class="bg-gray-50">
+						<tr>
+							<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Key</th>
+							<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+							<th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white divide-y divide-gray-200">
+						for _, envVar := range envVars {
+							<tr>
+								<td class="px-4 py-2 text-sm text-gray-900">{ envVar.Key }</td>
+								<td class="px-4 py-2 text-sm text-gray-500">
+									if envVar.IsSecret {
+										••••••••
+									} else {
+										{ envVar.Value }
+									}
+								</td>
+								<td class="px-4 py-2 text-right">
+									<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete") } method="post" class="inline">
+										<button type="submit" class="text-red-600 hover:text-red-900 text-sm">Delete</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
+			<h2 class="text-xl font-bold text-gray-900 mb-4">Deployments</h2>
+			<table class="min-w-full divide-y divide-gray-200">
+				<thead class="bg-gray-50">
+					<tr>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commit</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+					</tr>
+				</thead>
+				<tbody class="bg-white divide-y divide-gray-200">
+					for _, deployment := range deployments {
+						<tr>
+							<td class="px-6 py-4 text-sm text-gray-900 font-mono">{ deployment.ID[:8] }</td>
+							<td class="px-6 py-4 whitespace-nowrap">
+								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+									{ deployment.Status }
+								</span>
+							</td>
+							<td class="px-6 py-4 text-sm text-gray-500">
+								if deployment.CommitHash != nil {
+									{ *deployment.CommitHash }
+								}
+							</td>
+							<td class="px-6 py-4 text-sm text-gray-500">{ deployment.CreatedAt.Format("2006-01-02 15:04:05") }</td>
+							<td class="px-6 py-4 text-right">
+								<a href={ templ.SafeURL("/deployments/" + deployment.ID) } class="text-blue-600 hover:text-blue-900 text-sm">View</a>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+templ ApplicationCreatePage() {
+	<div>
+		<h1 class="text-3xl font-bold text-gray-900 mb-6">New Application</h1>
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+			<form action="/applications" method="post" class="space-y-4">
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Name</label>
+					<input type="text" name="name" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Source Type</label>
+					<select name="source_type" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+						<option value="git">Git</option>
+						<option value="docker_image">Docker Image</option>
+						<option value="dockerfile">Dockerfile</option>
+					</select>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Repository URL</label>
+					<input type="text" name="repository_url" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Docker Image</label>
+					<input type="text" name="docker_image" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">App Port</label>
+					<input type="number" name="app_port" value="8080" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div class="flex gap-2">
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Create Application</button>
+					<a href="/projects" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancel</a>
+				</div>
+			</form>
+		</div>
+	</div>
+}
