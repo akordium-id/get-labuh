@@ -1,0 +1,32 @@
+package pages
+
+templ DashboardPage(userName string) {
+	<div x-data="{ stats: { projects: 0, apps: 0 } }">
+		<h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome back, { userName }</h1>
+		<p class="text-gray-600 mb-8">Here's what's happening with your projects.</p>
+
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+			<div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+				<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Projects</h3>
+				<p class="mt-2 text-3xl font-bold text-gray-900" x-text="stats.projects">0</p>
+			</div>
+			<div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+				<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Apps</h3>
+				<p class="mt-2 text-3xl font-bold text-gray-900" x-text="stats.apps">0</p>
+			</div>
+			<div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+				<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Active Deployments</h3>
+				<p class="mt-2 text-3xl font-bold text-gray-900">0</p>
+			</div>
+		</div>
+
+		<div class="bg-white rounded-lg shadow border border-gray-200">
+			<div class="px-6 py-4 border-b border-gray-200">
+				<h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
+			</div>
+			<div class="p-6">
+				<p class="text-gray-500 text-sm">No recent activity yet.</p>
+			</div>
+		</div>
+	</div>
+}

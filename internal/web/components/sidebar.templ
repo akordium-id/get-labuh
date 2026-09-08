@@ -1,0 +1,20 @@
+package components
+
+templ Sidebar() {
+	<aside class="w-64 bg-gray-900 text-white h-screen flex flex-col">
+		<div class="p-4 border-b border-gray-800">
+			<h1 class="text-xl font-bold">Labuh</h1>
+		</div>
+		<nav class="flex-1 p-4 space-y-2">
+			<a href="/dashboard" class="block px-4 py-2 rounded hover:bg-gray-800">Dashboard</a>
+			<a href="/projects" class="block px-4 py-2 rounded hover:bg-gray-800">Projects</a>
+			<a href="#" class="block px-4 py-2 rounded hover:bg-gray-800">Servers</a>
+			<a href="#" class="block px-4 py-2 rounded hover:bg-gray-800">Settings</a>
+		</nav>
+		<div class="p-4 border-t border-gray-800">
+			<form action="/auth/logout" method="get">
+				<button type="submit" class="w-full text-left px-4 py-2 rounded hover:bg-gray-800">Logout</button>
+			</form>
+		</div>
+	</aside>
+}
