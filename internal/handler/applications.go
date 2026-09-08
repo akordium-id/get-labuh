@@ -246,3 +246,79 @@ func (h *ApplicationsHandler) DeleteEnvVar(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("HX-Redirect", "/applications/"+appID)
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *ApplicationsHandler) Move(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	targetEnvID := r.FormValue("environment_id")
+	if targetEnvID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.appRepo.Move(id, targetEnvID); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) Clone(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	targetEnvID := r.FormValue("environment_id")
+	newName := r.FormValue("name")
+	if targetEnvID == "" || newName == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	clonedApp, err := h.appRepo.Clone(app, targetEnvID, newName)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	envVars, _ := h.envVarRepo.GetByApplicationID(id)
+	for _, envVar := range envVars {
+		_, err := h.envVarRepo.Create(models.CreateAppEnvVarInput{
+			ApplicationID: clonedApp.ID,
+			Key:           envVar.Key,
+			Value:         envVar.Value,
+			IsSecret:      envVar.IsSecret,
+		})
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/" + clonedApp.ID)
+	w.WriteHeader(http.StatusOK)
+}

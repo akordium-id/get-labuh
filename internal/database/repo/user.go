@@ -62,3 +62,25 @@ func (r *UserRepo) GetByID(id string) (*models.User, error) {
 
 	return user, nil
 }
+
+func (r *UserRepo) GetAll() ([]*models.User, error) {
+	rows, err := r.db.Query(
+		"SELECT id, email, password_hash, name, created_at, updated_at FROM users ORDER BY created_at DESC",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		user := &models.User{}
+		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}

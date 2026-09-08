@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/deployments"
 )
@@ -68,6 +69,44 @@ func (h *DeploymentsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templ.Handler(layouts.AppLayout(deployments.DeploymentLogsPage(deployment, logs))).ServeHTTP(w, r)
+}
+
+func (h *DeploymentsHandler) Rollback(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	deployment, err := h.deployRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	prevDeployment, err := h.deployRepo.GetPreviousSuccessful(deployment.ApplicationID)
+	if err != nil || prevDeployment == nil {
+		http.Error(w, "No previous successful deployment found", http.StatusBadRequest)
+		return
+	}
+
+	rollbackDeployment, err := h.deployRepo.Create(models.CreateDeploymentInput{
+		ApplicationID:  deployment.ApplicationID,
+		CommitHash:     prevDeployment.CommitHash,
+		CommitMessage:  prevDeployment.CommitMessage,
+		LogPath:        prevDeployment.LogPath,
+	})
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	_ = h.deployRepo.MarkStarted(rollbackDeployment.ID)
+	_ = h.deployRepo.UpdateStatus(rollbackDeployment.ID, models.DeployStatusDeploying)
+	_ = h.appRepo.UpdateStatus(deployment.ApplicationID, models.AppStatusRunning)
+
+	w.Header().Set("HX-Redirect", "/deployments/"+rollbackDeployment.ID)
+	w.WriteHeader(http.StatusOK)
 }
 
 func readLogFile(path string) ([]string, error) {

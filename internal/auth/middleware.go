@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
@@ -46,6 +47,39 @@ func RequireAuth(sessionRepo *repo.SessionRepo, userRepo *repo.UserRepo, secure 
 
 			ctx := ContextWithUser(r.Context(), user)
 			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func RequireRole(teamRepo *repo.TeamRepo, roles ...models.TeamRole) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, ok := UserFromContext(r.Context())
+			if !ok || user == nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			teamID := chi.URLParam(r, "team_id")
+			if teamID == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			member, err := teamRepo.GetMember(teamID, user.ID)
+			if err != nil || member == nil {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			for _, role := range roles {
+				if member.Role == role || repo.HasRole(member.Role, role) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			http.Error(w, "Forbidden", http.StatusForbidden)
 		})
 	}
 }

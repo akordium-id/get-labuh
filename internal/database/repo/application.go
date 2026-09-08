@@ -165,6 +165,48 @@ func (r *ApplicationRepo) Delete(id string) error {
 	return err
 }
 
+func (r *ApplicationRepo) Clone(srcApp *models.Application, targetEnvID, newName string) (*models.Application, error) {
+	app := &models.Application{
+		ID:            uuid.New().String(),
+		EnvironmentID: targetEnvID,
+		Name:          newName,
+		Slug:          GenerateSlug(newName),
+		SourceType:    srcApp.SourceType,
+		RepositoryURL: srcApp.RepositoryURL,
+		Branch:        srcApp.Branch,
+		BuildPath:     srcApp.BuildPath,
+		DockerfilePath: srcApp.DockerfilePath,
+		DockerImage:   srcApp.DockerImage,
+		CustomDomain:  srcApp.CustomDomain,
+		AppPort:       srcApp.AppPort,
+		Status:        models.AppStatusIdle,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+
+	containerName := generateContainerName("env", app.Slug, app.ID)
+	app.ContainerName = &containerName
+
+	_, err := r.db.Exec(
+		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, srcApp.WebhookSecret, app.CreatedAt, app.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return app, nil
+}
+
+func (r *ApplicationRepo) Move(id, targetEnvID string) error {
+	_, err := r.db.Exec(
+		`UPDATE applications SET environment_id = ?, updated_at = ? WHERE id = ?`,
+		targetEnvID, time.Now(), id,
+	)
+	return err
+}
+
 func generateContainerName(envSlug, appSlug, appID string) string {
 	shortID := appID
 	if len(shortID) > 8 {
