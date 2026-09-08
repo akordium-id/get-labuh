@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -23,6 +24,13 @@ type DeploymentJob struct {
 	AppPort        int
 	EnvVars        []models.AppEnvVar
 	LogPath        string
+}
+
+type ComposeJob struct {
+	ComposeID          string
+	ComposeFilePath    string
+	ComposeProjectName string
+	LogPath            string
 }
 
 type Pipeline struct {
@@ -86,6 +94,35 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	}
 
 	writeLog(logFile, "Deployment completed successfully")
+	return nil
+}
+
+func (p *Pipeline) ExecuteCompose(ctx context.Context, job ComposeJob) error {
+	logDir := filepath.Dir(job.LogPath)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	logFile, err := os.Create(job.LogPath)
+	if err != nil {
+		return fmt.Errorf("failed to create log file: %w", err)
+	}
+	defer logFile.Close()
+
+	writeLog(logFile, "Starting compose deployment...")
+
+	args := []string{"-f", job.ComposeFilePath, "-p", job.ComposeProjectName, "up", "-d", "--build"}
+	cmd := exec.CommandContext(ctx, "docker", append([]string{"compose"}, args...)...)
+	cmd.Dir = "/tmp/labuh-builds/" + job.ComposeID
+
+	output, err := cmd.CombinedOutput()
+	writeLog(logFile, string(output))
+	if err != nil {
+		writeLog(logFile, fmt.Sprintf("Compose deployment failed: %v", err))
+		return fmt.Errorf("compose up failed: %w", err)
+	}
+
+	writeLog(logFile, "Compose deployment completed successfully")
 	return nil
 }
 

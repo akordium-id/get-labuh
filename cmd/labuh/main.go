@@ -18,6 +18,8 @@ import (
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages"
+	"github.com/akordium-id/get-labuh/internal/web/pages/compose"
+	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 	"github.com/akordium-id/get-labuh/internal/web/pages/projects"
 	"github.com/akordium-id/get-labuh/internal/worker"
 )
@@ -41,12 +43,20 @@ func main() {
 	appRepo := repo.NewApplicationRepo(db)
 	deployRepo := repo.NewDeploymentRepo(db)
 	envVarRepo := repo.NewEnvVarRepo(db)
+	composeRepo := repo.NewComposeRepo(db)
+	databaseRepo := repo.NewDatabaseRepo(db)
+	deployKeyRepo := repo.NewDeployKeyRepo(db)
 
 	authHandler := handler.NewAuthHandler(userRepo, sessionRepo, false)
 	projectsHandler := handler.NewProjectsHandler(projectRepo)
 	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo)
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
 	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
+	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo)
+	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
+	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
+	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
+	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
 
 	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
 
@@ -86,6 +96,9 @@ func main() {
 		r.Get("/projects/create", func(w http.ResponseWriter, r *http.Request) {
 			templ.Handler(layouts.AppLayout(projects.ProjectCreatePage())).ServeHTTP(w, r)
 		})
+		r.Get("/projects/{id}/deploy-keys", deployKeysHandler.List)
+		r.Post("/projects/{id}/deploy-keys", deployKeysHandler.Create)
+		r.Post("/deploy-keys/{id}/delete", deployKeysHandler.Delete)
 
 		r.Get("/projects/{project_id}/environments/{env_id}/applications", applicationsHandler.List)
 		r.Post("/projects/{project_id}/environments/{env_id}/applications", applicationsHandler.Create)
@@ -96,6 +109,28 @@ func main() {
 		r.Post("/applications/{id}/deploy", applicationsHandler.Deploy)
 		r.Post("/applications/{id}/env-vars", applicationsHandler.CreateEnvVar)
 		r.Post("/applications/{id}/env-vars/{var_id}/delete", applicationsHandler.DeleteEnvVar)
+		r.Get("/applications/{id}/stats", monitoringHandler.ApplicationStats)
+
+		r.Get("/projects/{project_id}/environments/{env_id}/compose-apps", composeHandler.List)
+		r.Get("/projects/{project_id}/environments/{env_id}/compose-apps/new", func(w http.ResponseWriter, r *http.Request) {
+			templ.Handler(layouts.AppLayout(compose.ComposeCreatePage())).ServeHTTP(w, r)
+		})
+		r.Post("/projects/{project_id}/environments/{env_id}/compose-apps", composeHandler.Create)
+		r.Get("/compose-apps/{id}", composeHandler.Get)
+		r.Post("/compose-apps/{id}/deploy", composeHandler.Deploy)
+		r.Post("/compose-apps/{id}/stop", composeHandler.Stop)
+		r.Post("/compose-apps/{id}/start", composeHandler.Start)
+
+		r.Get("/projects/{project_id}/environments/{env_id}/databases", databasesHandler.List)
+		r.Get("/projects/{project_id}/environments/{env_id}/databases/new", func(w http.ResponseWriter, r *http.Request) {
+			templ.Handler(layouts.AppLayout(databases.DatabaseCreatePage())).ServeHTTP(w, r)
+		})
+		r.Post("/projects/{project_id}/environments/{env_id}/databases", databasesHandler.Create)
+		r.Get("/databases/{id}", databasesHandler.Get)
+		r.Post("/databases/{id}/start", databasesHandler.Start)
+		r.Post("/databases/{id}/stop", databasesHandler.Stop)
+		r.Post("/databases/{id}/delete", databasesHandler.Delete)
+		r.Get("/databases/{id}/stats", monitoringHandler.DatabaseStats)
 
 		r.Get("/deployments/{id}", deploymentsHandler.Get)
 		r.Get("/deployments/{id}/logs", deploymentsHandler.Logs)
@@ -125,6 +160,8 @@ func main() {
 		w.Header().Set("HX-Redirect", "/deployments/"+id)
 		w.WriteHeader(http.StatusOK)
 	})
+
+	r.Post("/webhooks/deploy/{application_id}", webhooksHandler.Deploy)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)

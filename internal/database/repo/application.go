@@ -59,9 +59,9 @@ func (r *ApplicationRepo) Create(input models.CreateApplicationInput) (*models.A
 	app.ContainerName = &containerName
 
 	_, err := r.db.Exec(
-		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.CreatedAt, app.UpdatedAt,
+		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, app.CreatedAt, app.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -73,10 +73,10 @@ func (r *ApplicationRepo) Create(input models.CreateApplicationInput) (*models.A
 func (r *ApplicationRepo) GetByID(id string) (*models.Application, error) {
 	app := &models.Application{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
 		 FROM applications WHERE id = ?`,
 		id,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +87,10 @@ func (r *ApplicationRepo) GetByID(id string) (*models.Application, error) {
 func (r *ApplicationRepo) GetBySlug(envID, slug string) (*models.Application, error) {
 	app := &models.Application{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
 		 FROM applications WHERE environment_id = ? AND slug = ?`,
 		envID, slug,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +101,10 @@ func (r *ApplicationRepo) GetBySlug(envID, slug string) (*models.Application, er
 func (r *ApplicationRepo) GetByContainerName(containerName string) (*models.Application, error) {
 	app := &models.Application{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
 		 FROM applications WHERE container_name = ?`,
 		containerName,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (r *ApplicationRepo) GetByContainerName(containerName string) (*models.Appl
 
 func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Application, error) {
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
 		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC`,
 		envID,
 	)
@@ -126,7 +126,7 @@ func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Applicatio
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}

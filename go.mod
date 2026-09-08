@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/a-h/templ v0.3.1020
+	github.com/faiq/labuh v0.0.0-00010101000000-000000000000
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.52
@@ -11,4 +12,4 @@ require (
 	golang.org/x/crypto v0.56.0
 )
 
-require github.com/google/go-cmp v0.7.0 // indirect
+replace github.com/faiq/labuh => ./.

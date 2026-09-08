@@ -1,0 +1,49 @@
+package settings
+
+import (
+	"github.com/akordium-id/get-labuh/internal/models"
+)
+
+templ DeployKeysPage(projectID string, keys []*models.DeployKey) {
+	<div>
+		<div class="flex justify-between items-center mb-6">
+			<h1 class="text-3xl font-bold text-gray-900">Deploy Keys</h1>
+			<form action={ templ.SafeURL("/projects/" + projectID + "/deploy-keys") } method="post" class="inline">
+				<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Generate New Key</button>
+			</form>
+		</div>
+		<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+			<table class="min-w-full divide-y divide-gray-200">
+				<thead class="bg-gray-50">
+					<tr>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fingerprint</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+					</tr>
+				</thead>
+				<tbody class="bg-white divide-y divide-gray-200">
+					if len(keys) == 0 {
+						<tr>
+							<td colspan="4" class="px-6 py-4 text-center text-gray-500">No deploy keys yet</td>
+						</tr>
+					} else {
+						for _, key := range keys {
+							<tr>
+								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{ key.Name }</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{ key.Fingerprint }</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ key.CreatedAt.Format("2006-01-02 15:04:05") }</td>
+								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+									<button class="text-blue-600 hover:text-blue-900 mr-3" onclick="navigator.clipboard.writeText('{ key.PublicKey }')">Copy Public Key</button>
+									<form action={ templ.SafeURL("/deploy-keys/" + key.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure?')">
+										<button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+									</form>
+								</td>
+							</tr>
+						}
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}

@@ -23,3 +23,14 @@ func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imag
 	_ = envVars
 	return "", fmt.Errorf("not implemented without docker client")
 }
+
+func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imageName string, envVars map[string]string, ports []string, volumeName string) (string, error) {
+	_ = ctx
+	_ = envSlug
+	_ = dbSlug
+	_ = imageName
+	_ = envVars
+	_ = ports
+	_ = volumeName
+	return "", fmt.Errorf("not implemented without docker client")
+}

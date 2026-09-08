@@ -1,0 +1,177 @@
+package databases
+
+import (
+	"github.com/akordium-id/get-labuh/internal/models"
+)
+
+templ DatabaseListPage(dbServices []*models.DatabaseService) {
+	<div>
+		<div class="flex justify-between items-center mb-6">
+			<h1 class="text-3xl font-bold text-gray-900">Databases</h1>
+			<a href="/databases/new" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">New Database</a>
+		</div>
+		<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+			<table class="min-w-full divide-y divide-gray-200">
+				<thead class="bg-gray-50">
+					<tr>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Engine</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Port</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+					</tr>
+				</thead>
+				<tbody class="bg-white divide-y divide-gray-200">
+					if len(dbServices) == 0 {
+						<tr>
+							<td colspan="6" class="px-6 py-4 text-center text-gray-500">No databases yet</td>
+						</tr>
+					} else {
+						for _, db := range dbServices {
+							<tr>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="text-sm font-medium text-gray-900">{ db.Name }</div>
+									<div class="text-sm text-gray-500">{ db.Slug }</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+										{ db.Engine }
+									</span>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ db.Version }</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ db.Port }</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+										{ db.Status }
+									</span>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+									<a href={ templ.SafeURL("/databases/" + db.ID) } class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+								</td>
+							</tr>
+						}
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+templ DatabaseDetailPage(dbService *models.DatabaseService) {
+	<div>
+		<div class="flex justify-between items-center mb-6">
+			<div>
+				<h1 class="text-3xl font-bold text-gray-900">{ dbService.Name }</h1>
+				<p class="text-gray-600 mt-1">{ dbService.Slug }</p>
+			</div>
+			<div class="flex gap-2">
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/start") } method="post" class="inline">
+					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Start</button>
+				</form>
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/stop") } method="post" class="inline">
+					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Stop</button>
+				</form>
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure?')">
+					<button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">Delete</button>
+				</form>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<h2 class="text-xl font-bold text-gray-900 mb-4">Database Info</h2>
+				<dl class="space-y-3">
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Status</dt>
+						<dd class="text-gray-900">{ dbService.Status }</dd>
+					</div>
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Engine</dt>
+						<dd class="text-gray-900">{ dbService.Engine }</dd>
+					</div>
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Version</dt>
+						<dd class="text-gray-900">{ dbService.Version }</dd>
+					</div>
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Port</dt>
+						<dd class="text-gray-900">{ dbService.Port }</dd>
+					</div>
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Username</dt>
+						<dd class="text-gray-900 font-mono text-sm">{ dbService.Username }</dd>
+					</div>
+					<div class="flex justify-between">
+						<dt class="text-gray-600">Database</dt>
+						<dd class="text-gray-900 font-mono text-sm">{ dbService.DatabaseName }</dd>
+					</div>
+					if dbService.ConnectionString != nil {
+						<div class="flex justify-between">
+							<dt class="text-gray-600">Connection String</dt>
+							<dd class="text-gray-900 font-mono text-sm">{ *dbService.ConnectionString }</dd>
+						</div>
+					}
+				</dl>
+			</div>
+
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<h2 class="text-xl font-bold text-gray-900 mb-4">Monitoring</h2>
+				<div id="stats" hx-get={ templ.SafeURL("/databases/" + dbService.ID + "/stats") } hx-trigger="load, every 2s" hx-swap="innerHTML">
+					<div class="text-gray-500">Loading stats...</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ DatabaseCreatePage() {
+	<div>
+		<h1 class="text-3xl font-bold text-gray-900 mb-6">New Database</h1>
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+			<form action="/databases" method="post" class="space-y-4">
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Name</label>
+					<input type="text" name="name" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Slug</label>
+					<input type="text" name="slug" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Engine</label>
+					<select name="engine" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+						<option value="postgres">PostgreSQL</option>
+						<option value="mysql">MySQL</option>
+						<option value="redis">Redis</option>
+						<option value="mongodb">MongoDB</option>
+					</select>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Version</label>
+					<input type="text" name="version" value="latest" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Username</label>
+					<input type="text" name="username" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Password</label>
+					<input type="text" name="password" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Database Name</label>
+					<input type="text" name="database_name" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Port</label>
+					<input type="number" name="port" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div class="flex gap-2">
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Create</button>
+					<a href="/projects" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancel</a>
+				</div>
+			</form>
+		</div>
+	</div>
+}

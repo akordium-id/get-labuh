@@ -36,6 +36,7 @@ type Application struct {
 	ContainerID     *string
 	ContainerName   *string
 	Status          AppStatus
+	WebhookSecret   *string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -52,6 +53,7 @@ type CreateApplicationInput struct {
 	DockerImage    *string
 	CustomDomain   *string
 	AppPort        int
+	WebhookSecret  *string
 }
 
 type AppEnvVar struct {
