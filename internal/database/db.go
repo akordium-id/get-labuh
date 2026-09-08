@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"os"
+	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -31,6 +32,35 @@ func RunMigrations(db *sql.DB, migrationPath string) error {
 
 	_, err = db.Exec(string(content))
 	return err
+}
+
+func RunAllMigrations(db *sql.DB) error {
+	migrationsDir := "internal/database/migrations"
+	entries, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if filepath.Ext(entry.Name()) != ".sql" {
+			continue
+		}
+
+		path := filepath.Join(migrationsDir, entry.Name())
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		if _, err := db.Exec(string(content)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func Close() error {
