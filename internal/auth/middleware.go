@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/faiq/labuh/internal/database/repo"
-	"github.com/faiq/labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/models"
 )
 
 type contextKey string

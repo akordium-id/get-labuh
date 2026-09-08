@@ -1,4 +1,4 @@
-module github.com/faiq/labuh
+module github.com/akordium-id/get-labuh
 
 go 1.26.0
 

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/faiq/labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/google/uuid"
 )
 

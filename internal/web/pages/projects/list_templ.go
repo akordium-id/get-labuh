@@ -8,7 +8,7 @@ package projects
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/faiq/labuh/internal/models"
+import "github.com/akordium-id/get-labuh/internal/models"
 
 func ProjectsListPage(projects []*models.Project, envCounts map[string]int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {

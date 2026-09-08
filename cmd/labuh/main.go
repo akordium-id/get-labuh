@@ -10,13 +10,13 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/faiq/labuh/internal/auth"
-	"github.com/faiq/labuh/internal/database"
-	"github.com/faiq/labuh/internal/database/repo"
-	"github.com/faiq/labuh/internal/handler"
-	"github.com/faiq/labuh/internal/web/layouts"
-	"github.com/faiq/labuh/internal/web/pages"
-	"github.com/faiq/labuh/internal/web/pages/projects"
+	"github.com/akordium-id/get-labuh/internal/auth"
+	"github.com/akordium-id/get-labuh/internal/database"
+	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/handler"
+	"github.com/akordium-id/get-labuh/internal/web/layouts"
+	"github.com/akordium-id/get-labuh/internal/web/pages"
+	"github.com/akordium-id/get-labuh/internal/web/pages/projects"
 )
 
 func main() {

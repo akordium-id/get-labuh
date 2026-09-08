@@ -7,10 +7,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"github.com/a-h/templ"
 
-	"github.com/faiq/labuh/internal/auth"
-	"github.com/faiq/labuh/internal/database/repo"
-	"github.com/faiq/labuh/internal/models"
-	"github.com/faiq/labuh/internal/web/pages"
+	"github.com/akordium-id/get-labuh/internal/auth"
+	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/pages"
 )
 
 type AuthHandler struct {
