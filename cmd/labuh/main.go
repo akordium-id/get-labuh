@@ -10,13 +10,16 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/faiq/labuh/internal/auth"
-	"github.com/faiq/labuh/internal/database"
-	"github.com/faiq/labuh/internal/database/repo"
-	"github.com/faiq/labuh/internal/handler"
-	"github.com/faiq/labuh/internal/web/layouts"
-	"github.com/faiq/labuh/internal/web/pages"
-	"github.com/faiq/labuh/internal/web/pages/projects"
+	"github.com/akordium-id/get-labuh/internal/auth"
+	"github.com/akordium-id/get-labuh/internal/database"
+	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/handler"
+	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/layouts"
+	"github.com/akordium-id/get-labuh/internal/web/pages"
+	"github.com/akordium-id/get-labuh/internal/web/pages/projects"
+	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
 func main() {
@@ -28,18 +31,33 @@ func main() {
 	}
 	defer database.Close()
 
-	if err := database.RunMigrations(db, "internal/database/migrations/001_init.sql"); err != nil {
+	if err := database.RunAllMigrations(db); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	userRepo := repo.NewUserRepo(db)
 	sessionRepo := repo.NewSessionRepo(db)
 	projectRepo := repo.NewProjectRepo(db)
+	appRepo := repo.NewApplicationRepo(db)
+	deployRepo := repo.NewDeploymentRepo(db)
+	envVarRepo := repo.NewEnvVarRepo(db)
 
 	authHandler := handler.NewAuthHandler(userRepo, sessionRepo, false)
 	projectsHandler := handler.NewProjectsHandler(projectRepo)
+	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo)
+	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
+	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
 
 	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
+
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		log.Fatalf("Failed to connect to Docker: %v", err)
+	}
+
+	deployWorker := worker.NewDeployWorker(10)
+	deployWorker.Start(dockerClient)
+	defer deployWorker.Stop()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -68,6 +86,44 @@ func main() {
 		r.Get("/projects/create", func(w http.ResponseWriter, r *http.Request) {
 			templ.Handler(layouts.AppLayout(projects.ProjectCreatePage())).ServeHTTP(w, r)
 		})
+
+		r.Get("/projects/{project_id}/environments/{env_id}/applications", applicationsHandler.List)
+		r.Post("/projects/{project_id}/environments/{env_id}/applications", applicationsHandler.Create)
+		r.Get("/applications/{id}", applicationsHandler.Get)
+		r.Post("/applications/{id}/start", applicationsHandler.Start)
+		r.Post("/applications/{id}/stop", applicationsHandler.Stop)
+		r.Post("/applications/{id}/restart", applicationsHandler.Restart)
+		r.Post("/applications/{id}/deploy", applicationsHandler.Deploy)
+		r.Post("/applications/{id}/env-vars", applicationsHandler.CreateEnvVar)
+		r.Post("/applications/{id}/env-vars/{var_id}/delete", applicationsHandler.DeleteEnvVar)
+
+		r.Get("/deployments/{id}", deploymentsHandler.Get)
+		r.Get("/deployments/{id}/logs", deploymentsHandler.Logs)
+		r.Get("/deployments/{id}/logs/stream", logsHandler.StreamDeploymentLogs)
+		r.Get("/applications/{id}/logs/stream", logsHandler.StreamContainerLogs)
+	})
+
+	r.Post("/deployments/{id}/start", func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+
+		deployment, err := deployRepo.GetByID(id)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+
+		logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
+		_ = deployRepo.MarkStarted(deployment.ID)
+		_ = deployRepo.UpdateStatus(deployment.ID, models.DeployStatusCloning)
+		_ = logPath
+		_ = appRepo
+
+		w.Header().Set("HX-Redirect", "/deployments/"+id)
+		w.WriteHeader(http.StatusOK)
 	})
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {

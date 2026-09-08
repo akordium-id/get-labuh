@@ -1,0 +1,248 @@
+package handler
+
+import (
+	"net/http"
+	"strconv"
+
+	"github.com/a-h/templ"
+	"github.com/go-chi/chi/v5"
+
+	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/layouts"
+	"github.com/akordium-id/get-labuh/internal/web/pages/applications"
+)
+
+type ApplicationsHandler struct {
+	appRepo    *repo.ApplicationRepo
+	envRepo    *repo.ProjectRepo
+	deployRepo *repo.DeploymentRepo
+	envVarRepo *repo.EnvVarRepo
+}
+
+func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo, envVarRepo *repo.EnvVarRepo) *ApplicationsHandler {
+	return &ApplicationsHandler{
+		appRepo:    appRepo,
+		envRepo:    envRepo,
+		deployRepo: deployRepo,
+		envVarRepo: envVarRepo,
+	}
+}
+
+func (h *ApplicationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		if r.URL.Path == "/applications" {
+			h.List(w, r)
+		} else {
+			h.Get(w, r)
+		}
+	case http.MethodPost:
+		h.Create(w, r)
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *ApplicationsHandler) List(w http.ResponseWriter, r *http.Request) {
+	envID := chi.URLParam(r, "env_id")
+	if envID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	apps, err := h.appRepo.GetByEnvironmentID(envID)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	templ.Handler(layouts.AppLayout(applications.ApplicationsListPage(apps))).ServeHTTP(w, r)
+}
+
+func (h *ApplicationsHandler) Create(w http.ResponseWriter, r *http.Request) {
+	envID := chi.URLParam(r, "env_id")
+	if envID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("name")
+	sourceType := r.FormValue("source_type")
+	repoURL := r.FormValue("repository_url")
+	branch := r.FormValue("branch")
+	dockerImage := r.FormValue("docker_image")
+	appPort, _ := strconv.Atoi(r.FormValue("app_port"))
+	if appPort == 0 {
+		appPort = 8080
+	}
+
+	slug := repo.GenerateSlug(name)
+
+	var repoURLPtr *string
+	if repoURL != "" {
+		repoURLPtr = &repoURL
+	}
+	var branchPtr *string
+	if branch != "" {
+		branchPtr = &branch
+	}
+	var dockerImagePtr *string
+	if dockerImage != "" {
+		dockerImagePtr = &dockerImage
+	}
+
+	_, err := h.appRepo.Create(models.CreateApplicationInput{
+		EnvironmentID: envID,
+		Name:          name,
+		Slug:          slug,
+		SourceType:    models.SourceType(sourceType),
+		RepositoryURL: repoURLPtr,
+		Branch:        branchPtr,
+		DockerImage:   dockerImagePtr,
+		AppPort:       appPort,
+	})
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/projects/"+chi.URLParam(r, "project_id")+"/environments/"+envID+"/applications")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	deployments, _ := h.deployRepo.GetByApplicationID(id)
+	envVars, _ := h.envVarRepo.GetByApplicationID(id)
+
+	templ.Handler(layouts.AppLayout(applications.ApplicationDetailPage(app, deployments, envVars))).ServeHTTP(w, r)
+}
+
+func (h *ApplicationsHandler) Start(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_ = h.appRepo.UpdateStatus(id, models.AppStatusRunning)
+	w.Header().Set("HX-Redirect", "/applications/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) Stop(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_ = h.appRepo.UpdateStatus(id, models.AppStatusStopped)
+	w.Header().Set("HX-Redirect", "/applications/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) Restart(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_ = h.appRepo.UpdateStatus(id, models.AppStatusIdle)
+	w.Header().Set("HX-Redirect", "/applications/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) Deploy(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	deployment, err := h.deployRepo.Create(models.CreateDeploymentInput{
+		ApplicationID: app.ID,
+	})
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	_ = h.appRepo.UpdateStatus(app.ID, models.AppStatusBuilding)
+	_ = h.deployRepo.MarkStarted(deployment.ID)
+
+	logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
+	_ = h.deployRepo.UpdateStatus(deployment.ID, models.DeployStatusCloning)
+	_ = logPath
+
+	w.Header().Set("HX-Redirect", "/deployments/"+deployment.ID)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) CreateEnvVar(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	if appID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	key := r.FormValue("key")
+	value := r.FormValue("value")
+	isSecret := r.FormValue("is_secret") == "on"
+
+	_, err := h.envVarRepo.Create(models.CreateAppEnvVarInput{
+		ApplicationID: appID,
+		Key:           key,
+		Value:         value,
+		IsSecret:      isSecret,
+	})
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+appID)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) DeleteEnvVar(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	varID := chi.URLParam(r, "var_id")
+	if appID == "" || varID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_ = h.envVarRepo.Delete(varID)
+	w.Header().Set("HX-Redirect", "/applications/"+appID)
+	w.WriteHeader(http.StatusOK)
+}
