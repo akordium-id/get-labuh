@@ -10,12 +10,14 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/akordium-id/get-labuh/internal/api"
 	"github.com/akordium-id/get-labuh/internal/auth"
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/handler"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages"
 	"github.com/akordium-id/get-labuh/internal/web/pages/compose"
@@ -46,6 +48,10 @@ func main() {
 	composeRepo := repo.NewComposeRepo(db)
 	databaseRepo := repo.NewDatabaseRepo(db)
 	deployKeyRepo := repo.NewDeployKeyRepo(db)
+	templateRepo := repo.NewTemplateRepo(db)
+	apiKeyRepo := repo.NewApiKeyRepo(db)
+
+	seedTemplates(templateRepo)
 
 	authHandler := handler.NewAuthHandler(userRepo, sessionRepo, false)
 	projectsHandler := handler.NewProjectsHandler(projectRepo)
@@ -57,8 +63,12 @@ func main() {
 	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
+	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
+	apiKeysHandler := handler.NewAPIKeysHandler(apiKeyRepo, userRepo)
 
 	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
+
+	api.NewAPIKeyAuthMiddleware(apiKeyRepo, userRepo)
 
 	dockerClient, err := docker.NewClient()
 	if err != nil {
@@ -72,6 +82,20 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"healthy"}`))
+	})
+	r.Get("/metrics", observability.MetricsHandler)
+
+	apiRouter := api.NewRouter(
+		api.NewProjectsHandler(projectRepo),
+		api.NewApplicationsHandler(appRepo, projectRepo, deployRepo),
+		api.NewDeploymentsHandler(deployRepo, appRepo),
+	)
+	r.Mount("/api/v1", apiRouter)
 
 	r.Group(func(r chi.Router) {
 		r.Get("/auth/login", authHandler.LoginPage)
@@ -99,6 +123,10 @@ func main() {
 		r.Get("/projects/{id}/deploy-keys", deployKeysHandler.List)
 		r.Post("/projects/{id}/deploy-keys", deployKeysHandler.Create)
 		r.Post("/deploy-keys/{id}/delete", deployKeysHandler.Delete)
+
+		r.Get("/templates", templatesHandler.List)
+		r.Get("/templates/{id}", templatesHandler.Get)
+		r.Post("/templates/{id}/deploy", templatesHandler.Deploy)
 
 		r.Get("/projects/{project_id}/environments/{env_id}/applications", applicationsHandler.List)
 		r.Post("/projects/{project_id}/environments/{env_id}/applications", applicationsHandler.Create)
@@ -136,6 +164,10 @@ func main() {
 		r.Get("/deployments/{id}/logs", deploymentsHandler.Logs)
 		r.Get("/deployments/{id}/logs/stream", logsHandler.StreamDeploymentLogs)
 		r.Get("/applications/{id}/logs/stream", logsHandler.StreamContainerLogs)
+
+		r.Get("/settings/api-keys", apiKeysHandler.List)
+		r.Post("/settings/api-keys/create", apiKeysHandler.Create)
+		r.Post("/settings/api-keys/{id}/delete", apiKeysHandler.Delete)
 	})
 
 	r.Post("/deployments/{id}/start", func(w http.ResponseWriter, r *http.Request) {
@@ -190,4 +222,54 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("Server shutdown error: %v", err)
 	}
+}
+
+func seedTemplates(templateRepo *repo.TemplateRepo) {
+	templates, _ := templateRepo.GetAll()
+	if len(templates) > 0 {
+		return
+	}
+
+	templatesToSeed := []models.CreateServiceTemplateInput{
+		{
+			Name:        "WordPress",
+			Description: strPtr("WordPress is a free and open-source content management system."),
+			SourceType:  models.TemplateSourceGit,
+			RepositoryURL: strPtr("https://github.com/wordpress/wordpress"),
+			Category:   models.TemplateCategoryCMS,
+			IsOfficial: true,
+		},
+		{
+			Name:        "Ghost",
+			Description: strPtr("Ghost is a modern, professional publishing platform."),
+			SourceType:  models.TemplateSourceGit,
+			RepositoryURL: strPtr("https://github.com/TryGhost/Ghost"),
+			Category:   models.TemplateCategoryCMS,
+			IsOfficial: true,
+		},
+		{
+			Name:        "Grafana",
+			Description: strPtr("Grafana is an open source analytics and interactive visualization web platform."),
+			SourceType:  models.TemplateSourceDockerImage,
+			DockerImage: strPtr("grafana/grafana"),
+			Category:   models.TemplateCategoryMonitoring,
+			IsOfficial: true,
+		},
+		{
+			Name:        "Minio",
+			Description: strPtr("MinIO is a high-performance, S3 compatible object store."),
+			SourceType:  models.TemplateSourceDockerImage,
+			DockerImage: strPtr("minio/minio"),
+			Category:   models.TemplateCategoryStorage,
+			IsOfficial: true,
+		},
+	}
+
+	for _, t := range templatesToSeed {
+		_, _ = templateRepo.Create(t)
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
 }
