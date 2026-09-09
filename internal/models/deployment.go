@@ -1,5 +1,15 @@
 package models
 
+type DeployStep string
+
+const (
+	DeployStepClone   DeployStep = "clone"
+	DeployStepBuild   DeployStep = "build"
+	DeployStepPush    DeployStep = "push"
+	DeployStepDeploy  DeployStep = "deploy"
+	DeployStepCleanup DeployStep = "cleanup"
+)
+
 type DeploymentJob struct {
 	DeploymentID   string
 	ApplicationID  string

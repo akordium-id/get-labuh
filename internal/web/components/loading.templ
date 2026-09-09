@@ -1,0 +1,10 @@
+package components
+
+templ Loading(size, text string) {
+	<div class="flex items-center justify-center py-12">
+		<div class={ "animate-spin rounded-full border-b-2 border-blue-600 " + size }></div>
+		if text != "" {
+			<span class="ml-3 text-gray-600">{ text }</span>
+		}
+	</div>
+}

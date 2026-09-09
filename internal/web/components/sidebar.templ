@@ -6,13 +6,36 @@ templ Sidebar() {
 			<h1 class="text-xl font-bold">Labuh</h1>
 		</div>
 		<nav class="flex-1 p-4 space-y-2">
-			<a href="/dashboard" class="block px-4 py-2 rounded hover:bg-gray-800">Dashboard</a>
-			<a href="/projects" class="block px-4 py-2 rounded hover:bg-gray-800">Projects</a>
-			<a href="/templates" class="block px-4 py-2 rounded hover:bg-gray-800">Templates</a>
-			<a href="#" class="block px-4 py-2 rounded hover:bg-gray-800">Applications</a>
-			<a href="#" class="block px-4 py-2 rounded hover:bg-gray-800">Servers</a>
-			<a href="/settings/api-keys" class="block px-4 py-2 rounded hover:bg-gray-800">API Keys</a>
-			<a href="#" class="block px-4 py-2 rounded hover:bg-gray-800">Settings</a>
+			<a href="/dashboard" 
+			   class="block px-4 py-2 rounded"
+			   :class="window.location.pathname === '/dashboard' ? 'bg-gray-800' : 'hover:bg-gray-800'">
+				Dashboard
+			</a>
+			<a href="/projects" 
+			   class="block px-4 py-2 rounded"
+			   :class="window.location.pathname.startsWith('/projects') || window.location.pathname.startsWith('/templates') ? 'bg-gray-800' : 'hover:bg-gray-800'">
+				Projects
+			</a>
+			<a href="/templates" 
+			   class="block px-4 py-2 rounded"
+			   :class="window.location.pathname === '/templates' ? 'bg-gray-800' : 'hover:bg-gray-800'">
+				Templates
+			</a>
+			<a href="#" 
+			   class="block px-4 py-2 rounded"
+			   :class="window.location.pathname.startsWith('/applications') ? 'bg-gray-800' : 'hover:bg-gray-800'">
+				Applications
+			</a>
+			<a href="#" 
+			   class="block px-4 py-2 rounded"
+			   :class="window.location.pathname.startsWith('/servers') ? 'bg-gray-800' : 'hover:bg-gray-800'">
+				Servers
+			</a>
+			<a href="/settings/api-keys" 
+			   class="block px-4 py-2 rounded"
+			   :class="window.location.pathname.startsWith('/settings') ? 'bg-gray-800' : 'hover:bg-gray-800'">
+				Settings
+			</a>
 		</nav>
 		<div class="p-4 border-t border-gray-800">
 			<form action="/auth/logout" method="get">

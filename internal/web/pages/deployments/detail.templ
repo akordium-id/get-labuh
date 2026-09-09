@@ -1,15 +1,90 @@
 package deployments
 
-import "time"
+import (
+	"time"
+
+	"github.com/akordium-id/get-labuh/internal/models"
+)
+
+func statusColor(status models.DeployStatus) string {
+	switch status {
+	case models.DeployStatusSuccess:
+		return "bg-green-100 text-green-800"
+	case models.DeployStatusFailed:
+		return "bg-red-100 text-red-800"
+	case models.DeployStatusCloning, models.DeployStatusBuilding, models.DeployStatusDeploying:
+		return "bg-blue-100 text-blue-800"
+	case models.DeployStatusQueued:
+		return "bg-gray-100 text-gray-800"
+	case models.DeployStatusCancelled:
+		return "bg-yellow-100 text-yellow-800"
+	default:
+		return "bg-gray-100 text-gray-800"
+	}
+}
 
 templ DeploymentDetailPage(deployment interface{}, app interface{}) {
 	<div>
 		<h1 class="text-3xl font-bold text-gray-900 mb-6">Deployment Detail</h1>
+
+		if d, ok := deployment.(*models.Deployment); ok && d.ErrorMessage != nil && *d.ErrorMessage != "" {
+			<div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+				<p class="text-red-800 font-medium">Deployment Failed</p>
+				<p class="text-red-600 text-sm mt-1">{ *d.ErrorMessage }</p>
+			</div>
+		}
+
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+			<div class="flex items-center justify-between mb-4">
+				<div>
+					<span class={ "px-3 py-1 rounded-full text-sm font-medium " + statusColor(deployment.(*models.Deployment).Status) }>
+						{ deployment.(*models.Deployment).Status }
+					</span>
+				</div>
+				<div class="text-sm text-gray-500">
+					Started: { time.Now().Format("2006-01-02 15:04:05") }
+				</div>
+			</div>
+
+			if d, ok := deployment.(*models.Deployment); ok && d.Step != nil {
+				<div class="mt-4">
+					<h3 class="text-sm font-medium text-gray-700 mb-2">Deployment Steps</h3>
+					<div class="flex items-center space-x-2">
+						<div class={ "px-3 py-1 rounded-full text-xs " + stepColor("clone", *d.Step) }>Clone</div>
+						<div class={ "px-3 py-1 rounded-full text-xs " + stepColor("build", *d.Step) }>Build</div>
+						<div class={ "px-3 py-1 rounded-full text-xs " + stepColor("push", *d.Step) }>Push</div>
+						<div class={ "px-3 py-1 rounded-full text-xs " + stepColor("deploy", *d.Step) }>Deploy</div>
+						<div class={ "px-3 py-1 rounded-full text-xs " + stepColor("cleanup", *d.Step) }>Cleanup</div>
+					</div>
+				</div>
+			}
+		</div>
+
 		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-			<p class="text-gray-600">Deployment detail placeholder</p>
-			<p class="text-sm text-gray-500 mt-2">Started: { time.Now().Format("2006-01-02 15:04:05") }</p>
+			<p class="text-gray-600">Deployment logs will appear here.</p>
 		</div>
 	</div>
+}
+
+func stepColor(step, currentStep string) string {
+	steps := []string{"clone", "build", "push", "deploy", "cleanup"}
+	currentIdx := -1
+	stepIdx := -1
+	for i, s := range steps {
+		if s == currentStep {
+			currentIdx = i
+		}
+		if s == step {
+			stepIdx = i
+		}
+	}
+	if stepIdx < currentIdx {
+		return "bg-green-100 text-green-800"
+	}
+	if stepIdx == currentIdx {
+		return "bg-blue-100 text-blue-800"
+	}
+	return "bg-gray-100 text-gray-800"
 }
 
 templ DeploymentLogsPage(deployment interface{}, logs []string) {

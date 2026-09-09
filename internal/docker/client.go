@@ -35,10 +35,6 @@ func (c *Client) StartContainer(ctx context.Context, containerID string) error {
 	return nil
 }
 
-func (c *Client) StopContainer(ctx context.Context, containerID string) error {
-	return nil
-}
-
 func (c *Client) RemoveContainer(ctx context.Context, containerID string) error {
 	return nil
 }

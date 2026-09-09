@@ -2,13 +2,13 @@ package observability
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type HealthStatus string
@@ -119,9 +119,5 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 }
 
 func generateRequestID() string {
-	bytes := make([]byte, 16)
-	if _, err := rand.Read(bytes); err != nil {
-		return "unknown"
-	}
-	return hex.EncodeToString(bytes)
+	return uuid.New().String()
 }

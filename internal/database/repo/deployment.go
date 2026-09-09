@@ -23,15 +23,17 @@ func (r *DeploymentRepo) Create(input models.CreateDeploymentInput) (*models.Dep
 		CommitHash:    input.CommitHash,
 		CommitMessage: input.CommitMessage,
 		Status:        models.DeployStatusQueued,
+		Step:          input.Step,
+		Output:        input.Output,
 		ErrorMessage:  nil,
 		LogPath:       input.LogPath,
 		CreatedAt:     time.Now(),
 	}
 
 	_, err := r.db.Exec(
-		`INSERT INTO deployments (id, application_id, commit_hash, commit_message, status, error_message, log_path, started_at, finished_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		deployment.ID, deployment.ApplicationID, deployment.CommitHash, deployment.CommitMessage, deployment.Status, deployment.ErrorMessage, deployment.LogPath, nil, nil, deployment.CreatedAt,
+		`INSERT INTO deployments (id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		deployment.ID, deployment.ApplicationID, deployment.CommitHash, deployment.CommitMessage, deployment.Status, deployment.Step, deployment.Output, deployment.ErrorMessage, deployment.LogPath, nil, nil, deployment.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -43,10 +45,10 @@ func (r *DeploymentRepo) Create(input models.CreateDeploymentInput) (*models.Dep
 func (r *DeploymentRepo) GetByID(id string) (*models.Deployment, error) {
 	deployment := &models.Deployment{}
 	err := r.db.QueryRow(
-		`SELECT id, application_id, commit_hash, commit_message, status, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments WHERE id = ?`,
 		id,
-	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +58,7 @@ func (r *DeploymentRepo) GetByID(id string) (*models.Deployment, error) {
 
 func (r *DeploymentRepo) GetByApplicationID(appID string) ([]*models.Deployment, error) {
 	rows, err := r.db.Query(
-		`SELECT id, application_id, commit_hash, commit_message, status, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments WHERE application_id = ? ORDER BY created_at DESC`,
 		appID,
 	)
@@ -68,7 +70,7 @@ func (r *DeploymentRepo) GetByApplicationID(appID string) ([]*models.Deployment,
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -96,6 +98,24 @@ func (r *DeploymentRepo) UpdateStatusWithError(id string, status models.DeploySt
 	return err
 }
 
+func (r *DeploymentRepo) UpdateStep(id, step string) error {
+	now := time.Now()
+	_, err := r.db.Exec(
+		`UPDATE deployments SET step = ?, updated_at = ? WHERE id = ?`,
+		step, now, id,
+	)
+	return err
+}
+
+func (r *DeploymentRepo) UpdateOutput(id, output string) error {
+	now := time.Now()
+	_, err := r.db.Exec(
+		`UPDATE deployments SET output = ?, updated_at = ? WHERE id = ?`,
+		output, now, id,
+	)
+	return err
+}
+
 func (r *DeploymentRepo) MarkStarted(id string) error {
 	now := time.Now()
 	_, err := r.db.Exec(
@@ -116,7 +136,7 @@ func (r *DeploymentRepo) MarkFinished(id string) error {
 
 func (r *DeploymentRepo) GetByProjectID(projectID string) ([]*models.Deployment, error) {
 	rows, err := r.db.Query(
-		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.status, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
+		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.status, d.step, d.output, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
 		 FROM deployments d
 		 JOIN applications a ON d.application_id = a.id
 		 JOIN environments e ON a.environment_id = e.id
@@ -132,7 +152,7 @@ func (r *DeploymentRepo) GetByProjectID(projectID string) ([]*models.Deployment,
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +164,7 @@ func (r *DeploymentRepo) GetByProjectID(projectID string) ([]*models.Deployment,
 
 func (r *DeploymentRepo) GetByEnvironmentID(envID string) ([]*models.Deployment, error) {
 	rows, err := r.db.Query(
-		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.status, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
+		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.status, d.step, d.output, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
 		 FROM deployments d
 		 JOIN applications a ON d.application_id = a.id
 		 WHERE a.environment_id = ?
@@ -159,7 +179,7 @@ func (r *DeploymentRepo) GetByEnvironmentID(envID string) ([]*models.Deployment,
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -172,13 +192,13 @@ func (r *DeploymentRepo) GetByEnvironmentID(envID string) ([]*models.Deployment,
 func (r *DeploymentRepo) GetPreviousSuccessful(appID string) (*models.Deployment, error) {
 	deployment := &models.Deployment{}
 	err := r.db.QueryRow(
-		`SELECT id, application_id, commit_hash, commit_message, status, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments
 		 WHERE application_id = ? AND status = ?
 		 ORDER BY created_at DESC
 		 LIMIT 1`,
 		appID, models.DeployStatusSuccess,
-	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
