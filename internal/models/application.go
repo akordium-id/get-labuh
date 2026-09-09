@@ -100,6 +100,7 @@ type Deployment struct {
 	StartedAt      *time.Time
 	FinishedAt     *time.Time
 	CreatedAt      time.Time
+	Priority       int
 }
 
 type CreateDeploymentInput struct {
