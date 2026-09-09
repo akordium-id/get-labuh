@@ -1,0 +1,48 @@
+{
+  "name": "Labuh",
+  "description": "Self-hosted PaaS built with Go",
+  "version": "1.0.0",
+  "image": "labuh",
+  "port": 3000,
+  "env": [
+    {
+      "key": "PORT",
+      "value": "3000"
+    },
+    {
+      "key": "DATABASE_URL",
+      "value": "/var/lib/labuh/labuh.db"
+    },
+    {
+      "key": "SESSION_SECRET",
+      "required": true,
+      "description": "Secret key for session encryption"
+    },
+    {
+      "key": "LABUH_MASTER_KEY",
+      "required": true,
+      "description": "Master key for encryption"
+    },
+    {
+      "key": "TRUSTED_PROXIES",
+      "value": ""
+    }
+  ],
+  "volumes": [
+    {
+      "name": "labuh_data",
+      "mountPath": "/var/lib/labuh"
+    }
+  ],
+  "docker": {
+    "buildContext": ".",
+    "dockerfile": "Dockerfile",
+    "socketMount": true
+  },
+  "healthCheck": {
+    "path": "/health",
+    "port": 3000,
+    "initialDelaySeconds": 10,
+    "periodSeconds": 30
+  }
+}

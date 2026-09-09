@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Cache Node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          npm install -g tailwindcss @tailwindcss/cli
+
+      - name: Build
+        run: |
+          templ generate
+          tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --minify || true
+          go build -o labuh ./cmd/labuh
+
+      - name: Run tests
+        run: go test -count=1 ./internal/models ./internal/database/repo ./internal/handler ./internal/docker ./internal/caddy
+
+      - name: Create release archive
+        run: |
+          tar -czf labuh-linux-amd64.tar.gz labuh docker-compose.yml nixpacks.toml .nixpacksignore
+
+      - name: Generate checksum
+        run: sha256sum labuh-linux-amd64.tar.gz > labuh-linux-amd64.tar.gz.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            labuh-linux-amd64.tar.gz
+            labuh-linux-amd64.tar.gz.sha256
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

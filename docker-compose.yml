@@ -1,0 +1,25 @@
+services:
+  labuh:
+    build: .
+    container_name: labuh
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - labuh_data:/var/lib/labuh
+    environment:
+      - PORT=3000
+      - DATABASE_URL=/var/lib/labuh/labuh.db
+      - SESSION_SECRET=${SESSION_SECRET}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
+      - LABUH_MASTER_KEY=${LABUH_MASTER_KEY}
+    networks:
+      - labuh
+
+volumes:
+  labuh_data:
+
+networks:
+  labuh:
+    driver: bridge

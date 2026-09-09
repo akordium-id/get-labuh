@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["go", "nodejs", "sqlite", "gcc"]
+
+[phases.install]
+cmds = ["npm install -g tailwindcss @tailwindcss/cli"]
+
+[phases.build]
+cmds = ["templ generate", "tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --minify", "go build -o labuh ./cmd/labuh"]
+
+[start]
+cmd = "./labuh"
+
+[variables]
+CGO_ENABLED = "1"
