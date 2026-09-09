@@ -109,6 +109,14 @@ func (r *ComposeRepo) UpdateStatus(id string, status models.ComposeStatus) error
 	return err
 }
 
+func (r *ComposeRepo) UpdateCustomDomain(id string, customDomain *string) error {
+	_, err := r.db.Exec(
+		`UPDATE compose_applications SET custom_domain = ?, updated_at = ? WHERE id = ?`,
+		customDomain, time.Now(), id,
+	)
+	return err
+}
+
 func (r *ComposeRepo) Delete(id string) error {
 	_, err := r.db.Exec("DELETE FROM compose_applications WHERE id = ?", id)
 	return err

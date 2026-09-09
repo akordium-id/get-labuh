@@ -6,6 +6,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
@@ -15,12 +16,16 @@ import (
 type ComposeHandler struct {
 	composeRepo *repo.ComposeRepo
 	envRepo     *repo.ProjectRepo
+	caddyClient *caddy.Client
+	settingRepo *repo.SettingRepo
 }
 
-func NewComposeHandler(composeRepo *repo.ComposeRepo, envRepo *repo.ProjectRepo) *ComposeHandler {
+func NewComposeHandler(composeRepo *repo.ComposeRepo, envRepo *repo.ProjectRepo, caddyClient *caddy.Client, settingRepo *repo.SettingRepo) *ComposeHandler {
 	return &ComposeHandler{
 		composeRepo: composeRepo,
 		envRepo:     envRepo,
+		caddyClient: caddyClient,
+		settingRepo: settingRepo,
 	}
 }
 
@@ -151,6 +156,79 @@ func (h *ComposeHandler) Start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = h.composeRepo.UpdateStatus(id, models.ComposeStatusRunning)
+	w.Header().Set("HX-Redirect", "/compose-apps/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ComposeHandler) SetDomain(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	domain := r.FormValue("custom_domain")
+	if domain == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	composeApp, err := h.composeRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	domainPtr := &domain
+	if err := h.composeRepo.UpdateCustomDomain(id, domainPtr); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if h.caddyClient != nil {
+		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
+		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
+		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
+
+		_ = composeApp
+		_ = client
+	}
+
+	w.Header().Set("HX-Redirect", "/compose-apps/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ComposeHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	composeApp, err := h.composeRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.composeRepo.UpdateCustomDomain(id, nil); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if h.caddyClient != nil && composeApp.CustomDomain != nil && *composeApp.CustomDomain != "" {
+		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
+		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
+		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
+
+		_ = client
+	}
+
 	w.Header().Set("HX-Redirect", "/compose-apps/"+id)
 	w.WriteHeader(http.StatusOK)
 }

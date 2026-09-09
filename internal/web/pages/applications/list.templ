@@ -112,76 +112,67 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 			</div>
 
 			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<h2 class="text-xl font-bold text-gray-900 mb-4">Environment Variables</h2>
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars") } method="post" class="mb-4 flex gap-2">
-					<input type="text" name="key" placeholder="KEY" class="border border-gray-300 rounded px-2 py-1 text-sm w-32" required>
-					<input type="text" name="value" placeholder="value" class="border border-gray-300 rounded px-2 py-1 text-sm flex-1" required>
-					<label class="flex items-center text-sm">
-						<input type="checkbox" name="is_secret" class="mr-1">
-						Secret
-					</label>
-					<button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Add</button>
-				</form>
-				<table class="min-w-full divide-y divide-gray-200">
-					<thead class="bg-gray-50">
-						<tr>
-							<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Key</th>
-							<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-							<th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
-						</tr>
-					</thead>
-					<tbody class="bg-white divide-y divide-gray-200">
-						for _, envVar := range envVars {
-							<tr>
-								<td class="px-4 py-2 text-sm text-gray-900">{ envVar.Key }</td>
-								<td class="px-4 py-2 text-sm text-gray-500">
-									if envVar.IsSecret {
-										••••••••
-									} else {
-										{ envVar.Value }
-									}
-								</td>
-								<td class="px-4 py-2 text-right">
-									<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete") } method="post" class="inline">
-										<button type="submit" class="text-red-600 hover:text-red-900 text-sm">Delete</button>
-									</form>
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
+				<h2 class="text-xl font-bold text-gray-900 mb-4">Custom Domain</h2>
+				if app.CustomDomain != nil {
+					<dl class="space-y-3 mb-4">
+						<div class="flex justify-between">
+							<dt class="text-gray-600">Domain</dt>
+							<dd class="text-gray-900">{ *app.CustomDomain }</dd>
+						</div>
+						<div class="flex justify-between">
+							<dt class="text-gray-600">HTTPS</dt>
+							<dd class="text-green-600">Enabled (via Caddy)</dd>
+						</div>
+					</dl>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/domain/remove") } method="post" class="inline">
+						<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Remove Domain</button>
+					</form>
+				} else {
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/domain") } method="post" class="space-y-4">
+						<div>
+							<label class="block text-sm font-medium text-gray-700">Custom Domain</label>
+							<input type="text" name="custom_domain" placeholder="example.com" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" required>
+						</div>
+						<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Set Domain</button>
+					</form>
+				}
 			</div>
 		</div>
 
 		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
-			<h2 class="text-xl font-bold text-gray-900 mb-4">Deployments</h2>
+			<h2 class="text-xl font-bold text-gray-900 mb-4">Environment Variables</h2>
+			<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars") } method="post" class="mb-4 flex gap-2">
+				<input type="text" name="key" placeholder="KEY" class="border border-gray-300 rounded px-2 py-1 text-sm w-32" required>
+				<input type="text" name="value" placeholder="value" class="border border-gray-300 rounded px-2 py-1 text-sm flex-1" required>
+				<label class="flex items-center text-sm">
+					<input type="checkbox" name="is_secret" class="mr-1">
+					Secret
+				</label>
+				<button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Add</button>
+			</form>
 			<table class="min-w-full divide-y divide-gray-200">
 				<thead class="bg-gray-50">
 					<tr>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commit</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+						<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Key</th>
+						<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+						<th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
 					</tr>
 				</thead>
 				<tbody class="bg-white divide-y divide-gray-200">
-					for _, deployment := range deployments {
+					for _, envVar := range envVars {
 						<tr>
-							<td class="px-6 py-4 text-sm text-gray-900 font-mono">{ deployment.ID[:8] }</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-									{ deployment.Status }
-								</span>
-							</td>
-							<td class="px-6 py-4 text-sm text-gray-500">
-								if deployment.CommitHash != nil {
-									{ *deployment.CommitHash }
+							<td class="px-4 py-2 text-sm text-gray-900">{ envVar.Key }</td>
+							<td class="px-4 py-2 text-sm text-gray-500">
+								if envVar.IsSecret {
+									••••••••
+								} else {
+									{ envVar.Value }
 								}
 							</td>
-							<td class="px-6 py-4 text-sm text-gray-500">{ deployment.CreatedAt.Format("2006-01-02 15:04:05") }</td>
-							<td class="px-6 py-4 text-right">
-								<a href={ templ.SafeURL("/deployments/" + deployment.ID) } class="text-blue-600 hover:text-blue-900 text-sm">View</a>
+							<td class="px-4 py-2 text-right">
+								<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete") } method="post" class="inline">
+									<button type="submit" class="text-red-600 hover:text-red-900 text-sm">Delete</button>
+								</form>
 							</td>
 						</tr>
 					}

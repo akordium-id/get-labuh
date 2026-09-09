@@ -207,6 +207,14 @@ func (r *ApplicationRepo) Move(id, targetEnvID string) error {
 	return err
 }
 
+func (r *ApplicationRepo) UpdateCustomDomain(id string, customDomain *string) error {
+	_, err := r.db.Exec(
+		`UPDATE applications SET custom_domain = ?, updated_at = ? WHERE id = ?`,
+		customDomain, time.Now(), id,
+	)
+	return err
+}
+
 func generateContainerName(envSlug, appSlug, appID string) string {
 	shortID := appID
 	if len(shortID) > 8 {

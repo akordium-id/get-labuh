@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/akordium-id/get-labuh/internal/api"
 	"github.com/akordium-id/get-labuh/internal/auth"
+	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
@@ -50,21 +51,29 @@ func main() {
 	deployKeyRepo := repo.NewDeployKeyRepo(db)
 	templateRepo := repo.NewTemplateRepo(db)
 	apiKeyRepo := repo.NewApiKeyRepo(db)
+	settingRepo := repo.NewSettingRepo(db)
+
+	_ = settingRepo.InitializeDefaults()
+
+	caddyAPIURL, _ := settingRepo.Get("caddy_api_url")
+	caddyAPIKey, _ := settingRepo.Get("caddy_api_key")
+	caddyClient := caddy.NewClient(caddyAPIURL, caddyAPIKey)
 
 	seedTemplates(templateRepo)
 
 	authHandler := handler.NewAuthHandler(userRepo, sessionRepo, false)
 	projectsHandler := handler.NewProjectsHandler(projectRepo)
-	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo)
+	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo)
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
 	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
-	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo)
+	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo, caddyClient, settingRepo)
 	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
 	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	apiKeysHandler := handler.NewAPIKeysHandler(apiKeyRepo, userRepo)
+	settingsHandler := handler.NewSettingsHandler(settingRepo)
 
 	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
 
@@ -76,7 +85,7 @@ func main() {
 	}
 
 	deployWorker := worker.NewDeployWorker(10)
-	deployWorker.Start(dockerClient)
+	deployWorker.Start(dockerClient, caddyClient, settingRepo)
 	defer deployWorker.Stop()
 
 	r := chi.NewRouter()
@@ -137,6 +146,8 @@ func main() {
 		r.Post("/applications/{id}/deploy", applicationsHandler.Deploy)
 		r.Post("/applications/{id}/env-vars", applicationsHandler.CreateEnvVar)
 		r.Post("/applications/{id}/env-vars/{var_id}/delete", applicationsHandler.DeleteEnvVar)
+		r.Post("/applications/{id}/domain", applicationsHandler.SetDomain)
+		r.Post("/applications/{id}/domain/remove", applicationsHandler.RemoveDomain)
 		r.Get("/applications/{id}/stats", monitoringHandler.ApplicationStats)
 
 		r.Get("/projects/{project_id}/environments/{env_id}/compose-apps", composeHandler.List)
@@ -148,6 +159,8 @@ func main() {
 		r.Post("/compose-apps/{id}/deploy", composeHandler.Deploy)
 		r.Post("/compose-apps/{id}/stop", composeHandler.Stop)
 		r.Post("/compose-apps/{id}/start", composeHandler.Start)
+		r.Post("/compose-apps/{id}/domain", composeHandler.SetDomain)
+		r.Post("/compose-apps/{id}/domain/remove", composeHandler.RemoveDomain)
 
 		r.Get("/projects/{project_id}/environments/{env_id}/databases", databasesHandler.List)
 		r.Get("/projects/{project_id}/environments/{env_id}/databases/new", func(w http.ResponseWriter, r *http.Request) {
@@ -168,6 +181,10 @@ func main() {
 		r.Get("/settings/api-keys", apiKeysHandler.List)
 		r.Post("/settings/api-keys/create", apiKeysHandler.Create)
 		r.Post("/settings/api-keys/{id}/delete", apiKeysHandler.Delete)
+
+		r.Get("/settings/caddy", settingsHandler.Caddy)
+		r.Post("/settings/caddy", settingsHandler.UpdateCaddy)
+		r.Post("/settings/caddy/test", settingsHandler.TestCaddy)
 	})
 
 	r.Post("/deployments/{id}/start", func(w http.ResponseWriter, r *http.Request) {
