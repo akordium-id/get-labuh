@@ -77,20 +77,20 @@ func (h *ProjectsHandler) ListByProject(w http.ResponseWriter, r *http.Request) 
 	}
 
 	_ = id
-	writeJSONData(w, http.StatusOK, []interface{}{})
+	writeJSONData(w, http.StatusOK, []any{})
 }
 
 type ApplicationsHandler struct {
-	appRepo    *repo.ApplicationRepo
+	appRepo     *repo.ApplicationRepo
 	projectRepo *repo.ProjectRepo
-	deployRepo *repo.DeploymentRepo
+	deployRepo  *repo.DeploymentRepo
 }
 
 func NewApplicationsHandler(appRepo *repo.ApplicationRepo, projectRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo) *ApplicationsHandler {
 	return &ApplicationsHandler{
-		appRepo:    appRepo,
+		appRepo:     appRepo,
 		projectRepo: projectRepo,
-		deployRepo: deployRepo,
+		deployRepo:  deployRepo,
 	}
 }
 
@@ -102,7 +102,7 @@ func (h *ApplicationsHandler) ListByProject(w http.ResponseWriter, r *http.Reque
 	}
 
 	_ = projectID
-	writeJSONData(w, http.StatusOK, []interface{}{})
+	writeJSONData(w, http.StatusOK, []any{})
 }
 
 func (h *ApplicationsHandler) Deploy(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +142,7 @@ func (h *ApplicationsHandler) GetStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSONData(w, http.StatusOK, map[string]interface{}{
+	writeJSONData(w, http.StatusOK, map[string]any{
 		"id":     app.ID,
 		"name":   app.Name,
 		"status": app.Status,
@@ -181,7 +181,7 @@ func writeJSONError(w http.ResponseWriter, statusCode int, message string) {
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-func writeJSONData(w http.ResponseWriter, statusCode int, data interface{}) {
+func writeJSONData(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	response := APIResponse{Data: data}

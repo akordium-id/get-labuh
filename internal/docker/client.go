@@ -8,7 +8,7 @@ import (
 )
 
 type Client struct {
-	cli interface{}
+	cli any
 }
 
 func NewClient() (*Client, error) {
@@ -27,7 +27,7 @@ func (c *Client) BuildImage(ctx context.Context, buildContext io.Reader, dockerf
 	return "", nil
 }
 
-func (c *Client) CreateContainer(ctx context.Context, config interface{}, hostConfig interface{}, networkingConfig interface{}, name string) (string, error) {
+func (c *Client) CreateContainer(ctx context.Context, config any, hostConfig any, networkingConfig any, name string) (string, error) {
 	return "", nil
 }
 
@@ -47,11 +47,11 @@ func (c *Client) InspectContainer(ctx context.Context, containerID string) error
 	return nil
 }
 
-func (c *Client) ContainerLogs(ctx context.Context, containerID string, opts interface{}) (io.ReadCloser, error) {
+func (c *Client) ContainerLogs(ctx context.Context, containerID string, opts any) (io.ReadCloser, error) {
 	return nil, nil
 }
 
-func (c *Client) ListContainers(ctx context.Context, opts interface{}) error {
+func (c *Client) ListContainers(ctx context.Context, opts any) error {
 	return nil
 }
 

@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/akordium-id/get-labuh/internal/api"
 	"github.com/akordium-id/get-labuh/internal/auth"
 	"github.com/akordium-id/get-labuh/internal/database"
@@ -24,6 +22,8 @@ import (
 	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 	"github.com/akordium-id/get-labuh/internal/web/pages/projects"
 	"github.com/akordium-id/get-labuh/internal/worker"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
@@ -232,36 +232,36 @@ func seedTemplates(templateRepo *repo.TemplateRepo) {
 
 	templatesToSeed := []models.CreateServiceTemplateInput{
 		{
-			Name:        "WordPress",
-			Description: strPtr("WordPress is a free and open-source content management system."),
-			SourceType:  models.TemplateSourceGit,
-			RepositoryURL: strPtr("https://github.com/wordpress/wordpress"),
-			Category:   models.TemplateCategoryCMS,
-			IsOfficial: true,
+			Name:          "WordPress",
+			Description:   new("WordPress is a free and open-source content management system."),
+			SourceType:    models.TemplateSourceGit,
+			RepositoryURL: new("https://github.com/wordpress/wordpress"),
+			Category:      models.TemplateCategoryCMS,
+			IsOfficial:    true,
 		},
 		{
-			Name:        "Ghost",
-			Description: strPtr("Ghost is a modern, professional publishing platform."),
-			SourceType:  models.TemplateSourceGit,
-			RepositoryURL: strPtr("https://github.com/TryGhost/Ghost"),
-			Category:   models.TemplateCategoryCMS,
-			IsOfficial: true,
+			Name:          "Ghost",
+			Description:   new("Ghost is a modern, professional publishing platform."),
+			SourceType:    models.TemplateSourceGit,
+			RepositoryURL: new("https://github.com/TryGhost/Ghost"),
+			Category:      models.TemplateCategoryCMS,
+			IsOfficial:    true,
 		},
 		{
 			Name:        "Grafana",
-			Description: strPtr("Grafana is an open source analytics and interactive visualization web platform."),
+			Description: new("Grafana is an open source analytics and interactive visualization web platform."),
 			SourceType:  models.TemplateSourceDockerImage,
-			DockerImage: strPtr("grafana/grafana"),
-			Category:   models.TemplateCategoryMonitoring,
-			IsOfficial: true,
+			DockerImage: new("grafana/grafana"),
+			Category:    models.TemplateCategoryMonitoring,
+			IsOfficial:  true,
 		},
 		{
 			Name:        "Minio",
-			Description: strPtr("MinIO is a high-performance, S3 compatible object store."),
+			Description: new("MinIO is a high-performance, S3 compatible object store."),
 			SourceType:  models.TemplateSourceDockerImage,
-			DockerImage: strPtr("minio/minio"),
-			Category:   models.TemplateCategoryStorage,
-			IsOfficial: true,
+			DockerImage: new("minio/minio"),
+			Category:    models.TemplateCategoryStorage,
+			IsOfficial:  true,
 		},
 	}
 
@@ -270,6 +270,7 @@ func seedTemplates(templateRepo *repo.TemplateRepo) {
 	}
 }
 
+//go:fix inline
 func strPtr(s string) *string {
-	return &s
+	return new(s)
 }

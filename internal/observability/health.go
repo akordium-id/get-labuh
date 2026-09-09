@@ -20,11 +20,11 @@ const (
 )
 
 type HealthCheck struct {
-	Status      HealthStatus       `json:"status"`
-	Timestamp   time.Time          `json:"timestamp"`
-	Version     string             `json:"version,omitempty"`
-	Checks      map[string]Check   `json:"checks"`
-	Uptime      time.Duration      `json:"uptime,omitempty"`
+	Status    HealthStatus     `json:"status"`
+	Timestamp time.Time        `json:"timestamp"`
+	Version   string           `json:"version,omitempty"`
+	Checks    map[string]Check `json:"checks"`
+	Uptime    time.Duration    `json:"uptime,omitempty"`
 }
 
 type Check struct {
@@ -64,7 +64,7 @@ func (h *HealthChecker) Check(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"status":    status,
 		"timestamp": time.Now(),
 		"version":   h.version,
@@ -112,7 +112,7 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 
 		ctx := r.Context()
 		slog.Info("request started", "request_id", requestID, "method", r.Method, "path", r.URL.Path)
-		
+
 		w.Header().Set("X-Request-ID", requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

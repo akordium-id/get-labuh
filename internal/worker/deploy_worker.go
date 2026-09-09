@@ -28,9 +28,7 @@ func NewDeployWorker(bufferSize int) *DeployWorker {
 func (w *DeployWorker) Start(dockerClient *docker.Client) {
 	pipeline := deploy.NewPipeline(dockerClient)
 
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
+	w.wg.Go(func() {
 		for {
 			select {
 			case job, ok := <-w.jobQueue:
@@ -43,7 +41,7 @@ func (w *DeployWorker) Start(dockerClient *docker.Client) {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (w *DeployWorker) Enqueue(job models.DeploymentJob) {

@@ -70,11 +70,11 @@ func writeAPIError(w http.ResponseWriter, statusCode int, message string) {
 }
 
 type APIResponse struct {
-	Data  interface{} `json:"data"`
-	Error string      `json:"error,omitempty"`
+	Data  any    `json:"data"`
+	Error string `json:"error,omitempty"`
 }
 
-func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+func writeJSON(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	_ = data

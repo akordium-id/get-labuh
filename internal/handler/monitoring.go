@@ -12,12 +12,12 @@ import (
 )
 
 type MonitoringHandler struct {
-	appRepo    *repo.ApplicationRepo
-	dbRepo     *repo.DatabaseRepo
-	dockerCli  interface{}
+	appRepo   *repo.ApplicationRepo
+	dbRepo    *repo.DatabaseRepo
+	dockerCli any
 }
 
-func NewMonitoringHandler(appRepo *repo.ApplicationRepo, dbRepo *repo.DatabaseRepo, dockerCli interface{}) *MonitoringHandler {
+func NewMonitoringHandler(appRepo *repo.ApplicationRepo, dbRepo *repo.DatabaseRepo, dockerCli any) *MonitoringHandler {
 	return &MonitoringHandler{
 		appRepo:   appRepo,
 		dbRepo:    dbRepo,

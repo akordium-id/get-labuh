@@ -151,7 +151,7 @@ func initConfig() {
 	}
 }
 
-func apiRequest(method, path string, body interface{}) ([]byte, error) {
+func apiRequest(method, path string, body any) ([]byte, error) {
 	var reqBody []byte
 	if body != nil {
 		var err error
