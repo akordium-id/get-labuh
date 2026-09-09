@@ -1,0 +1,11 @@
+CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug);
+CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at);
+CREATE INDEX IF NOT EXISTS idx_environments_project_id ON environments(project_id);
+CREATE INDEX IF NOT EXISTS idx_applications_environment_id ON applications(environment_id);
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_applications_custom_domain ON applications(custom_domain);
+CREATE INDEX IF NOT EXISTS idx_deployments_application_id ON deployments(application_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_status ON deployments(status);
+CREATE INDEX IF NOT EXISTS idx_deployments_created_at ON deployments(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);

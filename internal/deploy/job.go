@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/logging"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
@@ -27,6 +29,8 @@ type DeploymentJob struct {
 	AppPort        int
 	EnvVars        []models.AppEnvVar
 	LogPath        string
+	Priority       int
+	CacheRef       string
 }
 
 type ComposeJob struct {
@@ -60,99 +64,125 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		return &DeployError{Step: "init", Cause: err}
 	}
 
-	logFile, err := os.Create(job.LogPath)
+	rotatingWriter, err := logging.NewRotatingWriter(job.LogPath, 10*1024*1024, 5)
 	if err != nil {
 		return &DeployError{Step: "init", Cause: err}
 	}
-	defer logFile.Close()
+	defer rotatingWriter.Close()
 
-	writeLog(logFile, "Starting deployment pipeline...")
+	writeLog(rotatingWriter, "Starting deployment pipeline...")
 
 	var imageName string
 	_ = imageName
 
+	stepTimeouts := map[string]time.Duration{
+		"clone":  5 * time.Minute,
+		"build":  20 * time.Minute,
+		"deploy": 2 * time.Minute,
+	}
+
 	switch job.SourceType {
 	case string(models.SourceTypeGit):
-		writeLog(logFile, "Cloning git repository...")
-		if err := p.deployRepo.UpdateStep(job.DeploymentID, "clone"); err != nil {
-			writeLog(logFile, fmt.Sprintf("Warning: failed to update step: %v", err))
-		}
-		if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusCloning); err != nil {
-			writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
-		}
+		if err := p.runStepWithTimeout(ctx, job, "clone", stepTimeouts["clone"], func(stepCtx context.Context) error {
+			writeLog(rotatingWriter, "Cloning git repository...")
+			if err := p.deployRepo.UpdateStep(job.DeploymentID, "clone"); err != nil {
+				writeLog(rotatingWriter, fmt.Sprintf("Warning: failed to update step: %v", err))
+			}
+			if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusCloning); err != nil {
+				writeLog(rotatingWriter, fmt.Sprintf("Warning: failed to update status: %v", err))
+			}
 
-		buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
-		if err := os.MkdirAll(buildDir, 0755); err != nil {
-			errMsg := fmt.Sprintf("failed to create build directory: %v", err)
-			writeLog(logFile, errMsg)
-			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			return &DeployError{Step: "clone", Cause: err, Output: errMsg}
-		}
+			buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
+			if err := os.MkdirAll(buildDir, 0755); err != nil {
+				errMsg := fmt.Sprintf("failed to create build directory: %v", err)
+				writeLog(rotatingWriter, errMsg)
+				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "clone", Cause: err, Output: errMsg}
+			}
 
-		if err := p.dockerClient.CloneGitRepo(ctx, job.RepositoryURL, job.Branch, buildDir); err != nil {
-			errMsg := fmt.Sprintf("git clone failed: %v", err)
-			writeLog(logFile, errMsg)
-			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			return &DeployError{Step: "clone", Cause: err, Output: errMsg}
-		}
+			if err := p.dockerClient.CloneGitRepo(stepCtx, job.RepositoryURL, job.Branch, buildDir); err != nil {
+				errMsg := fmt.Sprintf("git clone failed: %v", err)
+				writeLog(rotatingWriter, errMsg)
+				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "clone", Cause: err, Output: errMsg}
+			}
 
-		writeLog(logFile, "Git clone completed")
+			writeLog(rotatingWriter, "Git clone completed")
+			return nil
+		}); err != nil {
+			return err
+		}
 		imageName = "placeholder-image"
 
 	case string(models.SourceTypeDockerfile):
-		writeLog(logFile, "Building from Dockerfile...")
-		if err := p.deployRepo.UpdateStep(job.DeploymentID, "build"); err != nil {
-			writeLog(logFile, fmt.Sprintf("Warning: failed to update step: %v", err))
-		}
-		if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusBuilding); err != nil {
-			writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
-		}
+		if err := p.runStepWithTimeout(ctx, job, "build", stepTimeouts["build"], func(stepCtx context.Context) error {
+			writeLog(rotatingWriter, "Building from Dockerfile...")
+			if err := p.deployRepo.UpdateStep(job.DeploymentID, "build"); err != nil {
+				writeLog(rotatingWriter, fmt.Sprintf("Warning: failed to update step: %v", err))
+			}
+			if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusBuilding); err != nil {
+				writeLog(rotatingWriter, fmt.Sprintf("Warning: failed to update status: %v", err))
+			}
 
-		buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
-		if err := os.MkdirAll(buildDir, 0755); err != nil {
-			errMsg := fmt.Sprintf("failed to create build directory: %v", err)
-			writeLog(logFile, errMsg)
-			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			return &DeployError{Step: "build", Cause: err, Output: errMsg}
-		}
+			buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
+			if err := os.MkdirAll(buildDir, 0755); err != nil {
+				errMsg := fmt.Sprintf("failed to create build directory: %v", err)
+				writeLog(rotatingWriter, errMsg)
+				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "build", Cause: err, Output: errMsg}
+			}
 
-		builtImage, err := p.dockerClient.BuildFromDockerfile(ctx, job.ApplicationID, buildDir, job.DockerfilePath)
-		if err != nil {
-			errMsg := fmt.Sprintf("docker build failed: %v", err)
-			writeLog(logFile, errMsg)
-			p.cleanupFailedContainer(ctx, job)
-			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			return &DeployError{Step: "build", Cause: err, Output: errMsg}
-		}
+			cacheRef := job.CacheRef
+			if cacheRef == "" {
+				cacheRef = docker.GenerateCacheRef(job.ApplicationID, job.Branch)
+			}
 
-		writeLog(logFile, "Docker build completed")
-		imageName = builtImage
+			builtImage, err := p.dockerClient.BuildFromDockerfileWithCache(stepCtx, job.ApplicationID, job.Branch, buildDir, job.DockerfilePath, cacheRef)
+			if err != nil {
+				errMsg := fmt.Sprintf("docker build failed: %v", err)
+				writeLog(rotatingWriter, errMsg)
+				p.cleanupFailedContainer(ctx, job)
+				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "build", Cause: err, Output: errMsg}
+			}
+
+			writeLog(rotatingWriter, "Docker build completed")
+			imageName = builtImage
+			return nil
+		}); err != nil {
+			return err
+		}
 
 	case string(models.SourceTypeDockerImage):
-		writeLog(logFile, fmt.Sprintf("Pulling image %s...", job.DockerImage))
-		if err := p.deployRepo.UpdateStep(job.DeploymentID, "push"); err != nil {
-			writeLog(logFile, fmt.Sprintf("Warning: failed to update step: %v", err))
-		}
-		if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusDeploying); err != nil {
-			writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
-		}
+		if err := p.runStepWithTimeout(ctx, job, "push", stepTimeouts["deploy"], func(stepCtx context.Context) error {
+			writeLog(rotatingWriter, fmt.Sprintf("Pulling image %s...", job.DockerImage))
+			if err := p.deployRepo.UpdateStep(job.DeploymentID, "push"); err != nil {
+				writeLog(rotatingWriter, fmt.Sprintf("Warning: failed to update step: %v", err))
+			}
+			if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusDeploying); err != nil {
+				writeLog(rotatingWriter, fmt.Sprintf("Warning: failed to update status: %v", err))
+			}
 
-		if err := p.dockerClient.PullImage(ctx, job.DockerImage); err != nil {
-			errMsg := fmt.Sprintf("failed to pull image: %v", err)
-			writeLog(logFile, errMsg)
-			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			return &DeployError{Step: "push", Cause: err, Output: errMsg}
+			if err := p.dockerClient.PullImage(stepCtx, job.DockerImage); err != nil {
+				errMsg := fmt.Sprintf("failed to pull image: %v", err)
+				writeLog(rotatingWriter, errMsg)
+				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "push", Cause: err, Output: errMsg}
+			}
+			imageName = job.DockerImage
+			return nil
+		}); err != nil {
+			return err
 		}
-		imageName = job.DockerImage
 
 	default:
 		errMsg := fmt.Sprintf("unknown source type: %s", job.SourceType)
-		writeLog(logFile, errMsg)
+		writeLog(rotatingWriter, errMsg)
 		p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
 		return &DeployError{Step: "init", Output: errMsg}
 	}
 
-	writeLog(logFile, "Deployment completed successfully")
+	writeLog(rotatingWriter, "Deployment completed successfully")
 	p.deployRepo.UpdateStep(job.DeploymentID, "deploy")
 	p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusSuccess)
 
@@ -171,7 +201,32 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		_ = client
 	}
 
+	if err := docker.CleanOldCache(24 * time.Hour); err != nil {
+		writeLog(rotatingWriter, fmt.Sprintf("Warning: failed to clean old cache: %v", err))
+	}
+
 	return nil
+}
+
+func (p *Pipeline) runStepWithTimeout(ctx context.Context, job DeploymentJob, stepName string, timeout time.Duration, stepFunc func(context.Context) error) error {
+	stepCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- stepFunc(stepCtx)
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-stepCtx.Done():
+		errMsg := fmt.Sprintf("%s step timed out after %s", stepName, timeout)
+		p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
+		return &DeployError{Step: stepName, Cause: stepCtx.Err(), Output: errMsg}
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (p *Pipeline) ExecuteCompose(ctx context.Context, job ComposeJob) error {
@@ -225,13 +280,10 @@ func (p *Pipeline) cleanupFailedContainer(ctx context.Context, job DeploymentJob
 	}
 }
 
-func writeLog(file *os.File, message string) {
+func writeLog(writer io.Writer, message string) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	line := fmt.Sprintf("[%s] %s\n", timestamp, message)
-	if _, err := file.WriteString(line); err != nil {
-		// best effort
-	}
-	if err := file.Sync(); err != nil {
+	if _, err := writer.Write([]byte(line)); err != nil {
 		// best effort
 	}
 }

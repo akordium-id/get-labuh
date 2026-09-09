@@ -22,4 +22,5 @@ type DeploymentJob struct {
 	AppPort        int
 	EnvVars        []AppEnvVar
 	LogPath        string
+	Priority       int
 }

@@ -38,6 +38,10 @@ func (r *ProjectRepo) Create(input models.CreateProjectInput) (*models.Project, 
 	return project, nil
 }
 
+func (r *ProjectRepo) GetAll() ([]*models.Project, error) {
+	return r.GetAllPaginated(0, 0)
+}
+
 func (r *ProjectRepo) GetByID(id string) (*models.Project, error) {
 	project := &models.Project{}
 	err := r.db.QueryRow(
@@ -64,10 +68,18 @@ func (r *ProjectRepo) GetBySlug(slug string) (*models.Project, error) {
 	return project, nil
 }
 
-func (r *ProjectRepo) GetAll() ([]*models.Project, error) {
-	rows, err := r.db.Query(
-		"SELECT id, name, slug, description, created_at, updated_at FROM projects ORDER BY created_at DESC",
-	)
+func (r *ProjectRepo) GetAllPaginated(limit, offset int) ([]*models.Project, error) {
+	query := "SELECT id, name, slug, description, created_at, updated_at FROM projects ORDER BY created_at DESC"
+	var rows *sql.Rows
+	var err error
+
+	if limit > 0 {
+		query += " LIMIT ? OFFSET ?"
+		rows, err = r.db.Query(query, limit, offset)
+	} else {
+		rows, err = r.db.Query(query)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +96,12 @@ func (r *ProjectRepo) GetAll() ([]*models.Project, error) {
 	}
 
 	return projects, nil
+}
+
+func (r *ProjectRepo) Count() (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM projects").Scan(&count)
+	return count, err
 }
 
 func (r *ProjectRepo) Delete(id string) error {

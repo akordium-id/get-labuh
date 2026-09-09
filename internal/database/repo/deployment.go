@@ -57,10 +57,45 @@ func (r *DeploymentRepo) GetByID(id string) (*models.Deployment, error) {
 }
 
 func (r *DeploymentRepo) GetByApplicationID(appID string) ([]*models.Deployment, error) {
+	return r.GetByApplicationIDPaginated(appID, 0, 0)
+}
+
+func (r *DeploymentRepo) GetByApplicationIDPaginated(appID string, limit, offset int) ([]*models.Deployment, error) {
+	query := `SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		 FROM deployments WHERE application_id = ? ORDER BY created_at DESC`
+	var rows *sql.Rows
+	var err error
+
+	if limit > 0 {
+		query += " LIMIT ? OFFSET ?"
+		rows, err = r.db.Query(query, appID, limit, offset)
+	} else {
+		rows, err = r.db.Query(query, appID)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var deployments []*models.Deployment
+	for rows.Next() {
+		deployment := &models.Deployment{}
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		deployments = append(deployments, deployment)
+	}
+
+	return deployments, nil
+}
+
+func (r *DeploymentRepo) GetByStatus(status models.DeployStatus) ([]*models.Deployment, error) {
 	rows, err := r.db.Query(
 		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
-		 FROM deployments WHERE application_id = ? ORDER BY created_at DESC`,
-		appID,
+		 FROM deployments WHERE status = ? ORDER BY created_at DESC`,
+		status,
 	)
 	if err != nil {
 		return nil, err
@@ -78,6 +113,12 @@ func (r *DeploymentRepo) GetByApplicationID(appID string) ([]*models.Deployment,
 	}
 
 	return deployments, nil
+}
+
+func (r *DeploymentRepo) CountByStatus(status models.DeployStatus) (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM deployments WHERE status = ?", status).Scan(&count)
+	return count, err
 }
 
 func (r *DeploymentRepo) UpdateStatus(id string, status models.DeployStatus) error {

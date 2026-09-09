@@ -66,6 +66,10 @@ func StreamBuildOutput(ctx context.Context, reader io.Reader, logFile *os.File) 
 }
 
 func (c *Client) BuildFromDockerfile(ctx context.Context, appID, buildContextPath, dockerfilePath string) (string, error) {
+	return "", fmt.Errorf("use BuildFromDockerfileWithCache instead")
+}
+
+func (c *Client) BuildFromDockerfileWithCache(ctx context.Context, appID, branch, buildContextPath, dockerfilePath, cacheRef string) (string, error) {
 	if appID == "" {
 		return "", fmt.Errorf("build error: invalid application ID")
 	}
@@ -73,7 +77,12 @@ func (c *Client) BuildFromDockerfile(ctx context.Context, appID, buildContextPat
 		return "", fmt.Errorf("build error: build context path is empty")
 	}
 
+	if err := EnsureCacheDir(); err != nil {
+		return "", fmt.Errorf("build error: failed to prepare cache dir: %w", err)
+	}
+
 	imageTag := fmt.Sprintf("labuh-%s:%s", appID, time.Now().Format("20060102150405"))
+	cacheDir := getCacheDir()
 
 	buildContext, err := os.Open(buildContextPath)
 	if err != nil {
@@ -81,10 +90,18 @@ func (c *Client) BuildFromDockerfile(ctx context.Context, appID, buildContextPat
 	}
 	defer buildContext.Close()
 
-	_ = imageTag
 	_ = dockerfilePath
+	_ = buildContext
+	_ = cacheRef
+	_ = cacheDir
+	_ = imageTag
+	_ = branch
 
 	return "", fmt.Errorf("not implemented without docker client")
+}
+
+func (c *Client) BuildWithCache(ctx context.Context, appID, buildContextPath, cacheRef string) (string, error) {
+	return c.BuildFromDockerfileWithCache(ctx, appID, "", buildContextPath, "Dockerfile", cacheRef)
 }
 
 func (c *Client) BuildFromGit(ctx context.Context, repoURL, branch, dockerfilePath string) (string, error) {

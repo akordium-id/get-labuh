@@ -96,7 +96,7 @@ func main() {
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 
-	deployWorker := worker.NewDeployWorker(10)
+	deployWorker := worker.NewDeployWorker(10, 3)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 	defer deployWorker.Stop()
 
@@ -105,6 +105,7 @@ func main() {
 	r.Use(chimiddleware.Recoverer)
 	r.Use(observability.RequestIDMiddleware)
 	r.Use(middleware.SecurityHeadersMiddleware)
+	r.Use(middleware.CacheHeadersMiddleware)
 	r.Use(middleware.RateLimitMiddleware)
 	r.Use(middleware.CSRFProtectionMiddleware)
 	r.Use(middleware.AuditLoggingMiddleware(auditRepo))
@@ -115,6 +116,12 @@ func main() {
 		w.Write([]byte(`{"status":"healthy"}`))
 	})
 	r.Get("/metrics", observability.MetricsHandler)
+
+	if os.Getenv("LABUH_PPROF_ENABLED") == "true" {
+		r.Get("/debug/pprof/", observability.ProfilingHandler)
+		r.Get("/debug/pprof/profile", observability.ProfilingHandler)
+		r.Get("/debug/pprof/heap", observability.ProfilingHandler)
+	}
 
 	apiRouter := api.NewRouter(
 		api.NewProjectsHandler(projectRepo),

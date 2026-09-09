@@ -113,10 +113,45 @@ func (r *ApplicationRepo) GetByContainerName(containerName string) (*models.Appl
 }
 
 func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Application, error) {
+	return r.GetByEnvironmentIDPaginated(envID, 0, 0)
+}
+
+func (r *ApplicationRepo) GetByEnvironmentIDPaginated(envID string, limit, offset int) ([]*models.Application, error) {
+	query := `SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC`
+	var rows *sql.Rows
+	var err error
+
+	if limit > 0 {
+		query += " LIMIT ? OFFSET ?"
+		rows, err = r.db.Query(query, envID, limit, offset)
+	} else {
+		rows, err = r.db.Query(query, envID)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var apps []*models.Application
+	for rows.Next() {
+		app := &models.Application{}
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		apps = append(apps, app)
+	}
+
+	return apps, nil
+}
+
+func (r *ApplicationRepo) GetByStatus(status models.AppStatus) ([]*models.Application, error) {
 	rows, err := r.db.Query(
 		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
-		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC`,
-		envID,
+		 FROM applications WHERE status = ? ORDER BY created_at DESC`,
+		status,
 	)
 	if err != nil {
 		return nil, err
@@ -134,6 +169,26 @@ func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Applicatio
 	}
 
 	return apps, nil
+}
+
+func (r *ApplicationRepo) GetByCustomDomain(domain string) (*models.Application, error) {
+	app := &models.Application{}
+	err := r.db.QueryRow(
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		 FROM applications WHERE custom_domain = ?`,
+		domain,
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return app, nil
+}
+
+func (r *ApplicationRepo) CountByEnvironment(envID string) (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM applications WHERE environment_id = ?", envID).Scan(&count)
+	return count, err
 }
 
 func (r *ApplicationRepo) UpdateStatus(id string, status models.AppStatus) error {
