@@ -91,6 +91,8 @@ type Deployment struct {
 	CommitHash     *string
 	CommitMessage  *string
 	Status         DeployStatus
+	Step           *string
+	Output         *string
 	ErrorMessage   *string
 	LogPath        *string
 	StartedAt      *time.Time
@@ -103,6 +105,8 @@ type CreateDeploymentInput struct {
 	CommitHash     *string
 	CommitMessage  *string
 	LogPath        *string
+	Step           *string
+	Output         *string
 }
 
 

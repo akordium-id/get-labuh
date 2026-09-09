@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -9,28 +10,31 @@ import (
 
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/applications"
 )
 
 type ApplicationsHandler struct {
-	appRepo     *repo.ApplicationRepo
-	envRepo     *repo.ProjectRepo
-	deployRepo  *repo.DeploymentRepo
-	envVarRepo  *repo.EnvVarRepo
-	caddyClient *caddy.Client
-	settingRepo *repo.SettingRepo
+	appRepo      *repo.ApplicationRepo
+	envRepo      *repo.ProjectRepo
+	deployRepo   *repo.DeploymentRepo
+	envVarRepo   *repo.EnvVarRepo
+	caddyClient  *caddy.Client
+	settingRepo  *repo.SettingRepo
+	dockerClient *docker.Client
 }
 
-func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo, envVarRepo *repo.EnvVarRepo, caddyClient *caddy.Client, settingRepo *repo.SettingRepo) *ApplicationsHandler {
+func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo, envVarRepo *repo.EnvVarRepo, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, dockerClient *docker.Client) *ApplicationsHandler {
 	return &ApplicationsHandler{
-		appRepo:     appRepo,
-		envRepo:     envRepo,
-		deployRepo:  deployRepo,
-		envVarRepo:  envVarRepo,
-		caddyClient: caddyClient,
-		settingRepo: settingRepo,
+		appRepo:      appRepo,
+		envRepo:      envRepo,
+		deployRepo:   deployRepo,
+		envVarRepo:   envVarRepo,
+		caddyClient:  caddyClient,
+		settingRepo:  settingRepo,
+		dockerClient: dockerClient,
 	}
 }
 
@@ -147,7 +151,29 @@ func (h *ApplicationsHandler) Start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.appRepo.UpdateStatus(id, models.AppStatusRunning)
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	if app.ContainerID != nil && *app.ContainerID != "" {
+		running, err := h.dockerClient.IsContainerRunning(r.Context(), *app.ContainerID)
+		if err != nil {
+			slog.Error("failed to check container status", "error", err, "container_id", *app.ContainerID)
+		} else if running {
+			w.Header().Set("HX-Redirect", "/applications/"+id)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+
+	if err := h.appRepo.UpdateStatus(id, models.AppStatusRunning); err != nil {
+		slog.Error("failed to update app status", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
@@ -159,7 +185,24 @@ func (h *ApplicationsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.appRepo.UpdateStatus(id, models.AppStatusStopped)
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	if app.ContainerID != nil && *app.ContainerID != "" {
+		if err := h.dockerClient.StopContainer(r.Context(), *app.ContainerID, 10); err != nil {
+			slog.Error("failed to stop container", "error", err, "container_id", *app.ContainerID)
+		}
+	}
+
+	if err := h.appRepo.UpdateStatus(id, models.AppStatusStopped); err != nil {
+		slog.Error("failed to update app status", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
@@ -171,7 +214,26 @@ func (h *ApplicationsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.appRepo.UpdateStatus(id, models.AppStatusIdle)
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	if app.ContainerID != nil && *app.ContainerID != "" {
+		if err := h.dockerClient.RestartContainer(r.Context(), *app.ContainerID, 10); err != nil {
+			slog.Error("failed to restart container", "error", err, "container_id", *app.ContainerID)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := h.appRepo.UpdateStatus(id, models.AppStatusRunning); err != nil {
+		slog.Error("failed to update app status", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }

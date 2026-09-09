@@ -1,6 +1,9 @@
 package projects
 
-import "github.com/akordium-id/get-labuh/internal/models"
+import (
+	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/components"
+)
 
 templ ProjectsListPage(projects []*models.Project, envCounts map[string]int) {
 	<div>
@@ -19,9 +22,13 @@ templ ProjectsListPage(projects []*models.Project, envCounts map[string]int) {
 					</tr>
 				</thead>
 				<tbody class="bg-white divide-y divide-gray-200">
-					<tr>
-						<td colspan="4" class="px-6 py-4 text-center text-gray-500">No projects yet</td>
-					</tr>
+					if len(projects) == 0 {
+						<tr>
+							<td colspan="4">
+								@components.EmptyState("📁", "No projects yet", "Create your first project to get started", "New Project", "/projects/create")
+							</td>
+						</tr>
+					}
 				</tbody>
 			</table>
 		</div>

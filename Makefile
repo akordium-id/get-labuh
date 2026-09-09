@@ -1,4 +1,4 @@
-.PHONY: dev build migrate
+.PHONY: dev build migrate test-e2e test-unit
 
 dev:
 	templ generate --watch &
@@ -12,6 +12,12 @@ build:
 
 migrate:
 	# Run migrations
+
+test-unit:
+	go test ./...
+
+test-e2e:
+	bash scripts/test-e2e.sh
 
 install-tools:
 	go install github.com/a-h/templ/cmd/templ@latest

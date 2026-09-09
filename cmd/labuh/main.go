@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -17,6 +17,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/handler"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/observability"
+	"github.com/akordium-id/get-labuh/internal/server"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages"
 	"github.com/akordium-id/get-labuh/internal/web/pages/compose"
@@ -32,12 +33,14 @@ func main() {
 
 	db, err := database.Connect("labuh.db")
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 
 	if err := database.RunAllMigrations(db); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		slog.Error("Failed to run migrations", "error", err)
+		os.Exit(1)
 	}
 
 	userRepo := repo.NewUserRepo(db)
@@ -61,9 +64,22 @@ func main() {
 
 	seedTemplates(templateRepo)
 
+	apiKeysHandler := handler.NewAPIKeysHandler(apiKeyRepo, userRepo)
+	settingsHandler := handler.NewSettingsHandler(settingRepo)
+
+	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
+
+	_ = api.NewAPIKeyAuthMiddleware(apiKeyRepo, userRepo)
+
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		slog.Error("Failed to connect to Docker", "error", err)
+		os.Exit(1)
+	}
+
 	authHandler := handler.NewAuthHandler(userRepo, sessionRepo, false)
 	projectsHandler := handler.NewProjectsHandler(projectRepo)
-	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo)
+	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo, dockerClient)
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
 	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
 	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo, caddyClient, settingRepo)
@@ -72,25 +88,15 @@ func main() {
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
-	apiKeysHandler := handler.NewAPIKeysHandler(apiKeyRepo, userRepo)
-	settingsHandler := handler.NewSettingsHandler(settingRepo)
-
-	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
-
-	api.NewAPIKeyAuthMiddleware(apiKeyRepo, userRepo)
-
-	dockerClient, err := docker.NewClient()
-	if err != nil {
-		log.Fatalf("Failed to connect to Docker: %v", err)
-	}
 
 	deployWorker := worker.NewDeployWorker(10)
-	deployWorker.Start(dockerClient, caddyClient, settingRepo)
+	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 	defer deployWorker.Stop()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(observability.RequestIDMiddleware)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -226,19 +232,15 @@ func main() {
 		Handler: r,
 	}
 
-	log.Printf("Labuh server starting on :%s", port)
+	slog.Info("Labuh server starting", "port", port)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("Server error", "error", err)
+		os.Exit(1)
 	}
 
-	<-ctx.Done()
-	log.Println("Shutting down server...")
-
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server shutdown error: %v", err)
-	}
+	_ = server.GracefulShutdown(shutdownCtx, srv, deployWorker, db)
 }
 
 func seedTemplates(templateRepo *repo.TemplateRepo) {

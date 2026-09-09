@@ -27,8 +27,8 @@ func NewDeployWorker(bufferSize int) *DeployWorker {
 	}
 }
 
-func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo) {
-	pipeline := deploy.NewPipeline(dockerClient, caddyClient, settingRepo)
+func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, appRepo *repo.ApplicationRepo, deployRepo *repo.DeploymentRepo) {
+	pipeline := deploy.NewPipeline(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 
 	w.wg.Go(func() {
 		for {

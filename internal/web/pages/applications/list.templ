@@ -2,6 +2,7 @@ package applications
 
 import (
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/components"
 )
 
 templ ApplicationsListPage(apps []*models.Application) {
@@ -24,7 +25,9 @@ templ ApplicationsListPage(apps []*models.Application) {
 				<tbody class="bg-white divide-y divide-gray-200">
 					if len(apps) == 0 {
 						<tr>
-							<td colspan="5" class="px-6 py-4 text-center text-gray-500">No applications yet</td>
+							<td colspan="5">
+								@components.EmptyState("📦", "No applications yet", "Get started by creating your first application", "Create Application", "/applications/create")
+							</td>
 						</tr>
 					} else {
 						for _, app := range apps {
