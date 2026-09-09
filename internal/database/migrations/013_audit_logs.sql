@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     resource_id TEXT NOT NULL,
     ip_address TEXT,
     user_agent TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

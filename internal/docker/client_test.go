@@ -3,9 +3,14 @@ package docker
 import (
 	stdtesting "testing"
 	"errors"
+	"os"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	_ = os.Setenv("LABUH_DOCKER_MOCK", "true")
+}
 
 func TestClient_Ping(t *stdtesting.T) {
 	client, err := NewClient()

@@ -3,9 +3,11 @@ package api
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"strings"
 
+	"github.com/akordium-id/get-labuh/internal/auth"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 )
 
@@ -52,9 +54,8 @@ func (m *APIKeyAuthMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := r.Context()
-		_ = ctx
-		next.ServeHTTP(w, r)
+		ctx := auth.ContextWithUser(r.Context(), user)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -66,16 +67,16 @@ func hashAPIKey(apiKey string) string {
 func writeAPIError(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	_ = message
+	_ = json.NewEncoder(w).Encode(APIResponse{Error: message})
 }
 
 type APIResponse struct {
-	Data  any    `json:"data"`
+	Data  any    `json:"data,omitempty"`
 	Error string `json:"error,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	_ = data
+	_ = json.NewEncoder(w).Encode(APIResponse{Data: data})
 }

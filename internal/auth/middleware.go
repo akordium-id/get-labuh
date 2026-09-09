@@ -54,12 +54,6 @@ func RequireAuth(sessionRepo *repo.SessionRepo, userRepo *repo.UserRepo, secure 
 				return
 			}
 
-		activeSessions, _ := userRepo.CountActiveSessions(user.ID)
-		if activeSessions > MaxConcurrentSessions {
-			http.Redirect(w, r, "/auth/login?too_many_sessions=1", http.StatusFound)
-			return
-		}
-
 			ctx := ContextWithUser(r.Context(), user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

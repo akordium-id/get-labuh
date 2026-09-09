@@ -13,7 +13,7 @@ CREATE TABLE database_services (
     container_name TEXT UNIQUE,
     status TEXT NOT NULL DEFAULT 'idle',
     connection_string TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(environment_id, slug)
 );

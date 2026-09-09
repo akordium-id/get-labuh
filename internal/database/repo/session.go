@@ -53,3 +53,16 @@ func (r *SessionRepo) Delete(id string) error {
 	_, err := r.db.Exec("DELETE FROM sessions WHERE id = ?", id)
 	return err
 }
+
+func (r *SessionRepo) EvictOldestSessions(userID string, keepCount int) error {
+	_, err := r.db.Exec(`
+		DELETE FROM sessions
+		WHERE user_id = ? AND id NOT IN (
+			SELECT id FROM sessions
+			WHERE user_id = ?
+			ORDER BY created_at DESC
+			LIMIT ?
+		)
+	`, userID, userID, keepCount)
+	return err
+}

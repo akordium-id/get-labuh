@@ -34,7 +34,12 @@ func NewClient(host, user, keyPath string) (*Client, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, 22), config)
+	addr := host
+	if !strings.Contains(host, ":") {
+		addr = fmt.Sprintf("%s:22", host)
+	}
+
+	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial SSH: %w", err)
 	}
@@ -83,7 +88,8 @@ func (c *Client) CopyFile(localPath, remotePath string) error {
 		io.Copy(stdin, localFile)
 	}()
 
-	return session.Run(fmt.Sprintf("cat > %s", remotePath))
+	escapedRemotePath := "'" + strings.ReplaceAll(remotePath, "'", "'\\''") + "'"
+	return session.Run(fmt.Sprintf("cat > %s", escapedRemotePath))
 }
 
 func (c *Client) Close() error {

@@ -31,6 +31,9 @@ Thumbs.db
 tmp/
 logs/
 *.log
+*.db
+*.db-*
+backups/
 
 # Environment
 .env

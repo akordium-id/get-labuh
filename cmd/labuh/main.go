@@ -33,7 +33,11 @@ import (
 func main() {
 	ctx := context.Background()
 
-	db, err := database.Connect("labuh.db")
+	dbPath := os.Getenv("DATABASE_URL")
+	if dbPath == "" {
+		dbPath = "labuh.db"
+	}
+	db, err := database.Connect(dbPath)
 	if err != nil {
 		slog.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
@@ -71,12 +75,20 @@ func main() {
 
 	apiKeysHandler := handler.NewAPIKeysHandler(apiKeyRepo, userRepo)
 	settingsHandler := handler.NewSettingsHandler(settingRepo)
-	backupHandler := handler.NewBackupHandler(settingRepo, "/var/lib/labuh/backups")
+	backupDir := os.Getenv("LABUH_BACKUP_DIR")
+	if backupDir == "" {
+		if os.Geteuid() == 0 {
+			backupDir = "/var/lib/labuh/backups"
+		} else {
+			backupDir = "./backups"
+		}
+	}
+	backupHandler := handler.NewBackupHandler(settingRepo, backupDir)
 	auditHandler := handler.NewAuditHandler(auditRepo, userRepo)
 
 	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
 
-	_ = api.NewAPIKeyAuthMiddleware(apiKeyRepo, userRepo)
+	apiKeyAuthMiddleware := api.NewAPIKeyAuthMiddleware(apiKeyRepo, userRepo)
 
 	dockerClient, err := docker.NewClient()
 	if err != nil {
@@ -89,6 +101,7 @@ func main() {
 	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo, dockerClient)
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
 	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
+	logsHandler.SetDockerClient(dockerClient)
 	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo, caddyClient, settingRepo)
 	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
 	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
@@ -101,6 +114,10 @@ func main() {
 	deployWorker.SetWorkerCount(1)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 	defer deployWorker.Stop()
+
+	applicationsHandler.SetDeployWorker(deployWorker)
+	webhooksHandler.SetDeployWorker(deployWorker)
+	webhooksHandler.SetEnvVarRepo(envVarRepo)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
@@ -119,10 +136,15 @@ func main() {
 	})
 	r.Get("/metrics", observability.MetricsHandler)
 
+	apiAppHandler := api.NewApplicationsHandler(appRepo, projectRepo, deployRepo)
+	apiAppHandler.SetDeployWorker(deployWorker)
+	apiAppHandler.SetEnvVarRepo(envVarRepo)
+
 	apiRouter := api.NewRouter(
 		api.NewProjectsHandler(projectRepo),
-		api.NewApplicationsHandler(appRepo, projectRepo, deployRepo),
+		apiAppHandler,
 		api.NewDeploymentsHandler(deployRepo, appRepo),
+		apiKeyAuthMiddleware,
 	)
 	r.Mount("/api/v1", apiRouter)
 

@@ -5,5 +5,5 @@ CREATE TABLE deploy_keys (
     public_key TEXT NOT NULL,
     private_key_encrypted TEXT NOT NULL,
     fingerprint TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

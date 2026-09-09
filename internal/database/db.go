@@ -2,16 +2,29 @@ package database
 
 import (
 	"database/sql"
+	"embed"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
+
 var DB *sql.DB
 
 func Connect(dsn string) (*sql.DB, error) {
+	if dsn == "" {
+		dsn = os.Getenv("DATABASE_URL")
+		if dsn == "" {
+			dsn = "labuh.db"
+		}
+	}
+
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, err
@@ -25,9 +38,12 @@ func Connect(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	// Configure SQLite pragmas for concurrency and safety (skip for in-memory unit tests)
+	if !strings.Contains(dsn, ":memory:") {
+		_, _ = db.Exec("PRAGMA foreign_keys = ON;")
+		_, _ = db.Exec("PRAGMA journal_mode = WAL;")
+		_, _ = db.Exec("PRAGMA busy_timeout = 5000;")
+	}
 
 	DB = db
 	return db, nil
@@ -44,27 +60,60 @@ func RunMigrations(db *sql.DB, migrationPath string) error {
 }
 
 func RunAllMigrations(db *sql.DB) error {
-	migrationsDir := "internal/database/migrations"
-	entries, err := os.ReadDir(migrationsDir)
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version TEXT PRIMARY KEY,
+			applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+	`)
 	if err != nil {
 		return err
 	}
 
+	entries, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
+		return err
+	}
+
+	var filenames []string
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
+			filenames = append(filenames, entry.Name())
 		}
-		if filepath.Ext(entry.Name()) != ".sql" {
+	}
+	sort.Strings(filenames)
+
+	for _, filename := range filenames {
+		var exists int
+		err := db.QueryRow("SELECT COUNT(1) FROM schema_migrations WHERE version = ?", filename).Scan(&exists)
+		if err != nil {
+			return err
+		}
+		if exists > 0 {
 			continue
 		}
 
-		path := filepath.Join(migrationsDir, entry.Name())
-		content, err := os.ReadFile(path)
+		content, err := migrationsFS.ReadFile("migrations/" + filename)
 		if err != nil {
 			return err
 		}
 
-		if _, err := db.Exec(string(content)); err != nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec(string(content)); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+
+		if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", filename); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
 			return err
 		}
 	}

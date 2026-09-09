@@ -9,6 +9,14 @@ templ LoginPage() {
 		<title>Labuh - Login</title>
 		<script src="https://cdn.tailwindcss.com"></script>
 		<script src="https://unpkg.com/htmx.org@2.0.0"></script>
+		<script>
+			document.addEventListener('htmx:configRequest', function(evt) {
+				var match = document.cookie.match(new RegExp('(^| )csrf_token=([^;]+)'));
+				if (match) {
+					evt.detail.headers['X-CSRF-Token'] = decodeURIComponent(match[2]);
+				}
+			});
+		</script>
 	</head>
 	<body class="bg-gray-50 flex items-center justify-center min-h-screen">
 		<div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">

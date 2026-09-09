@@ -1,7 +1,7 @@
 package caddy
 
 type Route struct {
-	ID     string   `json:"id,omitempty"`
+	ID     string   `json:"@id,omitempty"`
 	Match  []Match  `json:"match"`
 	Handle []Handle `json:"handle"`
 }

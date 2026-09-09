@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
@@ -120,6 +121,12 @@ func (h *ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 2 {
+			id = parts[1]
+		}
+	}
+	if id == "" || id == "projects" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
@@ -139,6 +146,12 @@ func (h *ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ProjectsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 2 {
+			id = parts[1]
+		}
+	}
+	if id == "" || id == "projects" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}

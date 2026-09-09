@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -28,12 +29,20 @@ func NewClient(baseURL, apiKey string) *Client {
 	}
 }
 
+func routeIDForDomain(domain string) string {
+	return "labuh-route-" + strings.ReplaceAll(domain, ".", "-")
+}
+
 func (c *Client) AddRoute(domain, upstreamAddr string, port int) error {
 	if domain == "" {
 		return fmt.Errorf("domain cannot be empty")
 	}
 
+	// Remove existing route if any to prevent duplicates
+	_ = c.RemoveRoute(domain)
+
 	route := Route{
+		ID: routeIDForDomain(domain),
 		Match: []Match{
 			{Host: []string{domain}},
 		},
@@ -80,7 +89,8 @@ func (c *Client) RemoveRoute(domain string) error {
 		return fmt.Errorf("domain cannot be empty")
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), "DELETE", c.baseURL+"/config/apps/http/servers/srv0/routes/host/"+domain, nil)
+	routeID := routeIDForDomain(domain)
+	req, err := http.NewRequestWithContext(context.Background(), "DELETE", c.baseURL+"/id/"+routeID, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -95,7 +105,7 @@ func (c *Client) RemoveRoute(domain string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusNotFound {
 		return fmt.Errorf("caddy API returned status %d", resp.StatusCode)
 	}
 

@@ -1,16 +1,19 @@
 package handler
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
 
+	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/settings"
@@ -50,34 +53,17 @@ func (h *BackupHandler) CreateBackup(w http.ResponseWriter, r *http.Request) {
 	filename := fmt.Sprintf("labuh-backup-%s.db", timestamp)
 	backupFile := filepath.Join(h.backupPath, filename)
 
-	dbPath := "labuh.db"
-	if _, err := os.Stat(dbPath); err != nil {
-		http.Error(w, "Database not found", http.StatusInternalServerError)
+	if database.DB != nil {
+		// SQLite online atomic backup using VACUUM INTO
+		_, err := database.DB.Exec(fmt.Sprintf("VACUUM INTO '%s'", backupFile))
+		if err != nil {
+			slog.Error("failed to create atomic backup via vacuum", "error", err)
+			http.Error(w, "Failed to create backup", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
 		return
-	}
-
-	src, err := os.Open(dbPath)
-	if err != nil {
-		http.Error(w, "Failed to open database", http.StatusInternalServerError)
-		return
-	}
-	defer src.Close()
-
-	dst, err := os.Create(backupFile)
-	if err != nil {
-		http.Error(w, "Failed to create backup", http.StatusInternalServerError)
-		return
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		os.Remove(backupFile)
-		http.Error(w, "Failed to copy database", http.StatusInternalServerError)
-		return
-	}
-
-	if err := dst.Close(); err != nil {
-		slog.Error("failed to close backup file", "error", err)
 	}
 
 	if err := rotateBackups(h.backupPath, 5); err != nil {
@@ -95,7 +81,20 @@ func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	backupFile := filepath.Join(h.backupPath, filename)
+	// Strictly prevent path traversal: must be pure filename with .db extension
+	cleanName := filepath.Base(filepath.Clean(filename))
+	if cleanName != filename || !strings.HasSuffix(cleanName, ".db") {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	backupFile := filepath.Join(h.backupPath, cleanName)
+	rel, err := filepath.Rel(h.backupPath, backupFile)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
 	if _, err := os.Stat(backupFile); err != nil {
 		http.Error(w, "Backup not found", http.StatusNotFound)
 		return
@@ -109,7 +108,7 @@ func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", cleanName))
 	io.Copy(w, f)
 }
 
@@ -132,7 +131,17 @@ func (h *BackupHandler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbPath := "labuh.db"
+	// Validate SQLite file header magic bytes: "SQLite format 3\x00"
+	if len(data) < 16 || !bytes.HasPrefix(data, []byte("SQLite format 3\x00")) {
+		http.Error(w, "Invalid database backup file", http.StatusBadRequest)
+		return
+	}
+
+	dbPath := os.Getenv("DATABASE_URL")
+	if dbPath == "" {
+		dbPath = "labuh.db"
+	}
+
 	if err := os.Rename(dbPath, dbPath+".bak"); err != nil {
 		slog.Error("failed to backup current database", "error", err)
 	}

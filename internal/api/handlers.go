@@ -8,6 +8,7 @@ import (
 
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
 type ProjectsHandler struct {
@@ -81,9 +82,11 @@ func (h *ProjectsHandler) ListByProject(w http.ResponseWriter, r *http.Request) 
 }
 
 type ApplicationsHandler struct {
-	appRepo     *repo.ApplicationRepo
-	projectRepo *repo.ProjectRepo
-	deployRepo  *repo.DeploymentRepo
+	appRepo      *repo.ApplicationRepo
+	projectRepo  *repo.ProjectRepo
+	deployRepo   *repo.DeploymentRepo
+	envVarRepo   *repo.EnvVarRepo
+	deployWorker *worker.DeployWorker
 }
 
 func NewApplicationsHandler(appRepo *repo.ApplicationRepo, projectRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo) *ApplicationsHandler {
@@ -92,6 +95,14 @@ func NewApplicationsHandler(appRepo *repo.ApplicationRepo, projectRepo *repo.Pro
 		projectRepo: projectRepo,
 		deployRepo:  deployRepo,
 	}
+}
+
+func (h *ApplicationsHandler) SetDeployWorker(w *worker.DeployWorker) {
+	h.deployWorker = w
+}
+
+func (h *ApplicationsHandler) SetEnvVarRepo(r *repo.EnvVarRepo) {
+	h.envVarRepo = r
 }
 
 func (h *ApplicationsHandler) ListByProject(w http.ResponseWriter, r *http.Request) {
@@ -118,12 +129,29 @@ func (h *ApplicationsHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logPath := "/tmp/labuh-logs/"
 	deployment, err := h.deployRepo.Create(models.CreateDeploymentInput{
 		ApplicationID: app.ID,
+		LogPath:       &logPath,
 	})
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to create deployment")
 		return
+	}
+
+	fullLogPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
+	_ = h.appRepo.UpdateStatus(app.ID, models.AppStatusBuilding)
+	_ = h.deployRepo.MarkStarted(deployment.ID)
+	_ = h.deployRepo.UpdateStatus(deployment.ID, models.DeployStatusQueued)
+
+	if h.deployWorker != nil {
+		var envVars []*models.AppEnvVar
+		if h.envVarRepo != nil {
+			envVars, _ = h.envVarRepo.GetByApplicationID(app.ID)
+		}
+		job := worker.BuildDeploymentJob(app, deployment.ID, envVars)
+		job.LogPath = fullLogPath
+		_ = h.deployWorker.Enqueue(job)
 	}
 
 	writeJSONData(w, http.StatusAccepted, map[string]string{"deployment_id": deployment.ID})

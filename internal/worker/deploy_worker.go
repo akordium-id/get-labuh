@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sort"
 	"sync"
@@ -108,15 +109,59 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 	}()
 }
 
-func (w *DeployWorker) Enqueue(job models.DeploymentJob) {
+func (w *DeployWorker) Enqueue(job models.DeploymentJob) error {
 	select {
 	case w.jobQueue <- job:
-	default:
+		return nil
+	case <-w.ctx.Done():
+		return w.ctx.Err()
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("deploy queue is full, could not enqueue job %s", job.DeploymentID)
 	}
 }
 
-func (w *DeployWorker) EnqueuePriority(job models.DeploymentJob) {
-	w.Enqueue(job)
+func (w *DeployWorker) EnqueuePriority(job models.DeploymentJob) error {
+	return w.Enqueue(job)
+}
+
+func BuildDeploymentJob(app *models.Application, deploymentID string, envVars []*models.AppEnvVar) models.DeploymentJob {
+	var envList []models.AppEnvVar
+	for _, ev := range envVars {
+		if ev != nil {
+			envList = append(envList, *ev)
+		}
+	}
+	var repoURL, branch, dockerfilePath, buildPath, dockerImage string
+	if app.RepositoryURL != nil {
+		repoURL = *app.RepositoryURL
+	}
+	if app.Branch != nil {
+		branch = *app.Branch
+	}
+	if app.DockerfilePath != nil {
+		dockerfilePath = *app.DockerfilePath
+	}
+	if app.BuildPath != nil {
+		buildPath = *app.BuildPath
+	}
+	if app.DockerImage != nil {
+		dockerImage = *app.DockerImage
+	}
+
+	return models.DeploymentJob{
+		DeploymentID:   deploymentID,
+		ApplicationID:  app.ID,
+		SourceType:     string(app.SourceType),
+		RepositoryURL:  repoURL,
+		Branch:         branch,
+		DockerfilePath: dockerfilePath,
+		BuildPath:      buildPath,
+		DockerImage:    dockerImage,
+		AppPort:        app.AppPort,
+		EnvVars:        envList,
+		LogPath:        "/tmp/labuh-logs/" + deploymentID + ".log",
+		Priority:       1,
+	}
 }
 
 func (w *DeployWorker) Stop() {

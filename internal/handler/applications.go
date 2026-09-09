@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
@@ -14,6 +15,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/applications"
+	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
 type ApplicationsHandler struct {
@@ -24,6 +26,7 @@ type ApplicationsHandler struct {
 	caddyClient  *caddy.Client
 	settingRepo  *repo.SettingRepo
 	dockerClient *docker.Client
+	deployWorker *worker.DeployWorker
 }
 
 func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo, envVarRepo *repo.EnvVarRepo, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, dockerClient *docker.Client) *ApplicationsHandler {
@@ -38,6 +41,10 @@ func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.Project
 	}
 }
 
+func (h *ApplicationsHandler) SetDeployWorker(w *worker.DeployWorker) {
+	h.deployWorker = w
+}
+
 func (h *ApplicationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -47,7 +54,24 @@ func (h *ApplicationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			h.Get(w, r)
 		}
 	case http.MethodPost:
-		h.Create(w, r)
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/start"):
+			h.Start(w, r)
+		case strings.HasSuffix(r.URL.Path, "/stop"):
+			h.Stop(w, r)
+		case strings.HasSuffix(r.URL.Path, "/restart"):
+			h.Restart(w, r)
+		case strings.HasSuffix(r.URL.Path, "/domain/remove"):
+			h.RemoveDomain(w, r)
+		case strings.HasSuffix(r.URL.Path, "/domain"):
+			h.SetDomain(w, r)
+		case strings.HasSuffix(r.URL.Path, "/env-vars"):
+			h.CreateEnvVar(w, r)
+		case strings.HasSuffix(r.URL.Path, "/deploy"):
+			h.Deploy(w, r)
+		default:
+			h.Create(w, r)
+		}
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
@@ -278,12 +302,22 @@ func (h *ApplicationsHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
 	_ = h.appRepo.UpdateStatus(app.ID, models.AppStatusBuilding)
 	_ = h.deployRepo.MarkStarted(deployment.ID)
+	_ = h.deployRepo.UpdateStatus(deployment.ID, models.DeployStatusQueued)
 
-	logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
-	_ = h.deployRepo.UpdateStatus(deployment.ID, models.DeployStatusCloning)
-	_ = logPath
+	if h.deployWorker != nil {
+		var envVars []*models.AppEnvVar
+		if h.envVarRepo != nil {
+			envVars, _ = h.envVarRepo.GetByApplicationID(app.ID)
+		}
+		job := worker.BuildDeploymentJob(app, deployment.ID, envVars)
+		job.LogPath = logPath
+		if err := h.deployWorker.Enqueue(job); err != nil {
+			slog.Error("failed to enqueue deployment job", "error", err, "deployment_id", deployment.ID)
+		}
+	}
 
 	w.Header().Set("HX-Redirect", "/deployments/"+deployment.ID)
 	w.WriteHeader(http.StatusOK)

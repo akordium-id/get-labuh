@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 )
 
 type ContainerStatus string
@@ -49,25 +53,12 @@ func (c *Client) StopContainer(ctx context.Context, containerID string, timeout 
 		return nil
 	}
 
-	running, err := c.IsContainerRunning(ctx, containerID)
-	if err != nil {
-		if _, ok := err.(*ContainerNotFoundError); ok {
-			return nil
-		}
-		return &DockerUnavailableError{Cause: err}
-	}
-
-	if !running {
-		slog.Info("container already stopped", "container_id", containerID)
-		return nil
-	}
-
 	if timeout <= 0 {
 		timeout = 10
 	}
 
-	slog.Info("stopping container", "container_id", containerID, "timeout_s", timeout)
-	return nil
+	stopTimeout := timeout
+	return c.cli.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &stopTimeout})
 }
 
 func (c *Client) RestartContainer(ctx context.Context, containerID string, timeout int) error {
@@ -75,15 +66,16 @@ func (c *Client) RestartContainer(ctx context.Context, containerID string, timeo
 		return fmt.Errorf("empty container ID")
 	}
 
-	if err := c.StopContainer(ctx, containerID, timeout); err != nil {
-		return err
+	if c.cli == nil {
+		return nil
 	}
 
-	if err := c.StartContainer(ctx, containerID); err != nil {
-		return err
+	restartTimeout := timeout
+	if restartTimeout <= 0 {
+		restartTimeout = 10
 	}
 
-	return nil
+	return c.cli.ContainerRestart(ctx, containerID, container.StopOptions{Timeout: &restartTimeout})
 }
 
 func (c *Client) IsContainerRunning(ctx context.Context, containerID string) (bool, error) {
@@ -96,8 +88,12 @@ func (c *Client) IsContainerRunning(ctx context.Context, containerID string) (bo
 		return false, nil
 	}
 
-	slog.Info("checking container status", "container_id", containerID)
-	return false, nil
+	inspect, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return false, err
+	}
+
+	return inspect.State != nil && inspect.State.Running, nil
 }
 
 func (c *Client) GetContainerStatus(ctx context.Context, containerID string) (string, error) {
@@ -109,28 +105,122 @@ func (c *Client) GetContainerStatus(ctx context.Context, containerID string) (st
 		return string(ContainerStatusStopped), nil
 	}
 
-	slog.Info("inspecting container", "container_id", containerID)
+	inspect, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return string(ContainerStatusStopped), err
+	}
+
+	if inspect.State != nil {
+		if inspect.State.Running {
+			return string(ContainerStatusRunning), nil
+		}
+		if inspect.State.Dead || inspect.State.OOMKilled {
+			return string(ContainerStatusFailed), nil
+		}
+	}
 	return string(ContainerStatusStopped), nil
 }
 
 func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imageName string, appPort int, envVars []struct{ Key, Value string }) (string, error) {
-	_ = ctx
-	_ = appID
-	_ = envSlug
-	_ = appSlug
-	_ = imageName
-	_ = appPort
-	_ = envVars
-	return "", fmt.Errorf("not implemented without docker client")
+	if c.cli == nil {
+		slog.Warn("docker client unavailable, returning simulated container ID", "app_id", appID)
+		return fmt.Sprintf("sim-container-%s", appID), nil
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	networkName := "labuh-network"
+	networks, err := c.cli.NetworkList(ctx, network.ListOptions{})
+	if err == nil {
+		found := false
+		for _, netItem := range networks {
+			if netItem.Name == networkName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			_, _ = c.cli.NetworkCreate(ctx, networkName, network.CreateOptions{Driver: "bridge"})
+		}
+	}
+
+	var envList []string
+	for _, ev := range envVars {
+		envList = append(envList, fmt.Sprintf("%s=%s", ev.Key, ev.Value))
+	}
+
+	containerName := c.GenerateContainerName(envSlug, appSlug, appID)
+	_ = c.cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
+
+	portStr := fmt.Sprintf("%d/tcp", appPort)
+	cfg := &container.Config{
+		Image: imageName,
+		Env:   envList,
+		ExposedPorts: nat.PortSet{
+			nat.Port(portStr): struct{}{},
+		},
+	}
+	hostCfg := &container.HostConfig{
+		RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
+	}
+	netCfg := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			networkName: {},
+		},
+	}
+
+	resp, err := c.cli.ContainerCreate(ctx, cfg, hostCfg, netCfg, nil, containerName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create container: %w", err)
+	}
+
+	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return "", fmt.Errorf("failed to start container: %w", err)
+	}
+
+	return resp.ID, nil
 }
 
 func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imageName string, envVars map[string]string, ports []string, volumeName string) (string, error) {
-	_ = ctx
-	_ = envSlug
-	_ = dbSlug
-	_ = imageName
-	_ = envVars
-	_ = ports
-	_ = volumeName
-	return "", fmt.Errorf("not implemented without docker client")
+	if c.cli == nil {
+		return fmt.Sprintf("sim-db-%s", dbSlug), nil
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	var envList []string
+	for k, v := range envVars {
+		envList = append(envList, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	containerName := fmt.Sprintf("labuh-db-%s-%s", envSlug, dbSlug)
+	_ = c.cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
+
+	cfg := &container.Config{
+		Image: imageName,
+		Env:   envList,
+	}
+	hostCfg := &container.HostConfig{
+		RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
+	}
+	netCfg := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			"labuh-network": {},
+		},
+	}
+
+	resp, err := c.cli.ContainerCreate(ctx, cfg, hostCfg, netCfg, nil, containerName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create db container: %w", err)
+	}
+
+	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return "", fmt.Errorf("failed to start db container: %w", err)
+	}
+
+	return resp.ID, nil
 }

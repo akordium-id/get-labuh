@@ -19,9 +19,19 @@ const csrfTokenLifetime = 1 * time.Hour
 
 func CSRFProtectionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/webhooks/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		if isSafeMethod(r.Method) {
-			token := generateCSRFToken()
-			setCSRFCookie(w, token)
+			token := ""
+			if c, err := r.Cookie(csrfTokenCookieName); err == nil && c.Value != "" {
+				token = c.Value
+			} else {
+				token = generateCSRFToken()
+				setCSRFCookie(w, token)
+			}
 			w.Header().Set("X-CSRF-Token", token)
 			next.ServeHTTP(w, r)
 			return
@@ -67,7 +77,7 @@ func setCSRFCookie(w http.ResponseWriter, token string) {
 		Name:     csrfTokenCookieName,
 		Value:    token,
 		Path:     "/",
-		HttpOnly: true,
+		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(csrfTokenLifetime.Seconds()),
 	}

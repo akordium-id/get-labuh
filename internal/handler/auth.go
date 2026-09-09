@@ -87,6 +87,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	tokenHash := auth.HashToken(token)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
+	_ = h.sessionRepo.EvictOldestSessions(user.ID, auth.MaxConcurrentSessions-1)
+
 	_, err = h.sessionRepo.Create(models.CreateSessionInput{
 		UserID:    user.ID,
 		TokenHash: tokenHash,

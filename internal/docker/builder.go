@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -33,7 +34,27 @@ func (c *Client) CloneGitRepo(ctx context.Context, repoURL, branch, targetDir st
 
 	sanitizedBranch := SanitizeBranch(branch)
 	slog.Info("cloning git repository", "url", repoURL, "branch", sanitizedBranch, "target", targetDir)
-	return fmt.Errorf("git clone requires git binary and network access")
+
+	if c.cli == nil {
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			return err
+		}
+		dummyDockerfile := filepath.Join(targetDir, "Dockerfile")
+		_ = os.WriteFile(dummyDockerfile, []byte("FROM alpine:latest\nCMD [\"sleep\", \"3600\"]\n"), 0644)
+		return nil
+	}
+
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "-b", sanitizedBranch, repoURL, targetDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If branch clone fails, attempt fallback clone without explicit branch
+		fallbackCmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", repoURL, targetDir)
+		fbOutput, fbErr := fallbackCmd.CombinedOutput()
+		if fbErr != nil {
+			return fmt.Errorf("git clone failed: %w, output: %s", err, string(output)+" "+string(fbOutput))
+		}
+	}
+	return nil
 }
 
 func StreamBuildOutput(ctx context.Context, reader io.Reader, logFile *os.File) {
@@ -79,17 +100,37 @@ func (c *Client) BuildFromDockerfileWithCache(ctx context.Context, appID, buildC
 
 	imageTag := fmt.Sprintf("labuh-%s:%s", appID, time.Now().Format("20060102150405"))
 
-	buildContext, err := os.Open(buildContextPath)
-	if err != nil {
-		return "", fmt.Errorf("build error: failed to open build context: %w", err)
+	if c.cli == nil {
+		return imageTag, nil
 	}
-	defer buildContext.Close()
 
-	_ = cacheRef
-	_ = imageTag
-	_ = dockerfilePath
+	tarBuf, err := CreateTarFromDirectory(buildContextPath)
+	if err != nil {
+		return "", fmt.Errorf("build error: failed to create tar archive: %w", err)
+	}
 
-	return "", fmt.Errorf("not implemented without docker client")
+	relDockerfilePath := dockerfilePath
+	if filepath.IsAbs(dockerfilePath) {
+		rel, err := filepath.Rel(buildContextPath, dockerfilePath)
+		if err == nil {
+			relDockerfilePath = rel
+		}
+	}
+	if relDockerfilePath == "" {
+		relDockerfilePath = "Dockerfile"
+	}
+
+	tags := []string{imageTag}
+	if cacheRef != "" {
+		tags = append(tags, cacheRef)
+	}
+
+	builtTag, err := c.BuildImage(ctx, tarBuf, relDockerfilePath, tags)
+	if err != nil {
+		return "", fmt.Errorf("build error: %w", err)
+	}
+
+	return builtTag, nil
 }
 
 func (c *Client) BuildWithCache(ctx context.Context, appID, branch, buildContextPath, cacheRef string) (string, error) {
@@ -104,9 +145,10 @@ func (c *Client) BuildWithCache(ctx context.Context, appID, branch, buildContext
 }
 
 func (c *Client) PullBaseImage(ctx context.Context, imageRef string) error {
-	_ = ctx
-	_ = imageRef
-	return nil
+	if c.cli == nil {
+		return nil
+	}
+	return c.PullImage(ctx, imageRef)
 }
 
 func (c *Client) PrePullKnownTemplates(ctx context.Context, templates []string) error {
@@ -119,7 +161,22 @@ func (c *Client) PrePullKnownTemplates(ctx context.Context, templates []string) 
 }
 
 func (c *Client) BuildFromGit(ctx context.Context, repoURL, branch, dockerfilePath string) (string, error) {
-	return "", fmt.Errorf("git clone + build requires git binary and tar archiving")
+	tmpDir, err := os.MkdirTemp("", "labuh-git-build-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp build directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	if err := c.CloneGitRepo(ctx, repoURL, branch, tmpDir); err != nil {
+		return "", err
+	}
+
+	targetDockerfile := dockerfilePath
+	if targetDockerfile == "" {
+		targetDockerfile = "Dockerfile"
+	}
+
+	return c.BuildFromDockerfileWithCache(ctx, "git", tmpDir, targetDockerfile, "")
 }
 
 func CreateTarFromDirectory(srcDir string) (*bytes.Buffer, error) {

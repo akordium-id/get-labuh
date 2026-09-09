@@ -9,8 +9,8 @@ CREATE TABLE service_templates (
     icon_url TEXT,
     category TEXT NOT NULL DEFAULT 'other',
     is_official BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE template_variables (
@@ -21,5 +21,5 @@ CREATE TABLE template_variables (
     description TEXT,
     required BOOLEAN DEFAULT true,
     default_value TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

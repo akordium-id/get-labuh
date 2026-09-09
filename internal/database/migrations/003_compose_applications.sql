@@ -7,7 +7,7 @@ CREATE TABLE compose_applications (
     compose_project_name TEXT,
     custom_domain TEXT UNIQUE,
     status TEXT NOT NULL DEFAULT 'idle',
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(environment_id, slug)
 );

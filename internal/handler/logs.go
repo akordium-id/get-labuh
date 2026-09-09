@@ -1,18 +1,25 @@
 package handler
 
 import (
+	"bufio"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/models"
 )
 
 type LogsHandler struct {
-	deployRepo *repo.DeploymentRepo
-	appRepo    *repo.ApplicationRepo
+	deployRepo   *repo.DeploymentRepo
+	appRepo      *repo.ApplicationRepo
+	dockerClient *docker.Client
 }
 
 func NewLogsHandler(deployRepo *repo.DeploymentRepo, appRepo *repo.ApplicationRepo) *LogsHandler {
@@ -20,6 +27,10 @@ func NewLogsHandler(deployRepo *repo.DeploymentRepo, appRepo *repo.ApplicationRe
 		deployRepo: deployRepo,
 		appRepo:    appRepo,
 	}
+}
+
+func (h *LogsHandler) SetDockerClient(client *docker.Client) {
+	h.dockerClient = client
 }
 
 func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +47,7 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 	}
 
 	logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
-	if deployment.LogPath != nil {
+	if deployment.LogPath != nil && *deployment.LogPath != "" {
 		logPath = *deployment.LogPath
 	}
 
@@ -53,25 +64,44 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 
 	sendEvent := func(event, data string) {
 		if event != "" {
-			w.Write([]byte("event: " + event + "\n"))
+			_, _ = w.Write([]byte("event: " + event + "\n"))
 		}
-		w.Write([]byte("data: " + data + "\n\n"))
+		_, _ = w.Write([]byte("data: " + data + "\n\n"))
 		flusher.Flush()
 	}
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 
-	var lastSize int64
+	var lastOffset int64 = 0
 	for {
 		select {
 		case <-r.Context().Done():
-			sendEvent("error", `{"message": "connection closed"}`)
 			return
 		case <-ticker.C:
-			_ = logPath
-			_ = lastSize
-			sendEvent("log-message", `{"output": "waiting for logs...", "timestamp": "`+time.Now().Format(time.RFC3339)+`"}`)
+			if file, err := os.Open(logPath); err == nil {
+				stat, sErr := file.Stat()
+				if sErr == nil && stat.Size() > lastOffset {
+					_, _ = file.Seek(lastOffset, io.SeekStart)
+					scanner := bufio.NewScanner(file)
+					for scanner.Scan() {
+						line := scanner.Text()
+						if line != "" {
+							sendEvent("log-message", fmt.Sprintf(`{"output": "%s", "timestamp": "%s"}`, escapeJSON(line), time.Now().Format(time.RFC3339)))
+						}
+					}
+					lastOffset = stat.Size()
+				}
+				_ = file.Close()
+			}
+
+			latestDeploy, dErr := h.deployRepo.GetByID(id)
+			if dErr == nil && latestDeploy != nil {
+				if latestDeploy.Status == models.DeployStatusSuccess || latestDeploy.Status == models.DeployStatusFailed {
+					sendEvent("done", fmt.Sprintf(`{"status": "%s"}`, latestDeploy.Status))
+					return
+				}
+			}
 		}
 	}
 }
@@ -84,7 +114,7 @@ func (h *LogsHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Request
 	}
 
 	app, err := h.appRepo.GetByID(id)
-	if err != nil || app.ContainerID == nil {
+	if err != nil || app.ContainerID == nil || *app.ContainerID == "" {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
@@ -102,13 +132,50 @@ func (h *LogsHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Request
 
 	sendEvent := func(event, data string) {
 		if event != "" {
-			w.Write([]byte("event: " + event + "\n"))
+			_, _ = w.Write([]byte("event: " + event + "\n"))
 		}
-		w.Write([]byte("data: " + data + "\n\n"))
+		_, _ = w.Write([]byte("data: " + data + "\n\n"))
 		flusher.Flush()
 	}
 
-	sendEvent("error", `{"message": "docker client not implemented"}`)
+	if h.dockerClient == nil {
+		sendEvent("error", `{"message": "docker client not configured"}`)
+		sendEvent("done", "{}")
+		return
+	}
+
+	reader, err := h.dockerClient.ContainerLogs(r.Context(), *app.ContainerID, nil)
+	if err != nil {
+		sendEvent("error", fmt.Sprintf(`{"message": "%s"}`, escapeJSON(err.Error())))
+		sendEvent("done", "{}")
+		return
+	}
+	if reader == nil {
+		sendEvent("log-message", fmt.Sprintf(`{"output": "Container is not emitting logs or running in simulated mode", "timestamp": "%s"}`, time.Now().Format(time.RFC3339)))
+		sendEvent("done", "{}")
+		return
+	}
+	defer reader.Close()
+
+	pr, pw := io.Pipe()
+	go func() {
+		_ = docker.DemultiplexLogs(pw, reader)
+		_ = pw.Close()
+	}()
+
+	scanner := bufio.NewScanner(pr)
+	for scanner.Scan() {
+		select {
+		case <-r.Context().Done():
+			return
+		default:
+			line := scanner.Text()
+			if line != "" {
+				sendEvent("log-message", fmt.Sprintf(`{"output": "%s", "timestamp": "%s"}`, escapeJSON(line), time.Now().Format(time.RFC3339)))
+			}
+		}
+	}
+
 	sendEvent("done", "{}")
 }
 
