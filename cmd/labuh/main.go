@@ -97,6 +97,8 @@ func main() {
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 
 	deployWorker := worker.NewDeployWorker(10)
+	deployWorker.SetMaxConcurrent(3)
+	deployWorker.SetWorkerCount(1)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 	defer deployWorker.Stop()
 
@@ -108,6 +110,7 @@ func main() {
 	r.Use(middleware.RateLimitMiddleware)
 	r.Use(middleware.CSRFProtectionMiddleware)
 	r.Use(middleware.AuditLoggingMiddleware(auditRepo))
+	r.Use(middleware.CacheMiddleware)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -248,6 +251,9 @@ func main() {
 	tlsEnabled := os.Getenv("LABUH_TLS_ENABLED") == "true"
 	tlsCert := os.Getenv("LABUH_TLS_CERT_PATH")
 	tlsKey := os.Getenv("LABUH_TLS_KEY_PATH")
+
+	profilingAddr := os.Getenv("LABUH_PPROF_ADDR")
+	_ = observability.SetupProfiling(profilingAddr)
 
 	srv := &http.Server{
 		Addr:    ":" + port,

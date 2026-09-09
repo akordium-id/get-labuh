@@ -26,24 +26,24 @@ func GenerateRouteConfig(domain, upstreamAddr string, port int) ([]byte, error) 
 }
 
 func GenerateServerConfig(domain, upstreamAddr string, port int) ([]byte, error) {
-	config := map[string]interface{}{
-		"apps": map[string]interface{}{
-			"http": map[string]interface{}{
-				"servers": map[string]interface{}{
-					"srv0": map[string]interface{}{
-					"routes": []Route{
-						{
-							Match: []Match{
-								{Host: []string{domain}},
-							},
-							Handle: []Handle{
-								{
-									Handler:   "reverse_proxy",
-									Upstreams: []Upstream{{Dial: fmt.Sprintf("%s:%d", upstreamAddr, port)}},
+	config := map[string]any{
+		"apps": map[string]any{
+			"http": map[string]any{
+				"servers": map[string]any{
+					"srv0": map[string]any{
+						"routes": []Route{
+							{
+								Match: []Match{
+									{Host: []string{domain}},
+								},
+								Handle: []Handle{
+									{
+										Handler:   "reverse_proxy",
+										Upstreams: []Upstream{{Dial: fmt.Sprintf("%s:%d", upstreamAddr, port)}},
+									},
 								},
 							},
 						},
-					},
 					},
 				},
 			},

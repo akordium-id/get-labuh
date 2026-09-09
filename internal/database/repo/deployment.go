@@ -80,6 +80,66 @@ func (r *DeploymentRepo) GetByApplicationID(appID string) ([]*models.Deployment,
 	return deployments, nil
 }
 
+func (r *DeploymentRepo) GetByApplicationIDPaginated(appID string, limit, offset int) ([]*models.Deployment, int, error) {
+	var total int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM deployments WHERE application_id = ?", appID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(
+		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		 FROM deployments WHERE application_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		appID, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var deployments []*models.Deployment
+	for rows.Next() {
+		deployment := &models.Deployment{}
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		deployments = append(deployments, deployment)
+	}
+
+	return deployments, total, nil
+}
+
+func (r *DeploymentRepo) GetByStatusPaginated(status models.DeployStatus, limit, offset int) ([]*models.Deployment, int, error) {
+	var total int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM deployments WHERE status = ?", status).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(
+		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		 FROM deployments WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		status, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var deployments []*models.Deployment
+	for rows.Next() {
+		deployment := &models.Deployment{}
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		deployments = append(deployments, deployment)
+	}
+
+	return deployments, total, nil
+}
+
 func (r *DeploymentRepo) UpdateStatus(id string, status models.DeployStatus) error {
 	now := time.Now()
 	_, err := r.db.Exec(

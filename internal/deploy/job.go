@@ -12,6 +12,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/logging"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
@@ -27,6 +28,7 @@ type DeploymentJob struct {
 	AppPort        int
 	EnvVars        []models.AppEnvVar
 	LogPath        string
+	Priority       int
 }
 
 type ComposeJob struct {
@@ -60,7 +62,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		return &DeployError{Step: "init", Cause: err}
 	}
 
-	logFile, err := os.Create(job.LogPath)
+	logFile, err := logging.NewRotatingWriter(job.LogPath, 10*1024*1024, 5)
 	if err != nil {
 		return &DeployError{Step: "init", Cause: err}
 	}
@@ -81,6 +83,9 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
 		}
 
+		cloneCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
 		buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
 		if err := os.MkdirAll(buildDir, 0755); err != nil {
 			errMsg := fmt.Sprintf("failed to create build directory: %v", err)
@@ -89,7 +94,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			return &DeployError{Step: "clone", Cause: err, Output: errMsg}
 		}
 
-		if err := p.dockerClient.CloneGitRepo(ctx, job.RepositoryURL, job.Branch, buildDir); err != nil {
+		if err := p.dockerClient.CloneGitRepo(cloneCtx, job.RepositoryURL, job.Branch, buildDir); err != nil {
 			errMsg := fmt.Sprintf("git clone failed: %v", err)
 			writeLog(logFile, errMsg)
 			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
@@ -108,6 +113,9 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
 		}
 
+		buildCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+
 		buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
 		if err := os.MkdirAll(buildDir, 0755); err != nil {
 			errMsg := fmt.Sprintf("failed to create build directory: %v", err)
@@ -116,7 +124,8 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			return &DeployError{Step: "build", Cause: err, Output: errMsg}
 		}
 
-		builtImage, err := p.dockerClient.BuildFromDockerfile(ctx, job.ApplicationID, buildDir, job.DockerfilePath)
+		cacheRef := docker.GenerateCacheRef(job.ApplicationID, job.Branch)
+		builtImage, err := p.dockerClient.BuildWithCache(buildCtx, job.ApplicationID, job.Branch, buildDir, cacheRef)
 		if err != nil {
 			errMsg := fmt.Sprintf("docker build failed: %v", err)
 			writeLog(logFile, errMsg)
@@ -137,7 +146,10 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
 		}
 
-		if err := p.dockerClient.PullImage(ctx, job.DockerImage); err != nil {
+		pullCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+
+		if err := p.dockerClient.PullImage(pullCtx, job.DockerImage); err != nil {
 			errMsg := fmt.Sprintf("failed to pull image: %v", err)
 			writeLog(logFile, errMsg)
 			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
@@ -225,10 +237,10 @@ func (p *Pipeline) cleanupFailedContainer(ctx context.Context, job DeploymentJob
 	}
 }
 
-func writeLog(file *os.File, message string) {
+func writeLog(file logging.LogWriter, message string) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	line := fmt.Sprintf("[%s] %s\n", timestamp, message)
-	if _, err := file.WriteString(line); err != nil {
+	if _, err := file.Write([]byte(line)); err != nil {
 		// best effort
 	}
 	if err := file.Sync(); err != nil {

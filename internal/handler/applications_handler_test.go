@@ -15,8 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//go:fix inline
 func strPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
 func setupApplicationsHandler(t *stdtesting.T) (*ApplicationsHandler, *repo.ApplicationRepo, *repo.ProjectRepo) {
@@ -165,7 +166,7 @@ func TestApplicationsHandler_RemoveDomain(t *stdtesting.T) {
 		Name:          "Remove Domain App",
 		Slug:          "remove-domain-app",
 		SourceType:    models.SourceTypeGit,
-		CustomDomain:  strPtr("example.com"),
+		CustomDomain:  new("example.com"),
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/domain/remove", nil)

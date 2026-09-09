@@ -6,8 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//go:fix inline
 func strPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
 func TestDeployStepConstants(t *stdtesting.T) {
@@ -23,8 +24,8 @@ func TestDeploymentStruct(t *stdtesting.T) {
 		ID:            "deploy-1",
 		ApplicationID: "app-1",
 		Status:        DeployStatusQueued,
-		Step:          strPtr("clone"),
-		Output:        strPtr("cloning repo..."),
+		Step:          new("clone"),
+		Output:        new("cloning repo..."),
 	}
 
 	assert.Equal(t, "deploy-1", deployment.ID)
@@ -36,12 +37,12 @@ func TestDeploymentStruct(t *stdtesting.T) {
 
 func TestCreateDeploymentInput(t *stdtesting.T) {
 	input := CreateDeploymentInput{
-		ApplicationID:  "app-1",
-		CommitHash:     strPtr("abc123"),
-		CommitMessage:  strPtr("fix: bug"),
-		LogPath:        strPtr("/tmp/logs"),
-		Step:           strPtr("build"),
-		Output:         strPtr("building..."),
+		ApplicationID: "app-1",
+		CommitHash:    new("abc123"),
+		CommitMessage: new("fix: bug"),
+		LogPath:       new("/tmp/logs"),
+		Step:          new("build"),
+		Output:        new("building..."),
 	}
 
 	assert.Equal(t, "app-1", input.ApplicationID)

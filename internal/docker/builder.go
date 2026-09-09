@@ -66,6 +66,10 @@ func StreamBuildOutput(ctx context.Context, reader io.Reader, logFile *os.File) 
 }
 
 func (c *Client) BuildFromDockerfile(ctx context.Context, appID, buildContextPath, dockerfilePath string) (string, error) {
+	return c.BuildFromDockerfileWithCache(ctx, appID, buildContextPath, dockerfilePath, "")
+}
+
+func (c *Client) BuildFromDockerfileWithCache(ctx context.Context, appID, buildContextPath, dockerfilePath, cacheRef string) (string, error) {
 	if appID == "" {
 		return "", fmt.Errorf("build error: invalid application ID")
 	}
@@ -81,10 +85,37 @@ func (c *Client) BuildFromDockerfile(ctx context.Context, appID, buildContextPat
 	}
 	defer buildContext.Close()
 
+	_ = cacheRef
 	_ = imageTag
 	_ = dockerfilePath
 
 	return "", fmt.Errorf("not implemented without docker client")
+}
+
+func (c *Client) BuildWithCache(ctx context.Context, appID, branch, buildContextPath, cacheRef string) (string, error) {
+	if cacheRef == "" {
+		cacheRef = GenerateCacheRef(appID, branch)
+	}
+	dockerfilePath := "Dockerfile"
+	if buildContextPath != "" {
+		dockerfilePath = filepath.Join(buildContextPath, "Dockerfile")
+	}
+	return c.BuildFromDockerfileWithCache(ctx, appID, buildContextPath, dockerfilePath, cacheRef)
+}
+
+func (c *Client) PullBaseImage(ctx context.Context, imageRef string) error {
+	_ = ctx
+	_ = imageRef
+	return nil
+}
+
+func (c *Client) PrePullKnownTemplates(ctx context.Context, templates []string) error {
+	for _, template := range templates {
+		if err := c.PullBaseImage(ctx, template); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Client) BuildFromGit(ctx context.Context, repoURL, branch, dockerfilePath string) (string, error) {

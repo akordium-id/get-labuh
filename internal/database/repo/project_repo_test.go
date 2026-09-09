@@ -4,12 +4,13 @@ import (
 	stdtesting "testing"
 
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/stretchr/testify/assert"
 	testhelpers "github.com/akordium-id/get-labuh/internal/testing"
+	"github.com/stretchr/testify/assert"
 )
 
+//go:fix inline
 func strPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
 func TestProjectRepo_Create(t *stdtesting.T) {
@@ -20,7 +21,7 @@ func TestProjectRepo_Create(t *stdtesting.T) {
 	project, err := projectRepo.Create(models.CreateProjectInput{
 		Name:        "Test Project",
 		Slug:        "test-project",
-		Description: strPtr("desc"),
+		Description: new("desc"),
 	})
 
 	assert.NoError(t, err)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 )
 
@@ -132,10 +133,8 @@ func (c *Client) RouteExists(domain string) (bool, error) {
 
 	for _, route := range routes {
 		for _, match := range route.Match {
-			for _, host := range match.Host {
-				if host == domain {
-					return true, nil
-				}
+			if slices.Contains(match.Host, domain) {
+				return true, nil
 			}
 		}
 	}

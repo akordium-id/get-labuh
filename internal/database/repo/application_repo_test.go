@@ -4,8 +4,8 @@ import (
 	stdtesting "testing"
 
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/stretchr/testify/assert"
 	testhelpers "github.com/akordium-id/get-labuh/internal/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestApplicationRepo_Create(t *stdtesting.T) {
@@ -167,7 +167,7 @@ func TestApplicationRepo_Clone(t *stdtesting.T) {
 		Name:          "Original",
 		Slug:          "original",
 		SourceType:    models.SourceTypeGit,
-		RepositoryURL: strPtr("https://github.com/test/repo"),
+		RepositoryURL: new("https://github.com/test/repo"),
 	})
 
 	cloned, err := appRepo.Clone(src, "env-2", "Cloned App")
