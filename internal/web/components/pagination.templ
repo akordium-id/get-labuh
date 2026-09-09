@@ -1,0 +1,57 @@
+package components
+
+templ Pagination(currentPage, totalPages int, baseURL string) {
+	if totalPages > 1 {
+		<nav class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6" aria-label="Pagination">
+			<div class="hidden sm:block">
+				<p class="text-sm text-gray-700">
+					Page <span class="font-medium">{ formatInt(currentPage) }</span> of <span class="font-medium">{ formatInt(totalPages) }</span>
+				</p>
+			</div>
+			<div class="flex flex-1 justify-between sm:justify-end gap-2">
+				if currentPage > 1 {
+					<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(currentPage-1)) }
+					   class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+						Previous
+					</a>
+				}
+				<div class="hidden sm:flex gap-1">
+					for i := 1; i <= totalPages; i++ {
+						if i == currentPage {
+							<span class="relative inline-flex items-center rounded-md border border-blue-500 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-600">
+								{ formatInt(i) }
+							</span>
+						} else {
+							<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(i)) }
+							   class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+								{ formatInt(i) }
+							</a>
+						}
+					}
+				</div>
+				if currentPage < totalPages {
+					<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(currentPage+1)) }
+					   class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+						Next
+					</a>
+				}
+			</div>
+		</nav>
+	}
+}
+
+func formatInt(n int) string {
+	if n < 0 {
+		return "0"
+	}
+	if n == 0 {
+		return "0"
+	}
+	var result []byte
+	for n > 0 {
+		digit := byte('0' + n%10)
+		result = append([]byte{digit}, result...)
+		n /= 10
+	}
+	return string(result)
+}

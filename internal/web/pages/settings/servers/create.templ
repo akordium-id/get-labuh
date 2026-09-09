@@ -1,19 +1,23 @@
 package settings
 
+import "github.com/akordium-id/get-labuh/internal/web/components"
+
 templ ServerCreatePage() {
 	<div>
 		<div class="mb-6">
 			<h1 class="text-3xl font-bold text-gray-900">Add Server</h1>
 		</div>
 		<div class="max-w-lg">
-			<form action="/settings/servers" method="post" class="space-y-6 bg-white rounded-lg shadow border border-gray-200 p-6">
+			<form action="/settings/servers" method="post" hx-on:htmx:validation:failed="handleValidationFailed(event)" class="space-y-6 bg-white rounded-lg shadow border border-gray-200 p-6">
 				<div>
 					<label for="name" class="block text-sm font-medium text-gray-700">Name</label>
 					<input type="text" id="name" name="name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="Production Server">
+					<p class="mt-1 text-sm text-red-600 hidden" id="name-error">Name is required</p>
 				</div>
 				<div>
 					<label for="host" class="block text-sm font-medium text-gray-700">Host</label>
 					<input type="text" id="host" name="host" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="192.168.1.1">
+					<p class="mt-1 text-sm text-red-600 hidden" id="host-error">Host is required</p>
 				</div>
 				<div>
 					<label for="port" class="block text-sm font-medium text-gray-700">Port</label>
@@ -26,12 +30,30 @@ templ ServerCreatePage() {
 				<div>
 					<label for="ssh_key_path" class="block text-sm font-medium text-gray-700">SSH Key Path</label>
 					<input type="text" id="ssh_key_path" name="ssh_key_path" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="/root/.ssh/id_rsa">
+					<p class="mt-1 text-sm text-red-600 hidden" id="ssh_key_path-error">SSH Key Path is required</p>
 				</div>
 				<div class="flex justify-end">
 					<a href="/settings/servers" class="text-gray-600 hover:text-gray-900 mr-4">Cancel</a>
-					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Add Server</button>
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2">
+						@components.Spinner("sm", "white")
+						Add Server
+					</button>
 				</div>
 			</form>
 		</div>
 	</div>
+	<script>
+		function handleValidationFailed(event) {
+			var errors = event.detail.errors;
+			for (var name in errors) {
+				var input = document.querySelector('[name="' + name + '"]');
+				if (input) {
+					input.classList.add('border-red-500', 'focus:ring-red-500');
+					input.classList.remove('focus:ring-blue-500');
+					var errorEl = document.getElementById(name + '-error');
+					if (errorEl) errorEl.classList.remove('hidden');
+				}
+			}
+		}
+	</script>
 }

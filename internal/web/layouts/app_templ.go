@@ -31,7 +31,7 @@ func AppLayout(content templ.Component) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Labuh</title><script src=\"https://cdn.tailwindcss.com\"></script><script src=\"https://unpkg.com/htmx.org@2.0.0\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script></head><body class=\"bg-gray-50\"><div class=\"flex h-screen\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Labuh</title><script src=\"https://cdn.tailwindcss.com\"></script><script src=\"https://unpkg.com/htmx.org@2.0.0\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><script>\n\t\t\tdocument.addEventListener('htmx:configRequest', function(evt) {\n\t\t\t\tvar csrfToken = document.querySelector('meta[name=\"csrf-token\"]');\n\t\t\t\tif (csrfToken) {\n\t\t\t\t\tevt.detail.headers['X-CSRF-Token'] = csrfToken.getAttribute('content');\n\t\t\t\t}\n\t\t\t});\n\t\t</script></head><body class=\"bg-gray-50\" x-data=\"{ sidebarOpen: false }\"><div class=\"flex h-screen\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -39,7 +39,7 @@ func AppLayout(content templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"flex-1 flex flex-col\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"flex-1 flex flex-col min-w-0\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -47,7 +47,7 @@ func AppLayout(content templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<main id=\"main-content\" class=\"flex-1 overflow-auto p-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div id=\"toast-container\" class=\"fixed top-4 right-4 z-50 hidden\"><div id=\"toast\" class=\"hidden bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md shadow-lg max-w-sm\"><p class=\"text-sm font-medium\" id=\"toast-message\">An error occurred</p></div></div><main id=\"main-content\" class=\"flex-1 overflow-auto p-6\" hx-on:htmx:error=\"handleHtmxError(event)\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -55,7 +55,7 @@ func AppLayout(content templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main></div></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main></div></div><script>\n\t\t\tfunction handleHtmxError(event) {\n\t\t\t\tvar toast = document.getElementById('toast');\n\t\t\t\tvar toastMessage = document.getElementById('toast-message');\n\t\t\t\tvar toastContainer = document.getElementById('toast-container');\n\t\t\t\tif (toast && toastMessage && toastContainer) {\n\t\t\t\t\tvar status = event.detail.xhr ? event.detail.xhr.status : 0;\n\t\t\t\t\tvar message = 'Request failed with status ' + status;\n\t\t\t\t\tif (event.detail.xhr && event.detail.xhr.responseText) {\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tvar json = JSON.parse(event.detail.xhr.responseText);\n\t\t\t\t\t\t\tif (json.error) message = json.error;\n\t\t\t\t\t\t} catch(e) {}\n\t\t\t\t\t}\n\t\t\t\t\ttoastMessage.textContent = message;\n\t\t\t\t\ttoast.classList.remove('hidden');\n\t\t\t\t\ttoastContainer.classList.remove('hidden');\n\t\t\t\t\tsetTimeout(function() {\n\t\t\t\t\t\ttoast.classList.add('hidden');\n\t\t\t\t\t\ttoastContainer.classList.add('hidden');\n\t\t\t\t\t}, 5000);\n\t\t\t\t}\n\t\t\t}\n\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

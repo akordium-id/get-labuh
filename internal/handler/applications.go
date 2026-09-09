@@ -60,13 +60,32 @@ func (h *ApplicationsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apps, err := h.appRepo.GetByEnvironmentID(envID)
+	page := parseInt(r.URL.Query().Get("page"), 1)
+	search := r.URL.Query().Get("search")
+	limit := 10
+	offset := (page - 1) * limit
+
+	var apps []*models.Application
+	var total int
+	var err error
+
+	if search != "" {
+		apps, total, err = h.appRepo.SearchPaginated(envID, search, limit, offset)
+	} else {
+		apps, total, err = h.appRepo.GetByEnvironmentIDPaginated(envID, limit, offset)
+	}
+
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	templ.Handler(layouts.AppLayout(applications.ApplicationsListPage(apps))).ServeHTTP(w, r)
+	totalPages := (total + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	templ.Handler(layouts.AppLayout(applications.ApplicationsListPage(apps, page, totalPages, search))).ServeHTTP(w, r)
 }
 
 func (h *ApplicationsHandler) Create(w http.ResponseWriter, r *http.Request) {

@@ -33,13 +33,32 @@ func (h *DatabasesHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbServices, err := h.dbRepo.GetByEnvironmentID(envID)
+	page := parseInt(r.URL.Query().Get("page"), 1)
+	search := r.URL.Query().Get("search")
+	limit := 10
+	offset := (page - 1) * limit
+
+	var dbServices []*models.DatabaseService
+	var total int
+	var err error
+
+	if search != "" {
+		dbServices, total, err = h.dbRepo.SearchPaginated(envID, search, limit, offset)
+	} else {
+		dbServices, total, err = h.dbRepo.GetByEnvironmentIDPaginated(envID, limit, offset)
+	}
+
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	templ.Handler(layouts.AppLayout(databases.DatabaseListPage(dbServices))).ServeHTTP(w, r)
+	totalPages := (total + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	templ.Handler(layouts.AppLayout(databases.DatabaseListPage(dbServices, page, totalPages, search))).ServeHTTP(w, r)
 }
 
 func (h *DatabasesHandler) Create(w http.ResponseWriter, r *http.Request) {

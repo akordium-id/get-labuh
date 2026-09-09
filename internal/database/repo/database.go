@@ -116,6 +116,67 @@ func (r *DatabaseRepo) GetByEnvironmentID(envID string) ([]*models.DatabaseServi
 	return dbServices, nil
 }
 
+func (r *DatabaseRepo) GetByEnvironmentIDPaginated(envID string, limit, offset int) ([]*models.DatabaseService, int, error) {
+	var total int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM database_services WHERE environment_id = ?", envID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, created_at, updated_at
+		 FROM database_services WHERE environment_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		envID, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var dbServices []*models.DatabaseService
+	for rows.Next() {
+		dbService := &models.DatabaseService{}
+		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CreatedAt, &dbService.UpdatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		dbServices = append(dbServices, dbService)
+	}
+
+	return dbServices, total, nil
+}
+
+func (r *DatabaseRepo) SearchPaginated(envID, search string, limit, offset int) ([]*models.DatabaseService, int, error) {
+	var total int
+	searchPattern := "%" + search + "%"
+	err := r.db.QueryRow("SELECT COUNT(*) FROM database_services WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?)", envID, searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, created_at, updated_at
+		 FROM database_services WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		envID, searchPattern, searchPattern, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var dbServices []*models.DatabaseService
+	for rows.Next() {
+		dbService := &models.DatabaseService{}
+		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CreatedAt, &dbService.UpdatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		dbServices = append(dbServices, dbService)
+	}
+
+	return dbServices, total, nil
+}
+
 func (r *DatabaseRepo) UpdateStatus(id string, status models.DatabaseStatus) error {
 	_, err := r.db.Exec(
 		`UPDATE database_services SET status = ?, updated_at = ? WHERE id = ?`,

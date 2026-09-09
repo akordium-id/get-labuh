@@ -8,6 +8,8 @@ package projects
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import "github.com/akordium-id/get-labuh/internal/web/components"
+
 func ProjectCreatePage() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -29,7 +31,15 @@ func ProjectCreatePage() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"max-w-2xl\"><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Project</h1><form hx-post=\"/projects\" hx-target=\"#main-content\" hx-swap=\"innerHTML\" class=\"bg-white p-6 rounded-lg shadow border border-gray-200\"><div class=\"mb-4\"><label class=\"block text-sm font-medium text-gray-700 mb-1\">Name</label> <input type=\"text\" name=\"name\" required oninput=\"document.getElementById('slug-preview').value = this.value.toLowerCase().replace(/ /g, '-')\" class=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"></div><div class=\"mb-4\"><label class=\"block text-sm font-medium text-gray-700 mb-1\">Slug</label> <input type=\"text\" id=\"slug-preview\" name=\"slug\" required class=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"></div><div class=\"mb-4\"><label class=\"block text-sm font-medium text-gray-700 mb-1\">Description</label> <textarea name=\"description\" rows=\"3\" class=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"></textarea></div><div class=\"flex justify-end space-x-3\"><a href=\"/projects\" class=\"px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50\">Cancel</a> <button type=\"submit\" class=\"px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700\">Create Project</button></div></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"max-w-2xl\"><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Project</h1><form hx-post=\"/projects\" hx-target=\"#main-content\" hx-swap=\"innerHTML\" hx-on:htmx:validation:failed=\"handleValidationFailed(event)\" class=\"bg-white p-6 rounded-lg shadow border border-gray-200\"><div class=\"mb-4\"><label class=\"block text-sm font-medium text-gray-700 mb-1\">Name</label> <input type=\"text\" name=\"name\" required oninput=\"document.getElementById('slug-preview').value = this.value.toLowerCase().replace(/ /g, '-')\" class=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"><p class=\"mt-1 text-sm text-red-600 hidden\" id=\"name-error\">Name is required</p></div><div class=\"mb-4\"><label class=\"block text-sm font-medium text-gray-700 mb-1\">Slug</label> <input type=\"text\" id=\"slug-preview\" name=\"slug\" required class=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"><p class=\"mt-1 text-sm text-red-600 hidden\" id=\"slug-error\">Slug is required</p></div><div class=\"mb-4\"><label class=\"block text-sm font-medium text-gray-700 mb-1\">Description</label> <textarea name=\"description\" rows=\"3\" class=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"></textarea></div><div class=\"flex justify-end space-x-3\"><a href=\"/projects\" class=\"px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50\">Cancel</a> <button type=\"submit\" class=\"px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.Spinner("sm", "white").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Create Project</button></div></form><script>\n\t\t\tfunction handleValidationFailed(event) {\n\t\t\t\tvar errors = event.detail.errors;\n\t\t\t\tfor (var name in errors) {\n\t\t\t\t\tvar input = document.querySelector('[name=\"' + name + '\"]');\n\t\t\t\t\tif (input) {\n\t\t\t\t\t\tinput.classList.add('border-red-500', 'focus:ring-red-500');\n\t\t\t\t\t\tinput.classList.remove('focus:ring-blue-500');\n\t\t\t\t\t\tvar errorEl = document.getElementById(name + '-error');\n\t\t\t\t\t\tif (errorEl) errorEl.classList.remove('hidden');\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t</script></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

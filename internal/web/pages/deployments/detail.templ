@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/components"
+	"github.com/akordium-id/get-labuh/internal/web"
 )
 
 func statusColor(status models.DeployStatus) string {
@@ -37,12 +39,12 @@ templ DeploymentDetailPage(deployment interface{}, app interface{}) {
 		<div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
 			<div class="flex items-center justify-between mb-4">
 				<div>
-					<span class={ "px-3 py-1 rounded-full text-sm font-medium " + statusColor(deployment.(*models.Deployment).Status) }>
-						{ deployment.(*models.Deployment).Status }
-					</span>
+					if d, ok := deployment.(*models.Deployment); ok {
+						@components.StatusBadge(string(d.Status))
+					}
 				</div>
 				<div class="text-sm text-gray-500">
-					Started: { time.Now().Format("2006-01-02 15:04:05") }
+					Started: { web.FormatDateTime(time.Now()) }
 				</div>
 			</div>
 

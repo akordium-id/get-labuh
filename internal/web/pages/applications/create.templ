@@ -1,13 +1,16 @@
 package applications
 
+import "github.com/akordium-id/get-labuh/internal/web/components"
+
 templ ApplicationsCreatePage() {
 	<div>
 		<h1 class="text-3xl font-bold text-gray-900 mb-6">New Application</h1>
 		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-			<form action="/applications" method="post" class="space-y-4">
+			<form action="/applications" method="post" hx-on:htmx:validation:failed="handleValidationFailed(event)" class="space-y-4">
 				<div>
 					<label class="block text-sm font-medium text-gray-700">Name</label>
 					<input type="text" name="name" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+					<p class="mt-1 text-sm text-red-600 hidden" id="name-error">Name is required</p>
 				</div>
 				<div>
 					<label class="block text-sm font-medium text-gray-700">Source Type</label>
@@ -30,10 +33,27 @@ templ ApplicationsCreatePage() {
 					<input type="number" name="app_port" value="8080" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
 				</div>
 				<div class="flex gap-2">
-					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Create Application</button>
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2">
+						@components.Spinner("sm", "white")
+						Create Application
+					</button>
 					<a href="/projects" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancel</a>
 				</div>
 			</form>
 		</div>
 	</div>
+	<script>
+		function handleValidationFailed(event) {
+			var errors = event.detail.errors;
+			for (var name in errors) {
+				var input = document.querySelector('[name="' + name + '"]');
+				if (input) {
+					input.classList.add('border-red-500', 'focus:ring-red-500');
+					input.classList.remove('focus:ring-blue-500');
+					var errorEl = document.getElementById(name + '-error');
+					if (errorEl) errorEl.classList.remove('hidden');
+				}
+			}
+		}
+	</script>
 }

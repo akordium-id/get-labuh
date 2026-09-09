@@ -1,37 +1,43 @@
 package components
 
 templ Sidebar() {
-	<aside class="w-64 bg-gray-900 text-white h-screen flex flex-col">
-		<div class="p-4 border-b border-gray-800">
+	<aside x-data="{ open: false }" @toggle-sidebar.window="open = !open" class="fixed inset-y-0 left-0 z-40 w-64 bg-gray-900 text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto"
+	       :class="open ? 'translate-x-0' : '-translate-x-full'">
+		<div class="p-4 border-b border-gray-800 flex items-center justify-between">
 			<h1 class="text-xl font-bold">Labuh</h1>
+			<button @click="open = false" class="lg:hidden text-gray-400 hover:text-white">
+				<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+				</svg>
+			</button>
 		</div>
 		<nav class="flex-1 p-4 space-y-2">
-			<a href="/dashboard" 
+			<a href="/dashboard"
 			   class="block px-4 py-2 rounded"
 			   :class="window.location.pathname === '/dashboard' ? 'bg-gray-800' : 'hover:bg-gray-800'">
 				Dashboard
 			</a>
-			<a href="/projects" 
+			<a href="/projects"
 			   class="block px-4 py-2 rounded"
 			   :class="window.location.pathname.startsWith('/projects') || window.location.pathname.startsWith('/templates') ? 'bg-gray-800' : 'hover:bg-gray-800'">
 				Projects
 			</a>
-			<a href="/templates" 
+			<a href="/templates"
 			   class="block px-4 py-2 rounded"
 			   :class="window.location.pathname === '/templates' ? 'bg-gray-800' : 'hover:bg-gray-800'">
 				Templates
 			</a>
-			<a href="#" 
+			<a href="#"
 			   class="block px-4 py-2 rounded"
 			   :class="window.location.pathname.startsWith('/applications') ? 'bg-gray-800' : 'hover:bg-gray-800'">
 				Applications
 			</a>
-			<a href="#" 
+			<a href="#"
 			   class="block px-4 py-2 rounded"
 			   :class="window.location.pathname.startsWith('/servers') ? 'bg-gray-800' : 'hover:bg-gray-800'">
 				Servers
 			</a>
-			<a href="/settings/api-keys" 
+			<a href="/settings/api-keys"
 			   class="block px-4 py-2 rounded"
 			   :class="window.location.pathname.startsWith('/settings') ? 'bg-gray-800' : 'hover:bg-gray-800'">
 				Settings

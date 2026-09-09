@@ -29,7 +29,7 @@ func Topbar() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6\"><h2 class=\"text-lg font-semibold text-gray-800\">Labuh</h2><div class=\"flex items-center space-x-4\"><span class=\"text-sm text-gray-600\">User</span></div></header>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6\"><div class=\"flex items-center gap-4\"><button @click=\"$dispatch('toggle-sidebar')\" class=\"lg:hidden text-gray-600 hover:text-gray-900\"><svg class=\"h-6 w-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 6h16M4 12h16M4 18h16\"></path></svg></button><h2 class=\"text-lg font-semibold text-gray-800\">Labuh</h2></div><div class=\"flex items-center space-x-4\"><span class=\"text-sm text-gray-600\">User</span></div></header>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

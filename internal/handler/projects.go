@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
@@ -42,10 +43,29 @@ func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
-	projectList, err := h.projectRepo.GetAll()
+	page := parseInt(r.URL.Query().Get("page"), 1)
+	search := r.URL.Query().Get("search")
+	limit := 10
+	offset := (page - 1) * limit
+
+	var projectList []*models.Project
+	var total int
+	var err error
+
+	if search != "" {
+		projectList, total, err = h.projectRepo.SearchPaginated(search, limit, offset)
+	} else {
+		projectList, total, err = h.projectRepo.GetAllPaginated(limit, offset)
+	}
+
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
+	}
+
+	totalPages := (total + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
 	}
 
 	envCounts := make(map[string]int)
@@ -54,7 +74,18 @@ func (h *ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
 		envCounts[p.ID] = len(envs)
 	}
 
-	templ.Handler(layouts.AppLayout(projects.ProjectsListPage(projectList, envCounts))).ServeHTTP(w, r)
+	templ.Handler(layouts.AppLayout(projects.ProjectsListPage(projectList, envCounts, page, totalPages, search))).ServeHTTP(w, r)
+}
+
+func parseInt(s string, defaultValue int) int {
+	if s == "" {
+		return defaultValue
+	}
+	val, err := strconv.Atoi(s)
+	if err != nil || val < 1 {
+		return defaultValue
+	}
+	return val
 }
 
 func (h *ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {

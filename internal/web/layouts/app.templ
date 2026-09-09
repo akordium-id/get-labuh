@@ -12,17 +12,55 @@ templ AppLayout(content templ.Component) {
 		<script src="https://cdn.tailwindcss.com"></script>
 		<script src="https://unpkg.com/htmx.org@2.0.0"></script>
 		<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+		<script>
+			document.addEventListener('htmx:configRequest', function(evt) {
+				var csrfToken = document.querySelector('meta[name="csrf-token"]');
+				if (csrfToken) {
+					evt.detail.headers['X-CSRF-Token'] = csrfToken.getAttribute('content');
+				}
+			});
+		</script>
 	</head>
-	<body class="bg-gray-50">
+	<body class="bg-gray-50" x-data="{ sidebarOpen: false }">
 		<div class="flex h-screen">
 			@components.Sidebar()
-			<div class="flex-1 flex flex-col">
+			<div class="flex-1 flex flex-col min-w-0">
 				@components.Topbar()
-				<main id="main-content" class="flex-1 overflow-auto p-6">
+				<div id="toast-container" class="fixed top-4 right-4 z-50 hidden">
+					<div id="toast" class="hidden bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md shadow-lg max-w-sm">
+						<p class="text-sm font-medium" id="toast-message">An error occurred</p>
+					</div>
+				</div>
+				<main id="main-content" class="flex-1 overflow-auto p-6"
+				      hx-on:htmx:error="handleHtmxError(event)">
 					@content
 				</main>
 			</div>
 		</div>
+		<script>
+			function handleHtmxError(event) {
+				var toast = document.getElementById('toast');
+				var toastMessage = document.getElementById('toast-message');
+				var toastContainer = document.getElementById('toast-container');
+				if (toast && toastMessage && toastContainer) {
+					var status = event.detail.xhr ? event.detail.xhr.status : 0;
+					var message = 'Request failed with status ' + status;
+					if (event.detail.xhr && event.detail.xhr.responseText) {
+						try {
+							var json = JSON.parse(event.detail.xhr.responseText);
+							if (json.error) message = json.error;
+						} catch(e) {}
+					}
+					toastMessage.textContent = message;
+					toast.classList.remove('hidden');
+					toastContainer.classList.remove('hidden');
+					setTimeout(function() {
+						toast.classList.add('hidden');
+						toastContainer.classList.add('hidden');
+					}, 5000);
+				}
+			}
+		</script>
 	</body>
 	</html>
 }

@@ -2,60 +2,90 @@ package databases
 
 import (
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/components"
 )
 
-templ DatabaseListPage(dbServices []*models.DatabaseService) {
+templ DatabaseListPage(dbServices []*models.DatabaseService, currentPage, totalPages int, search string) {
 	<div>
-		<div class="flex justify-between items-center mb-6">
+		<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
 			<h1 class="text-3xl font-bold text-gray-900">Databases</h1>
 			<a href="/databases/new" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">New Database</a>
 		</div>
 		<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-			<table class="min-w-full divide-y divide-gray-200">
-				<thead class="bg-gray-50">
-					<tr>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Engine</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Port</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-					</tr>
-				</thead>
-				<tbody class="bg-white divide-y divide-gray-200">
-					if len(dbServices) == 0 {
+			<div class="p-4 border-b border-gray-200">
+				<input type="text"
+				       name="search"
+				       placeholder="Search databases..."
+				       value={ search }
+				       hx-trigger="keyup changed delay:500ms"
+				       hx-target="#databases-table"
+				       hx-swap="innerHTML"
+				       class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+			</div>
+			<div id="databases-table" class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-gray-200">
+					<thead class="bg-gray-50">
 						<tr>
-							<td colspan="6" class="px-6 py-4 text-center text-gray-500">No databases yet</td>
+							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Engine</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Port</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+							<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
 						</tr>
-					} else {
-						for _, db := range dbServices {
+					</thead>
+					<tbody class="bg-white divide-y divide-gray-200">
+						if len(dbServices) == 0 {
 							<tr>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<div class="text-sm font-medium text-gray-900">{ db.Name }</div>
-									<div class="text-sm text-gray-500">{ db.Slug }</div>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-										{ db.Engine }
-									</span>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ db.Version }</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ db.Port }</td>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-										{ db.Status }
-									</span>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-									<a href={ templ.SafeURL("/databases/" + db.ID) } class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+								<td colspan="6">
+									@components.EmptyState("🗄️", "No databases yet", "Create your first database to get started", "New Database", "/databases/new")
 								</td>
 							</tr>
+						} else {
+							for _, db := range dbServices {
+								<tr>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<div class="text-sm font-medium text-gray-900">{ db.Name }</div>
+										<div class="text-sm text-gray-500">{ db.Slug }</div>
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+											{ db.Engine }
+										</span>
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ db.Version }</td>
+									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ formatInt(db.Port) }</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										@components.StatusBadge(string(db.Status))
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+										<a href={ templ.SafeURL("/databases/" + db.ID) } class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+									</td>
+								</tr>
+							}
 						}
-					}
-				</tbody>
-			</table>
+					</tbody>
+				</table>
+			</div>
+			@components.Pagination(currentPage, totalPages, "/databases")
 		</div>
 	</div>
+}
+
+func formatInt(n int) string {
+	if n < 0 {
+		return "0"
+	}
+	if n == 0 {
+		return "0"
+	}
+	var result []byte
+	for n > 0 {
+		digit := byte('0' + n%10)
+		result = append([]byte{digit}, result...)
+		n /= 10
+	}
+	return string(result)
 }
 
 templ DatabaseDetailPage(dbService *models.DatabaseService) {
@@ -72,7 +102,7 @@ templ DatabaseDetailPage(dbService *models.DatabaseService) {
 				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/stop") } method="post" class="inline">
 					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Stop</button>
 				</form>
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure?')">
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete this database?')">
 					<button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">Delete</button>
 				</form>
 			</div>
@@ -96,7 +126,7 @@ templ DatabaseDetailPage(dbService *models.DatabaseService) {
 					</div>
 					<div class="flex justify-between">
 						<dt class="text-gray-600">Port</dt>
-						<dd class="text-gray-900">{ dbService.Port }</dd>
+						<dd class="text-gray-900">{ formatInt(dbService.Port) }</dd>
 					</div>
 					<div class="flex justify-between">
 						<dt class="text-gray-600">Username</dt>

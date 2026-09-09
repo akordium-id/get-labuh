@@ -8,6 +8,8 @@ package applications
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import "github.com/akordium-id/get-labuh/internal/web/components"
+
 func ApplicationsCreatePage() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -29,7 +31,15 @@ func ApplicationsCreatePage() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" hx-on:htmx:validation:failed=\"handleValidationFailed(event)\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><p class=\"mt-1 text-sm text-red-600 hidden\" id=\"name-error\">Name is required</p></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.Spinner("sm", "white").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div><script>\n\t\tfunction handleValidationFailed(event) {\n\t\t\tvar errors = event.detail.errors;\n\t\t\tfor (var name in errors) {\n\t\t\t\tvar input = document.querySelector('[name=\"' + name + '\"]');\n\t\t\t\tif (input) {\n\t\t\t\t\tinput.classList.add('border-red-500', 'focus:ring-red-500');\n\t\t\t\t\tinput.classList.remove('focus:ring-blue-500');\n\t\t\t\t\tvar errorEl = document.getElementById(name + '-error');\n\t\t\t\t\tif (errorEl) errorEl.classList.remove('hidden');\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

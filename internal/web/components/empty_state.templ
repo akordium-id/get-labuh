@@ -4,9 +4,11 @@ templ EmptyState(icon, title, description, actionLabel, actionURL string) {
 	<div class="text-center py-12">
 		<div class="text-gray-400 text-6xl mb-4">{ icon }</div>
 		<h3 class="text-lg font-medium text-gray-900 mb-2">{ title }</h3>
-		<p class="text-gray-500 mb-4">{ description }</p>
+		<p class="text-gray-500 mb-6">{ description }</p>
 		if actionLabel != "" && actionURL != "" {
-			<a href={ templ.SafeURL(actionURL) } class="text-blue-600 hover:text-blue-900">{ actionLabel }</a>
+			<a href={ templ.SafeURL(actionURL) } class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+				{ actionLabel }
+			</a>
 		}
 	</div>
 }

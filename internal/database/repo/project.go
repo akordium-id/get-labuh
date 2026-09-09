@@ -115,6 +115,36 @@ func (r *ProjectRepo) GetAllPaginated(limit, offset int) ([]*models.Project, int
 	return projects, total, nil
 }
 
+func (r *ProjectRepo) SearchPaginated(search string, limit, offset int) ([]*models.Project, int, error) {
+	var total int
+	searchPattern := "%" + search + "%"
+	err := r.db.QueryRow("SELECT COUNT(*) FROM projects WHERE name LIKE ? OR slug LIKE ?", searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(
+		"SELECT id, name, slug, description, created_at, updated_at FROM projects WHERE name LIKE ? OR slug LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+		searchPattern, searchPattern, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var projects []*models.Project
+	for rows.Next() {
+		project := &models.Project{}
+		err := rows.Scan(&project.ID, &project.Name, &project.Slug, &project.Description, &project.CreatedAt, &project.UpdatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		projects = append(projects, project)
+	}
+
+	return projects, total, nil
+}
+
 func (r *ProjectRepo) Delete(id string) error {
 	_, err := r.db.Exec("DELETE FROM projects WHERE id = ?", id)
 	return err

@@ -166,6 +166,37 @@ func (r *ApplicationRepo) GetByEnvironmentIDPaginated(envID string, limit, offse
 	return apps, total, nil
 }
 
+func (r *ApplicationRepo) SearchPaginated(envID, search string, limit, offset int) ([]*models.Application, int, error) {
+	var total int
+	searchPattern := "%" + search + "%"
+	err := r.db.QueryRow("SELECT COUNT(*) FROM applications WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?)", envID, searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		 FROM applications WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		envID, searchPattern, searchPattern, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var apps []*models.Application
+	for rows.Next() {
+		app := &models.Application{}
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		apps = append(apps, app)
+	}
+
+	return apps, total, nil
+}
+
 func (r *ApplicationRepo) GetByStatus(status models.AppStatus) ([]*models.Application, error) {
 	rows, err := r.db.Query(
 		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
