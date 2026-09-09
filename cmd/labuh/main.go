@@ -14,7 +14,9 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
+	"github.com/akordium-id/get-labuh/internal/middleware"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/server"
@@ -24,8 +26,8 @@ import (
 	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 	"github.com/akordium-id/get-labuh/internal/web/pages/projects"
 	"github.com/akordium-id/get-labuh/internal/worker"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
@@ -55,8 +57,11 @@ func main() {
 	templateRepo := repo.NewTemplateRepo(db)
 	apiKeyRepo := repo.NewApiKeyRepo(db)
 	settingRepo := repo.NewSettingRepo(db)
+	auditRepo := repo.NewAuditLogRepo(db)
 
 	_ = settingRepo.InitializeDefaults()
+
+	_ = encryption.Init("LABUH_MASTER_KEY")
 
 	caddyAPIURL, _ := settingRepo.Get("caddy_api_url")
 	caddyAPIKey, _ := settingRepo.Get("caddy_api_key")
@@ -66,6 +71,8 @@ func main() {
 
 	apiKeysHandler := handler.NewAPIKeysHandler(apiKeyRepo, userRepo)
 	settingsHandler := handler.NewSettingsHandler(settingRepo)
+	backupHandler := handler.NewBackupHandler(settingRepo, "/var/lib/labuh/backups")
+	auditHandler := handler.NewAuditHandler(auditRepo, userRepo)
 
 	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
 
@@ -94,9 +101,13 @@ func main() {
 	defer deployWorker.Stop()
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
 	r.Use(observability.RequestIDMiddleware)
+	r.Use(middleware.SecurityHeadersMiddleware)
+	r.Use(middleware.RateLimitMiddleware)
+	r.Use(middleware.CSRFProtectionMiddleware)
+	r.Use(middleware.AuditLoggingMiddleware(auditRepo))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -191,6 +202,13 @@ func main() {
 		r.Get("/settings/caddy", settingsHandler.Caddy)
 		r.Post("/settings/caddy", settingsHandler.UpdateCaddy)
 		r.Post("/settings/caddy/test", settingsHandler.TestCaddy)
+
+		r.Get("/settings/backup", backupHandler.BackupPage)
+		r.Post("/settings/backup/create", backupHandler.CreateBackup)
+		r.Get("/settings/backup/download", backupHandler.DownloadBackup)
+		r.Post("/settings/restore", backupHandler.RestoreBackup)
+
+		r.Get("/settings/audit-logs", auditHandler.AuditLogsPage)
 	})
 
 	r.Post("/deployments/{id}/start", func(w http.ResponseWriter, r *http.Request) {
@@ -227,15 +245,27 @@ func main() {
 		port = "3000"
 	}
 
+	tlsEnabled := os.Getenv("LABUH_TLS_ENABLED") == "true"
+	tlsCert := os.Getenv("LABUH_TLS_CERT_PATH")
+	tlsKey := os.Getenv("LABUH_TLS_KEY_PATH")
+
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: r,
 	}
 
-	slog.Info("Labuh server starting", "port", port)
-	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		slog.Error("Server error", "error", err)
-		os.Exit(1)
+	if tlsEnabled && tlsCert != "" && tlsKey != "" {
+		slog.Info("Labuh server starting with TLS", "port", port)
+		if err := srv.ListenAndServeTLS(tlsCert, tlsKey); err != http.ErrServerClosed {
+			slog.Error("Server error", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		slog.Info("Labuh server starting", "port", port)
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			slog.Error("Server error", "error", err)
+			os.Exit(1)
+		}
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)

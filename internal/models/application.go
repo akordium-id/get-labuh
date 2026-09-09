@@ -57,13 +57,14 @@ type CreateApplicationInput struct {
 }
 
 type AppEnvVar struct {
-	ID           string
+	ID            string
 	ApplicationID string
-	Key          string
-	Value        string
-	IsSecret     bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	Key           string
+	Value         string
+	IsSecret      bool
+	IsEncrypted   bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type CreateAppEnvVarInput struct {
@@ -71,6 +72,7 @@ type CreateAppEnvVarInput struct {
 	Key           string
 	Value         string
 	IsSecret      bool
+	IsEncrypted   bool
 }
 
 type DeployStatus string

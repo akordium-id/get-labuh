@@ -23,6 +23,10 @@ func UserFromContext(ctx context.Context) (*models.User, bool) {
 	return user, ok
 }
 
+const MaxFailedLogins = 5
+const LockoutDuration = 15 * time.Minute
+const MaxConcurrentSessions = 3
+
 func RequireAuth(sessionRepo *repo.SessionRepo, userRepo *repo.UserRepo, secure bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +48,17 @@ func RequireAuth(sessionRepo *repo.SessionRepo, userRepo *repo.UserRepo, secure 
 				http.Redirect(w, r, "/auth/login", http.StatusFound)
 				return
 			}
+
+			if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+				http.Redirect(w, r, "/auth/login?locked=1", http.StatusFound)
+				return
+			}
+
+		activeSessions, _ := userRepo.CountActiveSessions(user.ID)
+		if activeSessions > MaxConcurrentSessions {
+			http.Redirect(w, r, "/auth/login?too_many_sessions=1", http.StatusFound)
+			return
+		}
 
 			ctx := ContextWithUser(r.Context(), user)
 			next.ServeHTTP(w, r.WithContext(ctx))

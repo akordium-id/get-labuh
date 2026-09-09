@@ -40,9 +40,9 @@ func (r *UserRepo) Create(input models.CreateUserInput) (*models.User, error) {
 func (r *UserRepo) GetByEmail(email string) (*models.User, error) {
 	user := &models.User{}
 	err := r.db.QueryRow(
-		"SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email = ?",
+		"SELECT id, email, password_hash, name, failed_login_count, locked_until, last_login_at, created_at, updated_at FROM users WHERE email = ?",
 		email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.FailedLoginCount, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -53,9 +53,9 @@ func (r *UserRepo) GetByEmail(email string) (*models.User, error) {
 func (r *UserRepo) GetByID(id string) (*models.User, error) {
 	user := &models.User{}
 	err := r.db.QueryRow(
-		"SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE id = ?",
+		"SELECT id, email, password_hash, name, failed_login_count, locked_until, last_login_at, created_at, updated_at FROM users WHERE id = ?",
 		id,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.FailedLoginCount, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (r *UserRepo) GetByID(id string) (*models.User, error) {
 
 func (r *UserRepo) GetAll() ([]*models.User, error) {
 	rows, err := r.db.Query(
-		"SELECT id, email, password_hash, name, created_at, updated_at FROM users ORDER BY created_at DESC",
+		"SELECT id, email, password_hash, name, failed_login_count, locked_until, last_login_at, created_at, updated_at FROM users ORDER BY created_at DESC",
 	)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (r *UserRepo) GetAll() ([]*models.User, error) {
 	var users []*models.User
 	for rows.Next() {
 		user := &models.User{}
-		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt, &user.UpdatedAt)
+		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.FailedLoginCount, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -83,4 +83,38 @@ func (r *UserRepo) GetAll() ([]*models.User, error) {
 	}
 
 	return users, nil
+}
+
+func (r *UserRepo) IncrementFailedLogin(id string) error {
+	_, err := r.db.Exec(
+		"UPDATE users SET failed_login_count = failed_login_count + 1, updated_at = ? WHERE id = ?",
+		time.Now(), id,
+	)
+	return err
+}
+
+func (r *UserRepo) ResetFailedLogin(id string) error {
+	now := time.Now()
+	_, err := r.db.Exec(
+		"UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = ?, updated_at = ? WHERE id = ?",
+		now, now, id,
+	)
+	return err
+}
+
+func (r *UserRepo) LockUser(id string, until time.Time) error {
+	_, err := r.db.Exec(
+		"UPDATE users SET locked_until = ?, updated_at = ? WHERE id = ?",
+		until, time.Now(), id,
+	)
+	return err
+}
+
+func (r *UserRepo) CountActiveSessions(userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		"SELECT COUNT(*) FROM sessions WHERE user_id = ? AND expires_at > ?",
+		userID, time.Now(),
+	).Scan(&count)
+	return count, err
 }

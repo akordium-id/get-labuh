@@ -4,9 +4,27 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 )
+
+func ExtractIP(r *http.Request) string {
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		parts := strings.Split(forwarded, ",")
+		return strings.TrimSpace(parts[0])
+	}
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		return realIP
+	}
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return ip
+}
+
+func ExtractUserAgent(r *http.Request) string {
+	return r.Header.Get("User-Agent")
+}
 
 func GenerateSessionToken() (string, error) {
 	bytes := make([]byte, 32)

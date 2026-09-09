@@ -1,0 +1,32 @@
+package settings
+
+templ BackupPage() {
+	<div>
+		<h1 class="text-3xl font-bold text-gray-900 mb-6">Backup & Restore</h1>
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+			<h2 class="text-xl font-semibold text-gray-900 mb-4">Create Backup</h2>
+			<p class="text-sm text-gray-600 mb-4">Create a backup of the Labuh database. Backups are stored on the server.</p>
+			<form action="/settings/backup/create" method="post" class="inline">
+				<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Create Backup Now</button>
+			</form>
+		</div>
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+			<h2 class="text-xl font-semibold text-gray-900 mb-4">Restore from Backup</h2>
+			<p class="text-sm text-gray-600 mb-4">Upload a backup file to restore the database. This will replace the current database.</p>
+			<form action="/settings/restore" method="post" enctype="multipart/form-data" class="space-y-4">
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Backup File</label>
+					<input type="file" name="backup_file" accept=".db" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" required>
+				</div>
+				<button type="submit" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700">Restore Backup</button>
+			</form>
+		</div>
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+			<h2 class="text-xl font-semibold text-gray-900 mb-4">Download Backup</h2>
+			<p class="text-sm text-gray-600 mb-4">Download a previously created backup file.</p>
+			<div class="flex gap-2">
+				<a href="/settings/backup/download?file=labuh-backup-latest.db" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Download Latest Backup</a>
+			</div>
+		</div>
+	</div>
+}
