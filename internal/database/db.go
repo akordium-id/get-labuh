@@ -25,6 +25,14 @@ func Connect(dsn string) (*sql.DB, error) {
 		}
 	}
 
+	if !strings.Contains(dsn, "_loc=") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&_loc=UTC"
+		} else {
+			dsn += "?_loc=UTC"
+		}
+	}
+
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, err
