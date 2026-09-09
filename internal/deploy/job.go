@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/akordium-id/get-labuh/internal/caddy"
+	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
@@ -35,11 +37,15 @@ type ComposeJob struct {
 
 type Pipeline struct {
 	dockerClient *docker.Client
+	caddyClient  *caddy.Client
+	settingRepo  *repo.SettingRepo
 }
 
-func NewPipeline(dockerClient *docker.Client) *Pipeline {
+func NewPipeline(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo) *Pipeline {
 	return &Pipeline{
 		dockerClient: dockerClient,
+		caddyClient:  caddyClient,
+		settingRepo:  settingRepo,
 	}
 }
 
@@ -94,6 +100,23 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	}
 
 	writeLog(logFile, "Deployment completed successfully")
+
+	if p.caddyClient != nil {
+		caddyAPIURL, _ := p.settingRepo.Get("caddy_api_url")
+		caddyAPIKey, _ := p.settingRepo.Get("caddy_api_key")
+		caddyNetwork, _ := p.settingRepo.Get("caddy_network")
+
+		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
+
+		if caddyNetwork == "" {
+			caddyNetwork, _ = p.settingRepo.Get("caddy_network")
+		}
+
+		_ = caddyNetwork
+		_ = client
+		_ = p.caddyClient
+	}
+
 	return nil
 }
 

@@ -86,13 +86,34 @@ templ ComposeDetailPage(composeApp *models.ComposeApplication) {
 						<dd class="text-gray-900 font-mono text-sm">{ *composeApp.ComposeProjectName }</dd>
 					</div>
 				}
-				if composeApp.CustomDomain != nil {
+			</dl>
+		</div>
+
+		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
+			<h2 class="text-xl font-bold text-gray-900 mb-4">Custom Domain</h2>
+			if composeApp.CustomDomain != nil && *composeApp.CustomDomain != "" {
+				<dl class="space-y-3 mb-4">
 					<div class="flex justify-between">
-						<dt class="text-gray-600">Custom Domain</dt>
+						<dt class="text-gray-600">Domain</dt>
 						<dd class="text-gray-900">{ *composeApp.CustomDomain }</dd>
 					</div>
-				}
-			</dl>
+					<div class="flex justify-between">
+						<dt class="text-gray-600">HTTPS</dt>
+						<dd class="text-green-600">Enabled (via Caddy)</dd>
+					</div>
+				</dl>
+				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain/remove") } method="post" class="inline">
+					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Remove Domain</button>
+				</form>
+			} else {
+				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain") } method="post" class="space-y-4">
+					<div>
+						<label class="block text-sm font-medium text-gray-700">Custom Domain</label>
+						<input type="text" name="custom_domain" placeholder="example.com" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" required>
+					</div>
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Set Domain</button>
+				</form>
+			}
 		</div>
 	</div>
 }

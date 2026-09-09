@@ -1,0 +1,32 @@
+package settings
+
+import "github.com/akordium-id/get-labuh/internal/web/layouts"
+
+templ CaddySettingsPage(caddyAPIURL, caddyAPIKey, caddyNetwork string) {
+	<div>
+		<h1 class="text-3xl font-bold text-gray-900 mb-6">Caddy Settings</h1>
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+			<form action="/settings/caddy" method="post" class="space-y-4">
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Caddy API URL</label>
+					<input type="text" name="caddy_api_url" value={ caddyAPIURL } class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+					<p class="text-sm text-gray-500 mt-1">Default: http://localhost:2019</p>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Caddy API Key (optional)</label>
+					<input type="text" name="caddy_api_key" value={ caddyAPIKey } class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">Docker Network Name</label>
+					<input type="text" name="caddy_network" value={ caddyNetwork } class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+				</div>
+				<div class="flex gap-2">
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Save Settings</button>
+					<form action="/settings/caddy/test" method="post" class="inline">
+						<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Test Connection</button>
+					</form>
+				</div>
+			</form>
+		</div>
+	</div>
+}

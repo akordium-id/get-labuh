@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/akordium-id/get-labuh/internal/caddy"
+	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/deploy"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
@@ -25,8 +27,8 @@ func NewDeployWorker(bufferSize int) *DeployWorker {
 	}
 }
 
-func (w *DeployWorker) Start(dockerClient *docker.Client) {
-	pipeline := deploy.NewPipeline(dockerClient)
+func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo) {
+	pipeline := deploy.NewPipeline(dockerClient, caddyClient, settingRepo)
 
 	w.wg.Go(func() {
 		for {

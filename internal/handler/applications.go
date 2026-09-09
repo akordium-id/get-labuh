@@ -7,6 +7,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
@@ -14,18 +15,22 @@ import (
 )
 
 type ApplicationsHandler struct {
-	appRepo    *repo.ApplicationRepo
-	envRepo    *repo.ProjectRepo
-	deployRepo *repo.DeploymentRepo
-	envVarRepo *repo.EnvVarRepo
+	appRepo     *repo.ApplicationRepo
+	envRepo     *repo.ProjectRepo
+	deployRepo  *repo.DeploymentRepo
+	envVarRepo  *repo.EnvVarRepo
+	caddyClient *caddy.Client
+	settingRepo *repo.SettingRepo
 }
 
-func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo, envVarRepo *repo.EnvVarRepo) *ApplicationsHandler {
+func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo, envVarRepo *repo.EnvVarRepo, caddyClient *caddy.Client, settingRepo *repo.SettingRepo) *ApplicationsHandler {
 	return &ApplicationsHandler{
-		appRepo:    appRepo,
-		envRepo:    envRepo,
-		deployRepo: deployRepo,
-		envVarRepo: envVarRepo,
+		appRepo:     appRepo,
+		envRepo:     envRepo,
+		deployRepo:  deployRepo,
+		envVarRepo:  envVarRepo,
+		caddyClient: caddyClient,
+		settingRepo: settingRepo,
 	}
 }
 
@@ -320,5 +325,78 @@ func (h *ApplicationsHandler) Clone(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("HX-Redirect", "/applications/" + clonedApp.ID)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) SetDomain(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	domain := r.FormValue("custom_domain")
+	if domain == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	domainPtr := &domain
+	if err := h.appRepo.UpdateCustomDomain(id, domainPtr); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if h.caddyClient != nil {
+		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
+		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
+		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
+
+		_ = app
+		_ = client
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ApplicationsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.appRepo.UpdateCustomDomain(id, nil); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if h.caddyClient != nil && app.CustomDomain != nil && *app.CustomDomain != "" {
+		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
+		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
+		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
+
+		_ = client
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
