@@ -11,24 +11,6 @@ import (
 
 const defaultTimeout = 5 * time.Second
 
-type Route struct {
-	Match  []RouteMatch  `json:"match"`
-	Handle []RouteHandle `json:"handle"`
-}
-
-type RouteMatch struct {
-	Host []string `json:"host"`
-}
-
-type RouteHandle struct {
-	Handler   string      `json:"handler"`
-	Upstreams []Upstream  `json:"upstreams"`
-}
-
-type Upstream struct {
-	Dial string `json:"dial"`
-}
-
 type Client struct {
 	baseURL    string
 	apiKey     string
@@ -51,10 +33,10 @@ func (c *Client) AddRoute(domain, upstreamAddr string, port int) error {
 	}
 
 	route := Route{
-		Match: []RouteMatch{
+		Match: []Match{
 			{Host: []string{domain}},
 		},
-		Handle: []RouteHandle{
+		Handle: []Handle{
 			{
 				Handler: "reverse_proxy",
 				Upstreams: []Upstream{
