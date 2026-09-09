@@ -161,3 +161,9 @@ func (w *RotatingWriter) Sync() error {
 }
 
 var _ io.WriteCloser = (*RotatingWriter)(nil)
+
+type LogWriter interface {
+	Write(p []byte) (n int, err error)
+	Sync() error
+	Close() error
+}

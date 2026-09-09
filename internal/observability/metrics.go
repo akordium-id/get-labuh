@@ -9,6 +9,26 @@ import (
 	"time"
 )
 
+type RuntimeMetrics struct {
+	MemoryAlloc       uint64 `json:"memory_alloc"`
+	MemoryTotalAlloc  uint64 `json:"memory_total_alloc"`
+	MemorySys         uint64 `json:"memory_sys"`
+	NumGC             uint32 `json:"num_gc"`
+	NumGoroutine      int    `json:"num_goroutine"`
+}
+
+func GetRuntimeMetrics() RuntimeMetrics {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return RuntimeMetrics{
+		MemoryAlloc:      m.Alloc,
+		MemoryTotalAlloc: m.TotalAlloc,
+		MemorySys:        m.Sys,
+		NumGC:            m.NumGC,
+		NumGoroutine:     runtime.NumGoroutine(),
+	}
+}
+
 type Metrics struct {
 	Timestamp         time.Time      `json:"timestamp"`
 	Uptime            string         `json:"uptime"`

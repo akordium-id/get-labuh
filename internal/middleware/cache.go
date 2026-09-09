@@ -82,3 +82,5 @@ func matchesCacheControl(cacheControl string, directive string) bool {
 	}
 	return false
 }
+
+var CacheMiddleware = CacheHeadersMiddleware
