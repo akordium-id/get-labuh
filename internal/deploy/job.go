@@ -2,7 +2,9 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -29,6 +31,10 @@ type DeploymentJob struct {
 	EnvVars        []models.AppEnvVar
 	LogPath        string
 	Priority       int
+	AppSlug        string
+	CustomDomain   *string
+	ExtraLogWriter io.Writer
+	StatusCallback func(step string, status string, err error)
 }
 
 type ComposeJob struct {
@@ -68,7 +74,27 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	}
 	defer logFile.Close()
 
-	writeLog(logFile, "Starting deployment pipeline...")
+	activeLogWriter := logging.NewTeeLogWriter(logFile, job.ExtraLogWriter)
+
+	updateStep := func(step string, status models.DeployStatus, errMsg string) {
+		if p.deployRepo != nil {
+			_ = p.deployRepo.UpdateStep(job.DeploymentID, step)
+			if errMsg != "" {
+				_ = p.deployRepo.UpdateStatusWithError(job.DeploymentID, status, errMsg)
+			} else {
+				_ = p.deployRepo.UpdateStatus(job.DeploymentID, status)
+			}
+		}
+		if job.StatusCallback != nil {
+			var err error
+			if errMsg != "" {
+				err = errors.New(errMsg)
+			}
+			job.StatusCallback(step, string(status), err)
+		}
+	}
+
+	writeLog(activeLogWriter, "Starting deployment pipeline...")
 	if p.deployRepo != nil {
 		_ = p.deployRepo.MarkStarted(job.DeploymentID)
 	}
@@ -77,15 +103,8 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 
 	switch job.SourceType {
 	case string(models.SourceTypeGit):
-		writeLog(logFile, "Cloning git repository...")
-		if p.deployRepo != nil {
-			if err := p.deployRepo.UpdateStep(job.DeploymentID, "clone"); err != nil {
-				writeLog(logFile, fmt.Sprintf("Warning: failed to update step: %v", err))
-			}
-			if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusCloning); err != nil {
-				writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
-			}
-		}
+		writeLog(activeLogWriter, "Cloning git repository...")
+		updateStep("clone", models.DeployStatusCloning, "")
 
 		cloneCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 		defer cancel()
@@ -93,29 +112,22 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
 		if err := os.MkdirAll(buildDir, 0755); err != nil {
 			errMsg := fmt.Sprintf("failed to create build directory: %v", err)
-			writeLog(logFile, errMsg)
-			if p.deployRepo != nil {
-				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			}
+			writeLog(activeLogWriter, errMsg)
+			updateStep("clone", models.DeployStatusFailed, errMsg)
 			return &DeployError{Step: "clone", Cause: err, Output: errMsg}
 		}
 
 		if err := p.dockerClient.CloneGitRepo(cloneCtx, job.RepositoryURL, job.Branch, buildDir); err != nil {
 			errMsg := fmt.Sprintf("git clone failed: %v", err)
-			writeLog(logFile, errMsg)
-			if p.deployRepo != nil {
-				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			}
+			writeLog(activeLogWriter, errMsg)
+			updateStep("clone", models.DeployStatusFailed, errMsg)
 			return &DeployError{Step: "clone", Cause: err, Output: errMsg}
 		}
 
-		writeLog(logFile, "Git clone completed")
+		writeLog(activeLogWriter, "Git clone completed")
 
-		writeLog(logFile, "Building docker image from repository...")
-		if p.deployRepo != nil {
-			_ = p.deployRepo.UpdateStep(job.DeploymentID, "build")
-			_ = p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusBuilding)
-		}
+		writeLog(activeLogWriter, "Building docker image from repository...")
+		updateStep("build", models.DeployStatusBuilding, "")
 
 		buildCtx, cancelBuild := context.WithTimeout(ctx, 20*time.Minute)
 		defer cancelBuild()
@@ -124,27 +136,18 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		builtImage, err := p.dockerClient.BuildWithCache(buildCtx, job.ApplicationID, job.Branch, buildDir, cacheRef)
 		if err != nil {
 			errMsg := fmt.Sprintf("docker build failed: %v", err)
-			writeLog(logFile, errMsg)
+			writeLog(activeLogWriter, errMsg)
 			p.cleanupFailedContainer(ctx, job)
-			if p.deployRepo != nil {
-				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			}
+			updateStep("build", models.DeployStatusFailed, errMsg)
 			return &DeployError{Step: "build", Cause: err, Output: errMsg}
 		}
 
-		writeLog(logFile, "Docker build completed: "+builtImage)
+		writeLog(activeLogWriter, "Docker build completed: "+builtImage)
 		imageName = builtImage
 
 	case string(models.SourceTypeDockerfile):
-		writeLog(logFile, "Building from Dockerfile...")
-		if p.deployRepo != nil {
-			if err := p.deployRepo.UpdateStep(job.DeploymentID, "build"); err != nil {
-				writeLog(logFile, fmt.Sprintf("Warning: failed to update step: %v", err))
-			}
-			if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusBuilding); err != nil {
-				writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
-			}
-		}
+		writeLog(activeLogWriter, "Building from Dockerfile...")
+		updateStep("build", models.DeployStatusBuilding, "")
 
 		buildCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 		defer cancel()
@@ -152,10 +155,8 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
 		if err := os.MkdirAll(buildDir, 0755); err != nil {
 			errMsg := fmt.Sprintf("failed to create build directory: %v", err)
-			writeLog(logFile, errMsg)
-			if p.deployRepo != nil {
-				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			}
+			writeLog(activeLogWriter, errMsg)
+			updateStep("build", models.DeployStatusFailed, errMsg)
 			return &DeployError{Step: "build", Cause: err, Output: errMsg}
 		}
 
@@ -163,72 +164,61 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		builtImage, err := p.dockerClient.BuildWithCache(buildCtx, job.ApplicationID, job.Branch, buildDir, cacheRef)
 		if err != nil {
 			errMsg := fmt.Sprintf("docker build failed: %v", err)
-			writeLog(logFile, errMsg)
+			writeLog(activeLogWriter, errMsg)
 			p.cleanupFailedContainer(ctx, job)
-			if p.deployRepo != nil {
-				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			}
+			updateStep("build", models.DeployStatusFailed, errMsg)
 			return &DeployError{Step: "build", Cause: err, Output: errMsg}
 		}
 
-		writeLog(logFile, "Docker build completed: "+builtImage)
+		writeLog(activeLogWriter, "Docker build completed: "+builtImage)
 		imageName = builtImage
 
 	case string(models.SourceTypeDockerImage):
-		writeLog(logFile, fmt.Sprintf("Pulling image %s...", job.DockerImage))
-		if p.deployRepo != nil {
-			if err := p.deployRepo.UpdateStep(job.DeploymentID, "push"); err != nil {
-				writeLog(logFile, fmt.Sprintf("Warning: failed to update step: %v", err))
-			}
-			if err := p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusDeploying); err != nil {
-				writeLog(logFile, fmt.Sprintf("Warning: failed to update status: %v", err))
-			}
-		}
+		writeLog(activeLogWriter, fmt.Sprintf("Pulling image %s...", job.DockerImage))
+		updateStep("push", models.DeployStatusDeploying, "")
 
 		pullCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 		defer cancel()
 
 		if err := p.dockerClient.PullImage(pullCtx, job.DockerImage); err != nil {
 			errMsg := fmt.Sprintf("failed to pull image: %v", err)
-			writeLog(logFile, errMsg)
-			if p.deployRepo != nil {
-				p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-			}
+			writeLog(activeLogWriter, errMsg)
+			updateStep("push", models.DeployStatusFailed, errMsg)
 			return &DeployError{Step: "push", Cause: err, Output: errMsg}
 		}
 		imageName = job.DockerImage
 
 	default:
 		errMsg := fmt.Sprintf("unknown source type: %s", job.SourceType)
-		writeLog(logFile, errMsg)
-		if p.deployRepo != nil {
-			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-		}
+		writeLog(activeLogWriter, errMsg)
+		updateStep("init", models.DeployStatusFailed, errMsg)
 		return &DeployError{Step: "init", Output: errMsg}
 	}
 
-	writeLog(logFile, "Deploying container...")
-	if p.deployRepo != nil {
-		_ = p.deployRepo.UpdateStep(job.DeploymentID, "deploy")
-		_ = p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusDeploying)
-	}
+	writeLog(activeLogWriter, "Deploying container...")
+	updateStep("deploy", models.DeployStatusDeploying, "")
 
 	var appSlug string = "app"
-	var customDomain *string
+	if job.AppSlug != "" {
+		appSlug = job.AppSlug
+	}
+	var customDomain *string = job.CustomDomain
 	var appPort int = job.AppPort
 
 	if p.appRepo != nil {
 		app, err := p.appRepo.GetByID(job.ApplicationID)
 		if err == nil && app != nil {
 			appSlug = app.Slug
-			customDomain = app.CustomDomain
+			if app.CustomDomain != nil && *app.CustomDomain != "" {
+				customDomain = app.CustomDomain
+			}
 			if appPort <= 0 {
 				appPort = app.AppPort
 			}
 
 			// Clean up old container if running
 			if app.ContainerID != nil && *app.ContainerID != "" {
-				writeLog(logFile, "Stopping existing container...")
+				writeLog(activeLogWriter, "Stopping existing container...")
 				_ = p.dockerClient.StopContainer(ctx, *app.ContainerID, 10)
 				_ = p.dockerClient.RemoveContainer(ctx, *app.ContainerID)
 			}
@@ -250,32 +240,29 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	containerID, err := p.dockerClient.RunContainer(ctx, job.ApplicationID, "prod", appSlug, imageName, appPort, dockerEnvVars)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to run container: %v", err)
-		writeLog(logFile, errMsg)
-		if p.deployRepo != nil {
-			p.deployRepo.UpdateStatusWithError(job.DeploymentID, models.DeployStatusFailed, errMsg)
-		}
+		writeLog(activeLogWriter, errMsg)
+		updateStep("deploy", models.DeployStatusFailed, errMsg)
 		return &DeployError{Step: "deploy", Cause: err, Output: errMsg}
 	}
 
-	writeLog(logFile, fmt.Sprintf("Container started successfully (ID: %s)", containerID))
+	writeLog(activeLogWriter, fmt.Sprintf("Container started successfully (ID: %s)", containerID))
 	if p.appRepo != nil {
 		_ = p.appRepo.UpdateContainerAndStatus(job.ApplicationID, containerID, models.AppStatusRunning)
 	}
 
 	if p.caddyClient != nil && customDomain != nil && *customDomain != "" {
 		containerName := p.dockerClient.GenerateContainerName("prod", appSlug, job.ApplicationID)
-		writeLog(logFile, fmt.Sprintf("Configuring Caddy reverse proxy for %s -> %s:%d", *customDomain, containerName, appPort))
+		writeLog(activeLogWriter, fmt.Sprintf("Configuring Caddy reverse proxy for %s -> %s:%d", *customDomain, containerName, appPort))
 		if err := p.caddyClient.AddRoute(*customDomain, containerName, appPort); err != nil {
-			writeLog(logFile, fmt.Sprintf("Warning: failed to add Caddy route: %v", err))
+			writeLog(activeLogWriter, fmt.Sprintf("Warning: failed to add Caddy route: %v", err))
 		} else {
-			writeLog(logFile, "Caddy route configured successfully")
+			writeLog(activeLogWriter, "Caddy route configured successfully")
 		}
 	}
 
-	writeLog(logFile, "Deployment completed successfully")
+	writeLog(activeLogWriter, "Deployment completed successfully")
+	updateStep("done", models.DeployStatusSuccess, "")
 	if p.deployRepo != nil {
-		_ = p.deployRepo.UpdateStep(job.DeploymentID, "done")
-		_ = p.deployRepo.UpdateStatus(job.DeploymentID, models.DeployStatusSuccess)
 		_ = p.deployRepo.MarkFinished(job.DeploymentID)
 	}
 

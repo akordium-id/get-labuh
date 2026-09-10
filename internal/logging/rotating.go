@@ -167,3 +167,31 @@ type LogWriter interface {
 	Sync() error
 	Close() error
 }
+
+type teeLogWriter struct {
+	primary   LogWriter
+	secondary io.Writer
+}
+
+func (t *teeLogWriter) Write(p []byte) (n int, err error) {
+	n, err = t.primary.Write(p)
+	if t.secondary != nil {
+		_, _ = t.secondary.Write(p)
+	}
+	return n, err
+}
+
+func (t *teeLogWriter) Sync() error {
+	return t.primary.Sync()
+}
+
+func (t *teeLogWriter) Close() error {
+	return t.primary.Close()
+}
+
+func NewTeeLogWriter(primary LogWriter, secondary io.Writer) LogWriter {
+	if secondary == nil {
+		return primary
+	}
+	return &teeLogWriter{primary: primary, secondary: secondary}
+}

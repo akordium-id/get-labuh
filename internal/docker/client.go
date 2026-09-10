@@ -185,6 +185,34 @@ func (c *Client) ListContainers(ctx context.Context, opts any) error {
 	return err
 }
 
+func (c *Client) GetServerVersion(ctx context.Context) (string, error) {
+	if c.cli == nil {
+		return "mock", nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ver, err := c.cli.ServerVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+	return ver.Version, nil
+}
+
+func (c *Client) CountRunningContainers(ctx context.Context) (int, error) {
+	if c.cli == nil {
+		return 0, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	containers, err := c.cli.ContainerList(ctx, container.ListOptions{})
+	if err != nil {
+		return 0, err
+	}
+	return len(containers), nil
+}
+
 func DemultiplexLogs(dst io.Writer, src io.Reader) error {
 	_, err := stdcopy.StdCopy(dst, dst, src)
 	return err
