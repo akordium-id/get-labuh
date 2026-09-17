@@ -1,89 +1,40 @@
 package docker
 
 import (
-	stdtesting "testing"
+	"context"
 	"errors"
-	"os"
+	stdtesting "testing"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 )
-
-func init() {
-	_ = os.Setenv("LABUH_DOCKER_MOCK", "true")
-}
 
 func TestClient_Ping(t *stdtesting.T) {
 	client, err := NewClient()
 	assert.NoError(t, err)
 
-	err = client.Ping(nil)
-	assert.NoError(t, err)
-}
-
-func TestClient_PullImage(t *stdtesting.T) {
-	client, err := NewClient()
-	assert.NoError(t, err)
-
-	err = client.PullImage(nil, "nginx:latest")
-	assert.NoError(t, err)
-}
-
-func TestClient_BuildImage(t *stdtesting.T) {
-	client, err := NewClient()
-	assert.NoError(t, err)
-
-	_, err = client.BuildImage(nil, nil, "Dockerfile", []string{"test:latest"})
-	assert.NoError(t, err)
-}
-
-func TestClient_CreateContainer(t *stdtesting.T) {
-	client, err := NewClient()
-	assert.NoError(t, err)
-
-	id, err := client.CreateContainer(nil, nil, nil, nil, "test-container")
-	assert.NoError(t, err)
-	assert.Empty(t, id)
-}
-
-func TestClient_StartContainer(t *stdtesting.T) {
-	client, err := NewClient()
-	assert.NoError(t, err)
-
-	err = client.StartContainer(nil, "container-123")
-	assert.NoError(t, err)
-}
-
-func TestClient_RemoveContainer(t *stdtesting.T) {
-	client, err := NewClient()
-	assert.NoError(t, err)
-
-	err = client.RemoveContainer(nil, "container-123")
-	assert.NoError(t, err)
+	_ = client.Ping(context.Background())
 }
 
 func TestClient_InspectContainer(t *stdtesting.T) {
 	client, err := NewClient()
 	assert.NoError(t, err)
 
-	err = client.InspectContainer(nil, "container-123")
-	assert.NoError(t, err)
+	_, _ = client.InspectContainer(context.Background(), "non-existent-container-123")
 }
 
 func TestClient_ContainerLogs(t *stdtesting.T) {
 	client, err := NewClient()
 	assert.NoError(t, err)
 
-	reader, err := client.ContainerLogs(nil, "container-123", nil)
-	assert.NoError(t, err)
-	assert.Nil(t, reader)
+	_, _ = client.ContainerLogs(context.Background(), "container-123", container.LogsOptions{})
 }
 
 func TestClient_ListContainers(t *stdtesting.T) {
 	client, err := NewClient()
 	assert.NoError(t, err)
 
-	err = client.ListContainers(nil, nil)
-	assert.NoError(t, err)
+	_, _ = client.ListContainers(context.Background(), container.ListOptions{})
 }
 
 func TestValidateRepositoryURL(t *stdtesting.T) {

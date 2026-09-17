@@ -74,8 +74,8 @@ func parseCacheDuration(durationStr string) (time.Duration, error) {
 }
 
 func matchesCacheControl(cacheControl string, directive string) bool {
-	parts := strings.Split(cacheControl, ",")
-	for _, part := range parts {
+	parts := strings.SplitSeq(cacheControl, ",")
+	for part := range parts {
 		if strings.TrimSpace(strings.ToLower(part)) == directive {
 			return true
 		}

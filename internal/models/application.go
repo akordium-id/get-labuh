@@ -5,9 +5,11 @@ import "time"
 type SourceType string
 
 const (
-	SourceTypeGit         SourceType = "git"
-	SourceTypeDockerImage SourceType = "docker_image"
-	SourceTypeDockerfile  SourceType = "dockerfile"
+	SourceTypeGit           SourceType = "git"
+	SourceTypeDockerImage   SourceType = "docker_image"
+	SourceTypeDockerfile    SourceType = "dockerfile"
+	SourceTypeNixpacks      SourceType = "nixpacks"
+	SourceTypeDockerCompose SourceType = "docker_compose"
 )
 
 type AppStatus string

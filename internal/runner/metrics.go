@@ -142,10 +142,7 @@ func (m *MetricsCollector) collectMemory() (usedMB uint64, totalMB uint64) {
 	var rtm runtime.MemStats
 	runtime.ReadMemStats(&rtm)
 	usedMB = rtm.Alloc / (1024 * 1024)
-	totalMB = rtm.Sys / (1024 * 1024)
-	if totalMB < usedMB {
-		totalMB = usedMB
-	}
+	totalMB = max(rtm.Sys/(1024*1024), usedMB)
 	return usedMB, totalMB
 }
 

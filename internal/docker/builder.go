@@ -27,6 +27,14 @@ func ValidateRepositoryURL(repoURL string) error {
 	return nil
 }
 
+func SanitizeBranch(branch string) string {
+	b := strings.TrimSpace(branch)
+	if b == "" {
+		return "main"
+	}
+	return b
+}
+
 func (c *Client) CloneGitRepo(ctx context.Context, repoURL, branch, targetDir string) error {
 	if err := ValidateRepositoryURL(repoURL); err != nil {
 		return fmt.Errorf("clone error: %w", err)
@@ -35,29 +43,22 @@ func (c *Client) CloneGitRepo(ctx context.Context, repoURL, branch, targetDir st
 	sanitizedBranch := SanitizeBranch(branch)
 	slog.Info("cloning git repository", "url", repoURL, "branch", sanitizedBranch, "target", targetDir)
 
-	if c.cli == nil {
-		if err := os.MkdirAll(targetDir, 0755); err != nil {
-			return err
-		}
-		dummyDockerfile := filepath.Join(targetDir, "Dockerfile")
-		_ = os.WriteFile(dummyDockerfile, []byte("FROM alpine:latest\nCMD [\"sleep\", \"3600\"]\n"), 0644)
-		return nil
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "-b", sanitizedBranch, repoURL, targetDir)
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", sanitizedBranch, repoURL, targetDir)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// If branch clone fails, attempt fallback clone without explicit branch
-		fallbackCmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", repoURL, targetDir)
-		fbOutput, fbErr := fallbackCmd.CombinedOutput()
-		if fbErr != nil {
-			return fmt.Errorf("git clone failed: %w, output: %s", err, string(output)+" "+string(fbOutput))
-		}
+		return fmt.Errorf("git clone failed: %v, output: %s", err, string(output))
 	}
+
 	return nil
 }
 
-func StreamBuildOutput(ctx context.Context, reader io.Reader, logFile *os.File) {
+func StreamBuildOutput(ctx context.Context, reader io.Reader, logFile io.Writer) {
 	if reader == nil || logFile == nil {
 		return
 	}
@@ -76,14 +77,64 @@ func StreamBuildOutput(ctx context.Context, reader io.Reader, logFile *os.File) 
 				slog.Error("failed to stream build output", "error", writeErr)
 				return
 			}
-			if syncErr := logFile.Sync(); syncErr != nil {
-				slog.Error("failed to sync build log", "error", syncErr)
-			}
 		}
 		if err != nil {
 			return
 		}
 	}
+}
+
+func TarDirectory(srcDir string) (io.Reader, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	err := filepath.Walk(srcDir, func(file string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(srcDir, file)
+		if err != nil {
+			return err
+		}
+
+		if relPath == "." {
+			return nil
+		}
+
+		header, err := tar.FileInfoHeader(fi, fi.Name())
+		if err != nil {
+			return err
+		}
+
+		header.Name = filepath.ToSlash(relPath)
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		if !fi.Mode().IsRegular() {
+			return nil
+		}
+
+		f, err := os.Open(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		_, err = io.Copy(tw, f)
+		return err
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+
+	return &buf, nil
 }
 
 func (c *Client) BuildFromDockerfile(ctx context.Context, appID, buildContextPath, dockerfilePath string) (string, error) {
@@ -98,26 +149,15 @@ func (c *Client) BuildFromDockerfileWithCache(ctx context.Context, appID, buildC
 		return "", fmt.Errorf("build error: build context path is empty")
 	}
 
+	if dockerfilePath == "" {
+		dockerfilePath = "Dockerfile"
+	}
+
 	imageTag := fmt.Sprintf("labuh-%s:%s", appID, time.Now().Format("20060102150405"))
 
-	if c.cli == nil {
-		return imageTag, nil
-	}
-
-	tarBuf, err := CreateTarFromDirectory(buildContextPath)
+	tarStream, err := TarDirectory(buildContextPath)
 	if err != nil {
-		return "", fmt.Errorf("build error: failed to create tar archive: %w", err)
-	}
-
-	relDockerfilePath := dockerfilePath
-	if filepath.IsAbs(dockerfilePath) {
-		rel, err := filepath.Rel(buildContextPath, dockerfilePath)
-		if err == nil {
-			relDockerfilePath = rel
-		}
-	}
-	if relDockerfilePath == "" {
-		relDockerfilePath = "Dockerfile"
+		return "", fmt.Errorf("failed to tar build context: %w", err)
 	}
 
 	tags := []string{imageTag}
@@ -125,9 +165,9 @@ func (c *Client) BuildFromDockerfileWithCache(ctx context.Context, appID, buildC
 		tags = append(tags, cacheRef)
 	}
 
-	builtTag, err := c.BuildImage(ctx, tarBuf, relDockerfilePath, tags)
+	builtTag, err := c.BuildImage(ctx, tarStream, dockerfilePath, tags)
 	if err != nil {
-		return "", fmt.Errorf("build error: %w", err)
+		return "", err
 	}
 
 	return builtTag, nil
@@ -137,121 +177,35 @@ func (c *Client) BuildWithCache(ctx context.Context, appID, branch, buildContext
 	if cacheRef == "" {
 		cacheRef = GenerateCacheRef(appID, branch)
 	}
-	dockerfilePath := "Dockerfile"
-	if buildContextPath != "" {
-		dockerfilePath = filepath.Join(buildContextPath, "Dockerfile")
-	}
-	return c.BuildFromDockerfileWithCache(ctx, appID, buildContextPath, dockerfilePath, cacheRef)
+	return c.BuildFromDockerfileWithCache(ctx, appID, buildContextPath, "Dockerfile", cacheRef)
 }
 
-func (c *Client) PullBaseImage(ctx context.Context, imageRef string) error {
-	if c.cli == nil {
-		return nil
+func (c *Client) BuildWithNixpacks(ctx context.Context, appID, srcDir string, envs map[string]string, logWriter io.Writer) (string, error) {
+	if appID == "" {
+		return "", fmt.Errorf("invalid app ID")
 	}
-	return c.PullImage(ctx, imageRef)
-}
 
-func (c *Client) PrePullKnownTemplates(ctx context.Context, templates []string) error {
-	for _, template := range templates {
-		if err := c.PullBaseImage(ctx, template); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *Client) BuildFromGit(ctx context.Context, repoURL, branch, dockerfilePath string) (string, error) {
-	tmpDir, err := os.MkdirTemp("", "labuh-git-build-*")
+	nixpacksBin, err := exec.LookPath("nixpacks")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp build directory: %w", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	if err := c.CloneGitRepo(ctx, repoURL, branch, tmpDir); err != nil {
-		return "", err
+		return "", fmt.Errorf("nixpacks binary not found on host. Please install nixpacks (curl -sSL https://nixpacks.com/install.sh | bash): %w", err)
 	}
 
-	targetDockerfile := dockerfilePath
-	if targetDockerfile == "" {
-		targetDockerfile = "Dockerfile"
+	imageTag := fmt.Sprintf("labuh-%s:%s", appID, time.Now().Format("20060102150405"))
+	args := []string{"build", srcDir, "--name", imageTag}
+
+	for k, v := range envs {
+		args = append(args, "--env", fmt.Sprintf("%s=%s", k, v))
 	}
 
-	return c.BuildFromDockerfileWithCache(ctx, "git", tmpDir, targetDockerfile, "")
-}
-
-func CreateTarFromDirectory(srcDir string) (*bytes.Buffer, error) {
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-	defer tw.Close()
-
-	err := filepath.Walk(srcDir, func(file string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		header, err := tar.FileInfoHeader(fi, fi.Name())
-		if err != nil {
-			return err
-		}
-
-		relPath, err := filepath.Rel(srcDir, file)
-		if err != nil {
-			return err
-		}
-		header.Name = relPath
-
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-
-		if fi.Mode().IsRegular() {
-			f, err := os.Open(file)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			_, err = io.Copy(tw, f)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
+	cmd := exec.CommandContext(ctx, nixpacksBin, args...)
+	if logWriter != nil {
+		cmd.Stdout = logWriter
+		cmd.Stderr = logWriter
 	}
 
-	return &buf, nil
-}
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("nixpacks build failed: %w", err)
+	}
 
-func SanitizeBranch(branch string) string {
-	branch = strings.TrimSpace(branch)
-	if branch == "" {
-		return "main"
-	}
-	return branch
-}
-
-func FormatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		m := int(d.Minutes())
-		s := int(d.Seconds()) % 60
-		return fmt.Sprintf("%dm %ds", m, s)
-	}
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	return fmt.Sprintf("%dh %dm", h, m)
-}
-
-func TruncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
+	return imageTag, nil
 }

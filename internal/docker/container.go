@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -40,7 +42,9 @@ func (c *Client) GenerateContainerName(envSlug, appSlug, appID string) string {
 	if len(shortID) > 8 {
 		shortID = shortID[:8]
 	}
-	return fmt.Sprintf("labuh-%s-%s-%s", envSlug, appSlug, shortID)
+	cleanEnv := strings.ReplaceAll(strings.ToLower(envSlug), "_", "-")
+	cleanApp := strings.ReplaceAll(strings.ToLower(appSlug), "_", "-")
+	return fmt.Sprintf("labuh-%s-%s-%s", cleanEnv, cleanApp, shortID)
 }
 
 func (c *Client) StopContainer(ctx context.Context, containerID string, timeout int) error {
@@ -53,12 +57,28 @@ func (c *Client) StopContainer(ctx context.Context, containerID string, timeout 
 		return nil
 	}
 
+	running, err := c.IsContainerRunning(ctx, containerID)
+	if err != nil {
+		if _, ok := err.(*ContainerNotFoundError); ok {
+			return nil
+		}
+		return &DockerUnavailableError{Cause: err}
+	}
+
+	if !running {
+		slog.Info("container already stopped", "container_id", containerID)
+		return nil
+	}
+
 	if timeout <= 0 {
 		timeout = 10
 	}
 
+	slog.Info("stopping container", "container_id", containerID, "timeout_s", timeout)
 	stopTimeout := timeout
-	return c.cli.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &stopTimeout})
+	return c.cli.ContainerStop(ctx, containerID, container.StopOptions{
+		Timeout: &stopTimeout,
+	})
 }
 
 func (c *Client) RestartContainer(ctx context.Context, containerID string, timeout int) error {
@@ -66,16 +86,15 @@ func (c *Client) RestartContainer(ctx context.Context, containerID string, timeo
 		return fmt.Errorf("empty container ID")
 	}
 
-	if c.cli == nil {
-		return nil
+	if err := c.StopContainer(ctx, containerID, timeout); err != nil {
+		return err
 	}
 
-	restartTimeout := timeout
-	if restartTimeout <= 0 {
-		restartTimeout = 10
+	if err := c.StartContainer(ctx, containerID); err != nil {
+		return err
 	}
 
-	return c.cli.ContainerRestart(ctx, containerID, container.StopOptions{Timeout: &restartTimeout})
+	return nil
 }
 
 func (c *Client) IsContainerRunning(ctx context.Context, containerID string) (bool, error) {
@@ -84,16 +103,18 @@ func (c *Client) IsContainerRunning(ctx context.Context, containerID string) (bo
 	}
 
 	if c.cli == nil {
-		slog.Warn("docker client not initialized, assuming not running", "container_id", containerID)
-		return false, nil
+		return false, fmt.Errorf("docker client not initialized")
 	}
 
-	inspect, err := c.cli.ContainerInspect(ctx, containerID)
+	insp, err := c.InspectContainer(ctx, containerID)
 	if err != nil {
+		if client.IsErrNotFound(err) {
+			return false, &ContainerNotFoundError{ContainerID: containerID}
+		}
 		return false, err
 	}
 
-	return inspect.State != nil && inspect.State.Running, nil
+	return insp.State != nil && insp.State.Running, nil
 }
 
 func (c *Client) GetContainerStatus(ctx context.Context, containerID string) (string, error) {
@@ -105,122 +126,124 @@ func (c *Client) GetContainerStatus(ctx context.Context, containerID string) (st
 		return string(ContainerStatusStopped), nil
 	}
 
-	inspect, err := c.cli.ContainerInspect(ctx, containerID)
+	insp, err := c.InspectContainer(ctx, containerID)
 	if err != nil {
-		return string(ContainerStatusStopped), err
+		if client.IsErrNotFound(err) {
+			return string(ContainerStatusStopped), nil
+		}
+		return string(ContainerStatusFailed), err
 	}
 
-	if inspect.State != nil {
-		if inspect.State.Running {
-			return string(ContainerStatusRunning), nil
-		}
-		if inspect.State.Dead || inspect.State.OOMKilled {
-			return string(ContainerStatusFailed), nil
-		}
+	if insp.State != nil && insp.State.Running {
+		return string(ContainerStatusRunning), nil
 	}
+
 	return string(ContainerStatusStopped), nil
 }
 
 func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imageName string, appPort int, envVars []struct{ Key, Value string }) (string, error) {
 	if c.cli == nil {
-		slog.Warn("docker client unavailable, returning simulated container ID", "app_id", appID)
-		return fmt.Sprintf("sim-container-%s", appID), nil
-	}
-
-	if ctx == nil {
-		ctx = context.Background()
+		return "", fmt.Errorf("docker client not initialized")
 	}
 
 	networkName := "labuh-network"
-	networks, err := c.cli.NetworkList(ctx, network.ListOptions{})
-	if err == nil {
-		found := false
-		for _, netItem := range networks {
-			if netItem.Name == networkName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			_, _ = c.cli.NetworkCreate(ctx, networkName, network.CreateOptions{Driver: "bridge"})
-		}
-	}
-
-	var envList []string
-	for _, ev := range envVars {
-		envList = append(envList, fmt.Sprintf("%s=%s", ev.Key, ev.Value))
+	if err := c.EnsureNetwork(ctx, networkName); err != nil {
+		slog.Warn("failed to ensure labuh network, proceeding with default", "error", err)
 	}
 
 	containerName := c.GenerateContainerName(envSlug, appSlug, appID)
-	_ = c.cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 
-	portStr := fmt.Sprintf("%d/tcp", appPort)
+	// Build environment variable slice
+	envs := make([]string, 0, len(envVars))
+	for _, ev := range envVars {
+		envs = append(envs, fmt.Sprintf("%s=%s", ev.Key, ev.Value))
+	}
+
 	cfg := &container.Config{
 		Image: imageName,
-		Env:   envList,
-		ExposedPorts: nat.PortSet{
-			nat.Port(portStr): struct{}{},
+		Env:   envs,
+	}
+
+	hostCfg := &container.HostConfig{
+		RestartPolicy: container.RestartPolicy{
+			Name: "unless-stopped",
 		},
 	}
-	hostCfg := &container.HostConfig{
-		RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
+
+	if appPort > 0 {
+		portProto := nat.Port(fmt.Sprintf("%d/tcp", appPort))
+		cfg.ExposedPorts = nat.PortSet{
+			portProto: struct{}{},
+		}
 	}
+
 	netCfg := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
 			networkName: {},
 		},
 	}
 
-	resp, err := c.cli.ContainerCreate(ctx, cfg, hostCfg, netCfg, nil, containerName)
+	// If container already exists with same name, remove it first
+	_ = c.RemoveContainer(ctx, containerName)
+
+	containerID, err := c.CreateContainer(ctx, cfg, hostCfg, netCfg, containerName)
 	if err != nil {
 		return "", fmt.Errorf("failed to create container: %w", err)
 	}
 
-	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if err := c.StartContainer(ctx, containerID); err != nil {
+		_ = c.RemoveContainer(ctx, containerID)
 		return "", fmt.Errorf("failed to start container: %w", err)
 	}
 
-	return resp.ID, nil
+	return containerID, nil
 }
 
 func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imageName string, envVars map[string]string, ports []string, volumeName string) (string, error) {
 	if c.cli == nil {
-		return fmt.Sprintf("sim-db-%s", dbSlug), nil
+		return "", fmt.Errorf("docker client not initialized")
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	var envList []string
-	for k, v := range envVars {
-		envList = append(envList, fmt.Sprintf("%s=%s", k, v))
-	}
+	networkName := "labuh-network"
+	_ = c.EnsureNetwork(ctx, networkName)
 
 	containerName := fmt.Sprintf("labuh-db-%s-%s", envSlug, dbSlug)
-	_ = c.cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
+
+	envs := make([]string, 0, len(envVars))
+	for k, v := range envVars {
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	}
 
 	cfg := &container.Config{
 		Image: imageName,
-		Env:   envList,
+		Env:   envs,
 	}
+
 	hostCfg := &container.HostConfig{
-		RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
-	}
-	netCfg := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			"labuh-network": {},
+		RestartPolicy: container.RestartPolicy{
+			Name: "unless-stopped",
 		},
 	}
 
-	resp, err := c.cli.ContainerCreate(ctx, cfg, hostCfg, netCfg, nil, containerName)
+	if volumeName != "" {
+		hostCfg.Binds = []string{fmt.Sprintf("%s:/var/lib/data", volumeName)}
+	}
+
+	_ = c.RemoveContainer(ctx, containerName)
+
+	containerID, err := c.CreateContainer(ctx, cfg, hostCfg, &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			networkName: {},
+		},
+	}, containerName)
 	if err != nil {
-		return "", fmt.Errorf("failed to create db container: %w", err)
+		return "", fmt.Errorf("failed to create database container: %w", err)
 	}
 
-	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return "", fmt.Errorf("failed to start db container: %w", err)
+	if err := c.StartContainer(ctx, containerID); err != nil {
+		_ = c.RemoveContainer(ctx, containerID)
+		return "", fmt.Errorf("failed to start database container: %w", err)
 	}
 
-	return resp.ID, nil
+	return containerID, nil
 }

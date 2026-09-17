@@ -16,13 +16,13 @@ import (
 )
 
 type DeployWorker struct {
-	jobQueue     chan models.DeploymentJob
-	ctx          context.Context
-	cancel       context.CancelFunc
-	wg           sync.WaitGroup
-	semaphore    chan struct{}
+	jobQueue      chan models.DeploymentJob
+	ctx           context.Context
+	cancel        context.CancelFunc
+	wg            sync.WaitGroup
+	semaphore     chan struct{}
 	maxConcurrent int
-	workerCount  int
+	workerCount   int
 }
 
 func NewDeployWorker(bufferSize int) *DeployWorker {
@@ -57,9 +57,7 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 	}
 
 	for i := 0; i < w.workerCount; i++ {
-		w.wg.Add(1)
-		go func() {
-			defer w.wg.Done()
+		w.wg.Go(func() {
 			for {
 				select {
 				case job, ok := <-w.jobQueue:
@@ -67,32 +65,32 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 						return
 					}
 					w.semaphore <- struct{}{}
-				jobCtx, cancel := context.WithTimeout(w.ctx, 30*time.Minute)
-				deployJob := deploy.DeploymentJob{
-					DeploymentID:   job.DeploymentID,
-					ApplicationID:  job.ApplicationID,
-					SourceType:     job.SourceType,
-					RepositoryURL:  job.RepositoryURL,
-					Branch:         job.Branch,
-					DockerfilePath: job.DockerfilePath,
-					BuildPath:      job.BuildPath,
-					DockerImage:    job.DockerImage,
-					AppPort:        job.AppPort,
-					EnvVars:        job.EnvVars,
-					LogPath:        job.LogPath,
-					Priority:       job.Priority,
-				}
-				err := pipeline.Execute(jobCtx, deployJob)
-				cancel()
-				<-w.semaphore
-				if err != nil {
-					slog.Error("deployment job failed", "error", err, "deployment_id", job.DeploymentID)
-				}
+					jobCtx, cancel := context.WithTimeout(w.ctx, 30*time.Minute)
+					deployJob := deploy.DeploymentJob{
+						DeploymentID:   job.DeploymentID,
+						ApplicationID:  job.ApplicationID,
+						SourceType:     job.SourceType,
+						RepositoryURL:  job.RepositoryURL,
+						Branch:         job.Branch,
+						DockerfilePath: job.DockerfilePath,
+						BuildPath:      job.BuildPath,
+						DockerImage:    job.DockerImage,
+						AppPort:        job.AppPort,
+						EnvVars:        job.EnvVars,
+						LogPath:        job.LogPath,
+						Priority:       job.Priority,
+					}
+					err := pipeline.Execute(jobCtx, deployJob)
+					cancel()
+					<-w.semaphore
+					if err != nil {
+						slog.Error("deployment job failed", "error", err, "deployment_id", job.DeploymentID)
+					}
 				case <-w.ctx.Done():
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	go func() {

@@ -2,16 +2,17 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
-	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 type Client struct {
@@ -19,12 +20,12 @@ type Client struct {
 }
 
 func NewClient() (*Client, error) {
-	if os.Getenv("LABUH_DOCKER_MOCK") == "true" {
-		return &Client{cli: nil}, nil
-	}
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(
+		client.FromEnv,
+		client.WithAPIVersionNegotiation(),
+	)
 	if err != nil {
-		slog.Warn("docker client unavailable, falling back to stub", "error", err)
+		slog.Warn("failed to initialize docker client from env, falling back to dormant client", "error", err)
 		return &Client{cli: nil}, nil
 	}
 	return &Client{cli: cli}, nil
@@ -32,7 +33,7 @@ func NewClient() (*Client, error) {
 
 func (c *Client) Ping(ctx context.Context) error {
 	if c.cli == nil {
-		return nil
+		return fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -43,75 +44,73 @@ func (c *Client) Ping(ctx context.Context) error {
 
 func (c *Client) PullImage(ctx context.Context, imageRef string) error {
 	if c.cli == nil {
-		return nil
+		return fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	slog.Info("pulling docker image", "image", imageRef)
 	reader, err := c.cli.ImagePull(ctx, imageRef, image.PullOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("pull image error: %w", err)
 	}
 	defer reader.Close()
+
+	// Drain reader to ensure pull completes
 	_, _ = io.Copy(io.Discard, reader)
 	return nil
 }
 
 func (c *Client) BuildImage(ctx context.Context, buildContext io.Reader, dockerfilePath string, tags []string) (string, error) {
 	if c.cli == nil {
-		if len(tags) > 0 {
-			return tags[0], nil
-		}
-		return "test:latest", nil
+		return "", fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if buildContext == nil {
-		if len(tags) > 0 {
-			return tags[0], nil
-		}
-		return "test:latest", nil
+	if dockerfilePath == "" {
+		dockerfilePath = "Dockerfile"
 	}
-	resp, err := c.cli.ImageBuild(ctx, buildContext, types.ImageBuildOptions{
+
+	opts := types.ImageBuildOptions{
 		Dockerfile: dockerfilePath,
 		Tags:       tags,
 		Remove:     true,
-	})
+	}
+
+	resp, err := c.cli.ImageBuild(ctx, buildContext, opts)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("image build error: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// Drain output
 	_, _ = io.Copy(io.Discard, resp.Body)
+
 	if len(tags) > 0 {
 		return tags[0], nil
 	}
-	return "latest", nil
+	return "", nil
 }
 
-func (c *Client) CreateContainer(ctx context.Context, config any, hostConfig any, networkingConfig any, name string) (string, error) {
+func (c *Client) CreateContainer(ctx context.Context, cfg *container.Config, hostConfig *container.HostConfig, netConfig *network.NetworkingConfig, name string) (string, error) {
 	if c.cli == nil {
-		return "", nil
+		return "", fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	cfg, _ := config.(*container.Config)
-	if cfg == nil {
-		return "", nil
-	}
-	hCfg, _ := hostConfig.(*container.HostConfig)
-	nCfg, _ := networkingConfig.(*network.NetworkingConfig)
-	resp, err := c.cli.ContainerCreate(ctx, cfg, hCfg, nCfg, nil, name)
+
+	resp, err := c.cli.ContainerCreate(ctx, cfg, hostConfig, netConfig, nil, name)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("container create error: %w", err)
 	}
 	return resp.ID, nil
 }
 
 func (c *Client) StartContainer(ctx context.Context, containerID string) error {
 	if c.cli == nil {
-		return nil
+		return fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -121,73 +120,85 @@ func (c *Client) StartContainer(ctx context.Context, containerID string) error {
 
 func (c *Client) RemoveContainer(ctx context.Context, containerID string) error {
 	if c.cli == nil {
-		return nil
+		return fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	err := c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
-	if err != nil && client.IsErrNotFound(err) {
-		return nil
-	}
-	return err
+	return c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{
+		Force:         true,
+		RemoveVolumes: true,
+	})
 }
 
-func (c *Client) InspectContainer(ctx context.Context, containerID string) error {
+func (c *Client) InspectContainer(ctx context.Context, containerID string) (*types.ContainerJSON, error) {
 	if c.cli == nil {
-		return nil
+		return nil, fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	_, err := c.cli.ContainerInspect(ctx, containerID)
-	if err != nil && client.IsErrNotFound(err) {
-		return nil
+	insp, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return nil, err
 	}
-	return err
+	return &insp, nil
 }
 
-func (c *Client) ContainerLogs(ctx context.Context, containerID string, opts any) (io.ReadCloser, error) {
+func (c *Client) ContainerLogs(ctx context.Context, containerID string, opts container.LogsOptions) (io.ReadCloser, error) {
 	if c.cli == nil {
-		return nil, nil
+		return nil, fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	logOpts, ok := opts.(container.LogsOptions)
-	if !ok {
-		logOpts = container.LogsOptions{
-			ShowStdout: true,
-			ShowStderr: true,
-			Follow:     true,
-			Tail:       "100",
+	return c.cli.ContainerLogs(ctx, containerID, opts)
+}
+
+func (c *Client) ListContainers(ctx context.Context, opts container.ListOptions) ([]types.Container, error) {
+	if c.cli == nil {
+		return nil, fmt.Errorf("docker client not initialized")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return c.cli.ContainerList(ctx, opts)
+}
+
+func (c *Client) EnsureNetwork(ctx context.Context, networkName string) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if strings.TrimSpace(networkName) == "" {
+		networkName = "labuh-network"
+	}
+
+	nets, err := c.cli.NetworkList(ctx, network.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list networks: %w", err)
+	}
+
+	for _, n := range nets {
+		if n.Name == networkName {
+			return nil
 		}
 	}
-	reader, err := c.cli.ContainerLogs(ctx, containerID, logOpts)
-	if err != nil && client.IsErrNotFound(err) {
-		return nil, nil
-	}
-	return reader, err
-}
 
-func (c *Client) ListContainers(ctx context.Context, opts any) error {
-	if c.cli == nil {
-		return nil
+	_, err = c.cli.NetworkCreate(ctx, networkName, network.CreateOptions{
+		Driver: "bridge",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create network %s: %w", networkName, err)
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	listOpts, ok := opts.(container.ListOptions)
-	if !ok {
-		listOpts = container.ListOptions{All: true}
-	}
-	_, err := c.cli.ContainerList(ctx, listOpts)
-	return err
+	return nil
 }
 
 func (c *Client) GetServerVersion(ctx context.Context) (string, error) {
 	if c.cli == nil {
-		return "mock", nil
+		return "", fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -201,7 +212,7 @@ func (c *Client) GetServerVersion(ctx context.Context) (string, error) {
 
 func (c *Client) CountRunningContainers(ctx context.Context) (int, error) {
 	if c.cli == nil {
-		return 0, nil
+		return 0, fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -217,3 +228,4 @@ func DemultiplexLogs(dst io.Writer, src io.Reader) error {
 	_, err := stdcopy.StdCopy(dst, dst, src)
 	return err
 }
+

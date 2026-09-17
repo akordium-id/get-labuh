@@ -126,23 +126,98 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 
 		writeLog(activeLogWriter, "Git clone completed")
 
-		writeLog(activeLogWriter, "Building docker image from repository...")
+		dockerfilePath := "Dockerfile"
+		if job.DockerfilePath != "" {
+			dockerfilePath = job.DockerfilePath
+		}
+
+		fullDockerfilePath := filepath.Join(buildDir, dockerfilePath)
+		hasDockerfile := false
+		if fi, err := os.Stat(fullDockerfilePath); err == nil && !fi.IsDir() {
+			hasDockerfile = true
+		}
+
+		buildCtx, cancelBuild := context.WithTimeout(ctx, 20*time.Minute)
+		defer cancelBuild()
+
+		if hasDockerfile {
+			writeLog(activeLogWriter, fmt.Sprintf("Found %s, building docker image...", dockerfilePath))
+			updateStep("build", models.DeployStatusBuilding, "")
+
+			cacheRef := docker.GenerateCacheRef(job.ApplicationID, job.Branch)
+			builtImage, err := p.dockerClient.BuildFromDockerfileWithCache(buildCtx, job.ApplicationID, buildDir, dockerfilePath, cacheRef)
+			if err != nil {
+				errMsg := fmt.Sprintf("docker build failed: %v", err)
+				writeLog(activeLogWriter, errMsg)
+				p.cleanupFailedContainer(ctx, job)
+				updateStep("build", models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "build", Cause: err, Output: errMsg}
+			}
+			writeLog(activeLogWriter, "Docker build completed: "+builtImage)
+			imageName = builtImage
+		} else {
+			writeLog(activeLogWriter, "No Dockerfile found. Using Nixpacks to auto-detect runtime...")
+			updateStep("build", models.DeployStatusBuilding, "")
+
+			envs := make(map[string]string)
+			for _, ev := range job.EnvVars {
+				envs[ev.Key] = ev.Value
+			}
+
+			builtImage, err := p.dockerClient.BuildWithNixpacks(buildCtx, job.ApplicationID, buildDir, envs, activeLogWriter)
+			if err != nil {
+				errMsg := fmt.Sprintf("nixpacks build failed: %v", err)
+				writeLog(activeLogWriter, errMsg)
+				p.cleanupFailedContainer(ctx, job)
+				updateStep("build", models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "build", Cause: err, Output: errMsg}
+			}
+			writeLog(activeLogWriter, "Nixpacks build completed: "+builtImage)
+			imageName = builtImage
+		}
+
+	case string(models.SourceTypeNixpacks):
+		writeLog(activeLogWriter, "Cloning git repository for Nixpacks build...")
+		updateStep("clone", models.DeployStatusCloning, "")
+
+		cloneCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
+		buildDir := filepath.Join("/tmp/labuh-builds", job.DeploymentID)
+		if err := os.MkdirAll(buildDir, 0755); err != nil {
+			errMsg := fmt.Sprintf("failed to create build directory: %v", err)
+			writeLog(activeLogWriter, errMsg)
+			updateStep("clone", models.DeployStatusFailed, errMsg)
+			return &DeployError{Step: "clone", Cause: err, Output: errMsg}
+		}
+
+		if err := p.dockerClient.CloneGitRepo(cloneCtx, job.RepositoryURL, job.Branch, buildDir); err != nil {
+			errMsg := fmt.Sprintf("git clone failed: %v", err)
+			writeLog(activeLogWriter, errMsg)
+			updateStep("clone", models.DeployStatusFailed, errMsg)
+			return &DeployError{Step: "clone", Cause: err, Output: errMsg}
+		}
+
+		writeLog(activeLogWriter, "Git clone completed. Running Nixpacks build...")
 		updateStep("build", models.DeployStatusBuilding, "")
 
 		buildCtx, cancelBuild := context.WithTimeout(ctx, 20*time.Minute)
 		defer cancelBuild()
 
-		cacheRef := docker.GenerateCacheRef(job.ApplicationID, job.Branch)
-		builtImage, err := p.dockerClient.BuildWithCache(buildCtx, job.ApplicationID, job.Branch, buildDir, cacheRef)
+		envs := make(map[string]string)
+		for _, ev := range job.EnvVars {
+			envs[ev.Key] = ev.Value
+		}
+
+		builtImage, err := p.dockerClient.BuildWithNixpacks(buildCtx, job.ApplicationID, buildDir, envs, activeLogWriter)
 		if err != nil {
-			errMsg := fmt.Sprintf("docker build failed: %v", err)
+			errMsg := fmt.Sprintf("nixpacks build failed: %v", err)
 			writeLog(activeLogWriter, errMsg)
 			p.cleanupFailedContainer(ctx, job)
 			updateStep("build", models.DeployStatusFailed, errMsg)
 			return &DeployError{Step: "build", Cause: err, Output: errMsg}
 		}
-
-		writeLog(activeLogWriter, "Docker build completed: "+builtImage)
+		writeLog(activeLogWriter, "Nixpacks build completed: "+builtImage)
 		imageName = builtImage
 
 	case string(models.SourceTypeDockerfile):

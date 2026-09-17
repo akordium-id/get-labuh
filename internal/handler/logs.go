@@ -14,6 +14,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/docker/docker/api/types/container"
 )
 
 type LogsHandler struct {
@@ -144,7 +145,12 @@ func (h *LogsHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	reader, err := h.dockerClient.ContainerLogs(r.Context(), *app.ContainerID, nil)
+	reader, err := h.dockerClient.ContainerLogs(r.Context(), *app.ContainerID, container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+		Tail:       "100",
+	})
 	if err != nil {
 		sendEvent("error", fmt.Sprintf(`{"message": "%s"}`, escapeJSON(err.Error())))
 		sendEvent("done", "{}")

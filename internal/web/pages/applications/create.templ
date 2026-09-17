@@ -15,9 +15,11 @@ templ ApplicationsCreatePage() {
 				<div>
 					<label class="block text-sm font-medium text-gray-700">Source Type</label>
 					<select name="source_type" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
-						<option value="git">Git</option>
-						<option value="docker_image">Docker Image</option>
+						<option value="git">Git (Auto-detect / Dockerfile)</option>
+						<option value="nixpacks">Nixpacks (Zero-config build)</option>
 						<option value="dockerfile">Dockerfile</option>
+						<option value="docker_image">Docker Image</option>
+						<option value="docker_compose">Docker Compose</option>
 					</select>
 				</div>
 				<div>
