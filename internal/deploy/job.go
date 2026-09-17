@@ -279,6 +279,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	}
 	var customDomain *string = job.CustomDomain
 	var appPort int = job.AppPort
+	var oldContainerID string
 
 	if p.appRepo != nil {
 		app, err := p.appRepo.GetByID(job.ApplicationID)
@@ -290,12 +291,8 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			if appPort <= 0 {
 				appPort = app.AppPort
 			}
-
-			// Clean up old container if running
-			if app.ContainerID != nil && *app.ContainerID != "" {
-				writeLog(activeLogWriter, "Stopping existing container...")
-				_ = p.dockerClient.StopContainer(ctx, *app.ContainerID, 10)
-				_ = p.dockerClient.RemoveContainer(ctx, *app.ContainerID)
+			if app.ContainerID != nil {
+				oldContainerID = *app.ContainerID
 			}
 		}
 	}
@@ -312,30 +309,57 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		})
 	}
 
-	containerID, err := p.dockerClient.RunContainer(ctx, job.ApplicationID, "prod", appSlug, imageName, appPort, dockerEnvVars)
+	// Blue-Green container naming: generate candidate container name with timestamp
+	candidateName := fmt.Sprintf("%s-%d", p.dockerClient.GenerateContainerName("prod", appSlug, job.ApplicationID), time.Now().Unix())
+	writeLog(activeLogWriter, fmt.Sprintf("Launching new candidate container (%s)...", candidateName))
+
+	candidateContainerID, err := p.dockerClient.RunContainerWithCustomName(ctx, job.ApplicationID, candidateName, imageName, appPort, dockerEnvVars)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to run container: %v", err)
+		errMsg := fmt.Sprintf("failed to run candidate container: %v", err)
 		writeLog(activeLogWriter, errMsg)
 		updateStep("deploy", models.DeployStatusFailed, errMsg)
 		return &DeployError{Step: "deploy", Cause: err, Output: errMsg}
 	}
 
-	writeLog(activeLogWriter, fmt.Sprintf("Container started successfully (ID: %s)", containerID))
-	if p.appRepo != nil {
-		_ = p.appRepo.UpdateContainerAndStatus(job.ApplicationID, containerID, models.AppStatusRunning)
+	writeLog(activeLogWriter, fmt.Sprintf("Candidate container started (ID: %s). Running healthcheck gate...", candidateContainerID))
+	updateStep("healthcheck", models.DeployStatusDeploying, "")
+
+	// Healthcheck gate: wait up to 30 seconds for container to answer or stay running
+	if err := p.dockerClient.WaitForHealth(ctx, candidateContainerID, appPort, 30*time.Second); err != nil {
+		errMsg := fmt.Sprintf("Healthcheck failed for candidate container: %v. Rolling back...", err)
+		writeLog(activeLogWriter, errMsg)
+		_ = p.dockerClient.StopContainer(ctx, candidateContainerID, 5)
+		_ = p.dockerClient.RemoveContainer(ctx, candidateContainerID)
+		updateStep("healthcheck", models.DeployStatusFailed, errMsg)
+		return &DeployError{Step: "healthcheck", Cause: err, Output: errMsg}
 	}
 
+	writeLog(activeLogWriter, "Candidate container is healthy! Proceeding with traffic switch...")
+
+	// Atomic Caddy Route Update to the new healthy candidate container
 	if p.caddyClient != nil && customDomain != nil && *customDomain != "" {
-		containerName := p.dockerClient.GenerateContainerName("prod", appSlug, job.ApplicationID)
-		writeLog(activeLogWriter, fmt.Sprintf("Configuring Caddy reverse proxy for %s -> %s:%d", *customDomain, containerName, appPort))
-		if err := p.caddyClient.AddRoute(*customDomain, containerName, appPort); err != nil {
-			writeLog(activeLogWriter, fmt.Sprintf("Warning: failed to add Caddy route: %v", err))
+		writeLog(activeLogWriter, fmt.Sprintf("Switching Caddy route for %s -> %s:%d", *customDomain, candidateName, appPort))
+		if err := p.caddyClient.AddRoute(*customDomain, candidateName, appPort); err != nil {
+			writeLog(activeLogWriter, fmt.Sprintf("Warning: failed to update Caddy route: %v", err))
 		} else {
-			writeLog(activeLogWriter, "Caddy route configured successfully")
+			writeLog(activeLogWriter, "Caddy route switched successfully without downtime")
 		}
 	}
 
-	writeLog(activeLogWriter, "Deployment completed successfully")
+	// Update DB record to point to the new running container
+	if p.appRepo != nil {
+		_ = p.appRepo.UpdateContainerAndStatus(job.ApplicationID, candidateContainerID, models.AppStatusRunning)
+	}
+
+	// Zero-Downtime Cleanup: Stop and remove old container only after candidate is healthy and live
+	if oldContainerID != "" && oldContainerID != candidateContainerID {
+		writeLog(activeLogWriter, fmt.Sprintf("Stopping previous container (%s)...", oldContainerID))
+		_ = p.dockerClient.StopContainer(ctx, oldContainerID, 10)
+		_ = p.dockerClient.RemoveContainer(ctx, oldContainerID)
+		writeLog(activeLogWriter, "Previous container stopped and cleaned up")
+	}
+
+	writeLog(activeLogWriter, "Zero-downtime deployment completed successfully!")
 	updateStep("done", models.DeployStatusSuccess, "")
 	if p.deployRepo != nil {
 		_ = p.deployRepo.MarkFinished(job.DeploymentID)

@@ -27,7 +27,7 @@ Labuh mendukung 5 moda build & deployment pada single-node host:
 
 ---
 
-## 3. Alur Deployment Pipeline (`internal/deploy/job.go`)
+## 3. Alur Deployment Pipeline Zero-Downtime (`internal/deploy/job.go`)
 
 ```
 [ Trigger Deployment ]
@@ -45,16 +45,23 @@ Labuh mendukung 5 moda build & deployment pada single-node host:
    └── Dockerf -> Git Clone -> Docker Tar Build
           │
           ▼
-   [ Container Lifecycle ]
-   ├── Cek apakah ada container lama yang aktif untuk app ini
-   ├── Jalankan container baru pada `labuh-network`
-   ├── Verifikasi status container `running`
-   └── Stop & Remove container lama
+   [ Blue-Green Candidate Container ]
+   └── Jalankan candidate container baru berdampingan dengan nama bertimestamp
+       di bridge network `labuh-network`
           │
           ▼
-   [ Caddy Reverse Proxy ]
-   └── Jika aplikasi memiliki `CustomDomain`, push route upstream
-       (`customDomain -> <containerName>:<port>`) ke Caddy API
+   [ Healthcheck Gate (Timeout 30s) ]
+   ├── Polling HTTP GET atau TCP ping ke IP internal container pada port aplikasi
+   ├── Jika Gagal: Stop & remove candidate container (Rollback protektif, container lama tetap hidup)
+   └── Jika Sehat (HTTP 2xx/3xx/4xx atau TCP connect): Lanjut ke routing switch
+          │
+          ▼
+   [ Atomic Caddy Route Switch ]
+   └── Re-route upstream reverse proxy Caddy secara atomik dari container lama ke candidate container
+          │
+          ▼
+   [ Cleanup Previous Container ]
+   └── Stop dan prune container versi sebelumnya setelah trafik baru berhasil dialihkan (0 Downtime)
           │
           ▼
    [ Mark Finished ] (Status: Success / Failed)

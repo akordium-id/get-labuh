@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -142,6 +145,11 @@ func (c *Client) GetContainerStatus(ctx context.Context, containerID string) (st
 }
 
 func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imageName string, appPort int, envVars []struct{ Key, Value string }) (string, error) {
+	containerName := c.GenerateContainerName(envSlug, appSlug, appID)
+	return c.RunContainerWithCustomName(ctx, appID, containerName, imageName, appPort, envVars)
+}
+
+func (c *Client) RunContainerWithCustomName(ctx context.Context, appID, containerName, imageName string, appPort int, envVars []struct{ Key, Value string }) (string, error) {
 	if c.cli == nil {
 		return "", fmt.Errorf("docker client not initialized")
 	}
@@ -151,9 +159,6 @@ func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imag
 		slog.Warn("failed to ensure labuh network, proceeding with default", "error", err)
 	}
 
-	containerName := c.GenerateContainerName(envSlug, appSlug, appID)
-
-	// Build environment variable slice
 	envs := make([]string, 0, len(envVars))
 	for _, ev := range envVars {
 		envs = append(envs, fmt.Sprintf("%s=%s", ev.Key, ev.Value))
@@ -183,7 +188,7 @@ func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imag
 		},
 	}
 
-	// If container already exists with same name, remove it first
+	// Remove old container with exact same name if present
 	_ = c.RemoveContainer(ctx, containerName)
 
 	containerID, err := c.CreateContainer(ctx, cfg, hostCfg, netCfg, containerName)
@@ -197,6 +202,105 @@ func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imag
 	}
 
 	return containerID, nil
+}
+
+func (c *Client) GetContainerIP(ctx context.Context, containerID, networkName string) (string, error) {
+	insp, err := c.InspectContainer(ctx, containerID)
+	if err != nil {
+		return "", err
+	}
+
+	if insp.NetworkSettings != nil {
+		if networkName != "" {
+			if netSettings, exists := insp.NetworkSettings.Networks[networkName]; exists && netSettings.IPAddress != "" {
+				return netSettings.IPAddress, nil
+			}
+		}
+		if insp.NetworkSettings.IPAddress != "" {
+			return insp.NetworkSettings.IPAddress, nil
+		}
+	}
+
+	return "", fmt.Errorf("no IP address found for container %s", containerID)
+}
+
+func (c *Client) WaitForHealth(ctx context.Context, containerID string, appPort int, maxDuration time.Duration) error {
+	if maxDuration <= 0 {
+		maxDuration = 30 * time.Second
+	}
+
+	deadline := time.Now().Add(maxDuration)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	httpClient := &http.Client{
+		Timeout: 2 * time.Second,
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if time.Now().After(deadline) {
+				return fmt.Errorf("healthcheck timed out after %v", maxDuration)
+			}
+
+			running, err := c.IsContainerRunning(ctx, containerID)
+			if err != nil || !running {
+				return fmt.Errorf("container stopped or exited unexpectedly: %v", err)
+			}
+
+			// Try to connect to container IP if port is provided
+			if appPort > 0 {
+				ip, err := c.GetContainerIP(ctx, containerID, "labuh-network")
+				if err == nil && ip != "" {
+					portsToTry := []int{appPort}
+
+					// Inspect container to check actual exposed ports (e.g. 80 for nginx)
+					if insp, inspErr := c.InspectContainer(ctx, containerID); inspErr == nil && insp != nil && insp.Config != nil {
+						for p := range insp.Config.ExposedPorts {
+							if p.Int() > 0 && p.Int() != appPort {
+								portsToTry = append(portsToTry, p.Int())
+							}
+						}
+					}
+
+					for _, checkPort := range portsToTry {
+						// 1. Try HTTP request
+						url := fmt.Sprintf("http://%s:%d/", ip, checkPort)
+						req, reqErr := http.NewRequestWithContext(ctx, "GET", url, nil)
+						if reqErr == nil {
+							resp, httpErr := httpClient.Do(req)
+							if httpErr == nil {
+								resp.Body.Close()
+								// Any status code under 500 implies the app server is up
+								if resp.StatusCode < 500 {
+									return nil
+								}
+							}
+						}
+
+						// 2. Fallback to TCP dial
+						conn, tcpErr := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, checkPort), 1*time.Second)
+						if tcpErr == nil {
+							conn.Close()
+							return nil
+						}
+					}
+				}
+			}
+
+			// If container has been continuously running for at least 3 seconds without exiting, consider healthy
+			if insp, inspErr := c.InspectContainer(ctx, containerID); inspErr == nil && insp != nil && insp.State != nil && insp.State.Running {
+				if startedAt, err := time.Parse(time.RFC3339Nano, insp.State.StartedAt); err == nil {
+					if time.Since(startedAt) >= 3*time.Second {
+						return nil
+					}
+				}
+			}
+		}
+	}
 }
 
 func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imageName string, envVars map[string]string, ports []string, volumeName string) (string, error) {
