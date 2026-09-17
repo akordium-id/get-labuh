@@ -182,16 +182,16 @@ templ DatabaseCreatePage() {
 					<input type="text" name="version" value="latest" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
 				</div>
 				<div>
-					<label class="block text-sm font-medium text-gray-700">Username</label>
-					<input type="text" name="username" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+					<label class="block text-sm font-medium text-gray-700">Username <span class="text-gray-400 font-normal">(optional, default auto-set)</span></label>
+					<input type="text" name="username" placeholder="e.g. postgres, root, default" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
 				</div>
 				<div>
-					<label class="block text-sm font-medium text-gray-700">Password</label>
-					<input type="text" name="password" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+					<label class="block text-sm font-medium text-gray-700">Password <span class="text-gray-400 font-normal">(optional, auto-generated if empty)</span></label>
+					<input type="password" name="password" placeholder="Leave empty for auto-generated secure password" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
 				</div>
 				<div>
-					<label class="block text-sm font-medium text-gray-700">Database Name</label>
-					<input type="text" name="database_name" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+					<label class="block text-sm font-medium text-gray-700">Database Name <span class="text-gray-400 font-normal">(optional, defaults to slug)</span></label>
+					<input type="text" name="database_name" placeholder="e.g. app_production" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
 				</div>
 				<div>
 					<label class="block text-sm font-medium text-gray-700">Port</label>

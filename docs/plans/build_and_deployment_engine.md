@@ -69,7 +69,26 @@ Labuh mendukung 5 moda build & deployment pada single-node host:
 
 ---
 
-## 4. Persyaratan Host
+## 4. One-Click Database Provisioning Engine
+
+Labuh menyediakan provisioning database terisolasi siap pakai dalam bridge network `labuh-network`:
+
+| Engine | Image Default | Direktori Data Persistent Volume | Connection String Format |
+| :--- | :--- | :--- | :--- |
+| **PostgreSQL** | `postgres:15-alpine` | `/var/lib/postgresql/data` | `postgres://<user>:<pass>@<container_name>:5432/<dbname>?sslmode=disable` |
+| **MySQL** | `mysql:8` | `/var/lib/mysql` | `mysql://<user>:<pass>@<container_name>:3306/<dbname>` |
+| **Redis** | `redis:7-alpine` | `/data` | `redis://:<pass>@<container_name>:6379` |
+| **MongoDB** | `mongo:6` | `/data/db` | `mongodb://<user>:<pass>@<container_name>:27017/<dbname>?authSource=admin` |
+
+### Fitur Otomatisasi Database:
+1. **Auto Password & Port**: Jika user tidak mengisi kredensial, Labuh men-generate random secure password dan menetapkan default port standar.
+2. **Persistent Named Volume**: Data disimpan pada Docker Named Volume berformat `labuh-vol-<envSlug>-<dbSlug>` sehingga data aman saat container restart / stop.
+3. **Internal Hostname**: Container bernama `labuh-db-<envSlug>-<dbSlug>` yang langsung dapat di-resolve oleh aplikasi lain di network `labuh-network` tanpa membuka port ke publik.
+4. **Lifecycle Control**: Mendukung Start, Stop, dan Delete (termasuk cleanup container di Docker host).
+
+---
+
+## 5. Persyaratan Host
 
 - **Docker Engine**: Docker CE versi 24+ dengan user Labuh tergabung dalam group `docker`.
 - **Git**: Binary `git` terinstall di sistem host.

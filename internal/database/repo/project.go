@@ -194,6 +194,18 @@ func (r *ProjectRepo) GetEnvironmentsByProjectID(projectID string) ([]*models.En
 	return environments, nil
 }
 
+func (r *ProjectRepo) GetEnvironmentByID(id string) (*models.Environment, error) {
+	env := &models.Environment{}
+	err := r.db.QueryRow(
+		"SELECT id, project_id, name, slug, created_at, updated_at FROM environments WHERE id = ?",
+		id,
+	).Scan(&env.ID, &env.ProjectID, &env.Name, &env.Slug, &env.CreatedAt, &env.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return env, nil
+}
+
 func GenerateSlug(name string) string {
 	slug := strings.ToLower(name)
 	slug = strings.ReplaceAll(slug, " ", "-")

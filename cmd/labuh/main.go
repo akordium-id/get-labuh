@@ -118,6 +118,7 @@ func main() {
 	logsHandler.SetDockerClient(dockerClient)
 	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo, caddyClient, settingRepo)
 	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
+	databasesHandler.SetDockerClient(dockerClient)
 	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)

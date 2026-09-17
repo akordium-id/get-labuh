@@ -329,8 +329,20 @@ func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imag
 		},
 	}
 
+	// Engine-specific data directory inside the container
+	dataDir := "/var/lib/data"
+	if strings.Contains(imageName, "postgres") {
+		dataDir = "/var/lib/postgresql/data"
+	} else if strings.Contains(imageName, "mysql") {
+		dataDir = "/var/lib/mysql"
+	} else if strings.Contains(imageName, "redis") {
+		dataDir = "/data"
+	} else if strings.Contains(imageName, "mongo") {
+		dataDir = "/data/db"
+	}
+
 	if volumeName != "" {
-		hostCfg.Binds = []string{fmt.Sprintf("%s:/var/lib/data", volumeName)}
+		hostCfg.Binds = []string{fmt.Sprintf("%s:%s", volumeName, dataDir)}
 	}
 
 	_ = c.RemoveContainer(ctx, containerName)
