@@ -1,6 +1,6 @@
 package components
 
-templ Pagination(currentPage, totalPages int, baseURL string) {
+templ Pagination(currentPage, totalPages int, baseURL string, search ...string) {
 	if totalPages > 1 {
 		<nav class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6" aria-label="Pagination">
 			<div class="hidden sm:block">
@@ -10,7 +10,7 @@ templ Pagination(currentPage, totalPages int, baseURL string) {
 			</div>
 			<div class="flex flex-1 justify-between sm:justify-end gap-2">
 				if currentPage > 1 {
-					<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(currentPage-1)) }
+					<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(currentPage-1) + getSearchQuery(search)) }
 					   class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
 						Previous
 					</a>
@@ -22,7 +22,7 @@ templ Pagination(currentPage, totalPages int, baseURL string) {
 								{ formatInt(i) }
 							</span>
 						} else {
-							<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(i)) }
+							<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(i) + getSearchQuery(search)) }
 							   class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
 								{ formatInt(i) }
 							</a>
@@ -30,7 +30,7 @@ templ Pagination(currentPage, totalPages int, baseURL string) {
 					}
 				</div>
 				if currentPage < totalPages {
-					<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(currentPage+1)) }
+					<a href={ templ.SafeURL(baseURL + "?page=" + formatInt(currentPage+1) + getSearchQuery(search)) }
 					   class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
 						Next
 					</a>
@@ -38,6 +38,13 @@ templ Pagination(currentPage, totalPages int, baseURL string) {
 			</div>
 		</nav>
 	}
+}
+
+func getSearchQuery(search []string) string {
+	if len(search) > 0 && search[0] != "" {
+		return "&search=" + search[0]
+	}
+	return ""
 }
 
 func formatInt(n int) string {

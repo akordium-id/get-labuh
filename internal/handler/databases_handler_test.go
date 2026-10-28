@@ -31,6 +31,62 @@ func setupDatabasesHandler(t *stdtesting.T) (*DatabasesHandler, *repo.DatabaseRe
 	return h, dbRepo, projectRepo
 }
 
+func TestDatabasesHandler_List(t *stdtesting.T) {
+	h, dbRepo, projectRepo := setupDatabasesHandler(t)
+
+	project, err := projectRepo.Create(models.CreateProjectInput{Name: "DB Project", Slug: "db-proj"})
+	require.NoError(t, err)
+	env, err := projectRepo.CreateEnvironment(project.ID, "Production", "prod")
+	require.NoError(t, err)
+
+	_, err = dbRepo.Create(models.CreateDatabaseServiceInput{
+		EnvironmentID: env.ID,
+		Name:          "Primary PG",
+		Slug:          "primary-pg",
+		Engine:        "postgres",
+		Version:       "16",
+		Port:          5432,
+	})
+	require.NoError(t, err)
+
+	_, err = dbRepo.Create(models.CreateDatabaseServiceInput{
+		EnvironmentID: env.ID,
+		Name:          "Cache Redis",
+		Slug:          "cache-redis",
+		Engine:        "redis",
+		Version:       "7",
+		Port:          6379,
+	})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Get("/projects/{project_id}/environments/{env_id}/databases", h.List)
+
+	// 1. Full page
+	req := httptest.NewRequest(http.MethodGet, "/projects/"+project.ID+"/environments/"+env.ID+"/databases", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, "<!doctype html>")
+	assert.Contains(t, body, "databases-container")
+	assert.Contains(t, body, "Primary PG")
+	assert.Contains(t, body, "Cache Redis")
+
+	// 2. HTMX search partial
+	reqHTMX := httptest.NewRequest(http.MethodGet, "/projects/"+project.ID+"/environments/"+env.ID+"/databases?search=Primary", nil)
+	reqHTMX.Header.Set("HX-Request", "true")
+	wHTMX := httptest.NewRecorder()
+	r.ServeHTTP(wHTMX, reqHTMX)
+
+	assert.Equal(t, http.StatusOK, wHTMX.Code)
+	bodyHTMX := wHTMX.Body.String()
+	assert.NotContains(t, bodyHTMX, "<!doctype html>")
+	assert.Contains(t, bodyHTMX, "Primary PG")
+	assert.NotContains(t, bodyHTMX, "Cache Redis")
+}
+
 func TestDatabasesHandler_CreateAndLifecycle(t *stdtesting.T) {
 	h, dbRepo, projectRepo := setupDatabasesHandler(t)
 

@@ -28,16 +28,35 @@ func setupProjectsHandler(t *stdtesting.T) (*ProjectsHandler, *repo.ProjectRepo)
 
 func TestProjectsHandler_List(t *stdtesting.T) {
 	h, _ := setupProjectsHandler(t)
-	h.projectRepo.Create(models.CreateProjectInput{Name: "P1", Slug: "p1"})
-	h.projectRepo.Create(models.CreateProjectInput{Name: "P2", Slug: "p2"})
+	_, _ = h.projectRepo.Create(models.CreateProjectInput{Name: "P1", Slug: "p1"})
+	_, _ = h.projectRepo.Create(models.CreateProjectInput{Name: "P2", Slug: "p2"})
 
+	// 1. Standard request returns full page with layout
 	req := httptest.NewRequest(http.MethodGet, "/projects", nil)
 	w := httptest.NewRecorder()
-
 	h.List(w, req)
 
 	resp := w.Result()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body := w.Body.String()
+	assert.Contains(t, body, "<!doctype html>")
+	assert.Contains(t, body, "projects-container")
+	assert.Contains(t, body, "P1")
+	assert.Contains(t, body, "P2")
+
+	// 2. HTMX search request returns only table partial
+	reqHTMX := httptest.NewRequest(http.MethodGet, "/projects?search=P1", nil)
+	reqHTMX.Header.Set("HX-Request", "true")
+	wHTMX := httptest.NewRecorder()
+	h.List(wHTMX, reqHTMX)
+
+	respHTMX := wHTMX.Result()
+	assert.Equal(t, http.StatusOK, respHTMX.StatusCode)
+	bodyHTMX := wHTMX.Body.String()
+	assert.NotContains(t, bodyHTMX, "<!doctype html>")
+	assert.NotContains(t, bodyHTMX, "<aside") // layout sidebar
+	assert.Contains(t, bodyHTMX, "P1")
+	assert.NotContains(t, bodyHTMX, "P2")
 }
 
 func TestProjectsHandler_Create(t *stdtesting.T) {

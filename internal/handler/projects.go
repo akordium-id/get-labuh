@@ -75,6 +75,11 @@ func (h *ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
 		envCounts[p.ID] = len(envs)
 	}
 
+	if r.Header.Get("HX-Request") == "true" {
+		templ.Handler(projects.ProjectsTable(projectList, envCounts, page, totalPages, search)).ServeHTTP(w, r)
+		return
+	}
+
 	templ.Handler(layouts.AppLayout(projects.ProjectsListPage(projectList, envCounts, page, totalPages, search))).ServeHTTP(w, r)
 }
 

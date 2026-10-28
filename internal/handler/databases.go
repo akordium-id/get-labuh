@@ -86,7 +86,18 @@ func (h *DatabasesHandler) List(w http.ResponseWriter, r *http.Request) {
 		totalPages = 1
 	}
 
-	templ.Handler(layouts.AppLayout(databases.DatabaseListPage(dbServices, page, totalPages, search))).ServeHTTP(w, r)
+	projectID := chi.URLParam(r, "project_id")
+	baseURL := "/projects/" + projectID + "/environments/" + envID + "/databases"
+	if projectID == "" {
+		baseURL = "/environments/" + envID + "/databases"
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		templ.Handler(databases.DatabasesTable(dbServices, page, totalPages, search, baseURL)).ServeHTTP(w, r)
+		return
+	}
+
+	templ.Handler(layouts.AppLayout(databases.DatabaseListPage(dbServices, page, totalPages, search, baseURL))).ServeHTTP(w, r)
 }
 
 func (h *DatabasesHandler) Create(w http.ResponseWriter, r *http.Request) {

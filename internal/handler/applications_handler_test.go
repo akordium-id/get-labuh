@@ -60,6 +60,52 @@ func TestApplicationsHandler_Create(t *stdtesting.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
+func TestApplicationsHandler_List(t *stdtesting.T) {
+	h, appRepo, projectRepo := setupApplicationsHandler(t)
+	project, _ := projectRepo.Create(models.CreateProjectInput{Name: "P", Slug: "p"})
+	env, _ := projectRepo.CreateEnvironment(project.ID, "Prod", "prod")
+
+	_, _ = appRepo.Create(models.CreateApplicationInput{
+		EnvironmentID: env.ID,
+		Name:          "Web App",
+		Slug:          "web-app",
+		SourceType:    models.SourceTypeGit,
+	})
+	_, _ = appRepo.Create(models.CreateApplicationInput{
+		EnvironmentID: env.ID,
+		Name:          "Worker App",
+		Slug:          "worker-app",
+		SourceType:    models.SourceTypeGit,
+	})
+
+	r := chi.NewRouter()
+	r.Get("/projects/{project_id}/environments/{env_id}/applications", h.List)
+
+	// 1. Full page
+	req := httptest.NewRequest(http.MethodGet, "/projects/"+project.ID+"/environments/"+env.ID+"/applications", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, "<!doctype html>")
+	assert.Contains(t, body, "applications-container")
+	assert.Contains(t, body, "Web App")
+	assert.Contains(t, body, "Worker App")
+
+	// 2. HTMX search partial
+	reqHTMX := httptest.NewRequest(http.MethodGet, "/projects/"+project.ID+"/environments/"+env.ID+"/applications?search=Web", nil)
+	reqHTMX.Header.Set("HX-Request", "true")
+	wHTMX := httptest.NewRecorder()
+	r.ServeHTTP(wHTMX, reqHTMX)
+
+	assert.Equal(t, http.StatusOK, wHTMX.Code)
+	bodyHTMX := wHTMX.Body.String()
+	assert.NotContains(t, bodyHTMX, "<!doctype html>")
+	assert.Contains(t, bodyHTMX, "Web App")
+	assert.NotContains(t, bodyHTMX, "Worker App")
+}
+
 func TestApplicationsHandler_Start(t *stdtesting.T) {
 	h, appRepo, projectRepo := setupApplicationsHandler(t)
 	project, _ := projectRepo.Create(models.CreateProjectInput{Name: "P", Slug: "p"})

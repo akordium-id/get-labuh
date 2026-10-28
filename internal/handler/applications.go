@@ -109,7 +109,18 @@ func (h *ApplicationsHandler) List(w http.ResponseWriter, r *http.Request) {
 		totalPages = 1
 	}
 
-	templ.Handler(layouts.AppLayout(applications.ApplicationsListPage(apps, page, totalPages, search))).ServeHTTP(w, r)
+	projectID := chi.URLParam(r, "project_id")
+	baseURL := "/projects/" + projectID + "/environments/" + envID + "/applications"
+	if projectID == "" {
+		baseURL = "/environments/" + envID + "/applications"
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		templ.Handler(applications.ApplicationsTable(apps, page, totalPages, search, baseURL)).ServeHTTP(w, r)
+		return
+	}
+
+	templ.Handler(layouts.AppLayout(applications.ApplicationsListPage(apps, page, totalPages, search, baseURL))).ServeHTTP(w, r)
 }
 
 func (h *ApplicationsHandler) Create(w http.ResponseWriter, r *http.Request) {

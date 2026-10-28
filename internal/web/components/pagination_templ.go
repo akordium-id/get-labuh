@@ -9,7 +9,7 @@ package components
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Pagination(currentPage, totalPages int, baseURL string) templ.Component {
+func Pagination(currentPage, totalPages int, baseURL string, search ...string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -63,9 +63,9 @@ func Pagination(currentPage, totalPages int, baseURL string) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var4 string
-				templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(baseURL + "?page=" + formatInt(currentPage-1))).ResolveURL(ctx)
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(baseURL + "?page=" + formatInt(currentPage-1) + getSearchQuery(search))).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/pagination.templ`, Line: 13, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/pagination.templ`, Line: 13, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
@@ -105,9 +105,9 @@ func Pagination(currentPage, totalPages int, baseURL string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var6 string
-					templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(baseURL + "?page=" + formatInt(i))).ResolveURL(ctx)
+					templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(baseURL + "?page=" + formatInt(i) + getSearchQuery(search))).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/pagination.templ`, Line: 25, Col: 65}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/pagination.templ`, Line: 25, Col: 90}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 					if templ_7745c5c3_Err != nil {
@@ -142,9 +142,9 @@ func Pagination(currentPage, totalPages int, baseURL string) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 string
-				templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(baseURL + "?page=" + formatInt(currentPage+1))).ResolveURL(ctx)
+				templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(baseURL + "?page=" + formatInt(currentPage+1) + getSearchQuery(search))).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/pagination.templ`, Line: 33, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/pagination.templ`, Line: 33, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -162,6 +162,13 @@ func Pagination(currentPage, totalPages int, baseURL string) templ.Component {
 		}
 		return nil
 	})
+}
+
+func getSearchQuery(search []string) string {
+	if len(search) > 0 && search[0] != "" {
+		return "&search=" + search[0]
+	}
+	return ""
 }
 
 func formatInt(n int) string {
