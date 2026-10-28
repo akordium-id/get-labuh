@@ -247,3 +247,28 @@ func TestApplicationsHandler_CreateEnvVar(t *stdtesting.T) {
 	resp := w.Result()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
+
+func TestApplicationsHandler_Status(t *stdtesting.T) {
+	h, appRepo, projectRepo := setupApplicationsHandler(t)
+	project, _ := projectRepo.Create(models.CreateProjectInput{Name: "P", Slug: "p"})
+	env, _ := projectRepo.CreateEnvironment(project.ID, "Prod", "prod")
+	app, _ := appRepo.Create(models.CreateApplicationInput{
+		EnvironmentID: env.ID,
+		Name:          "Status App",
+		Slug:          "status-app",
+		SourceType:    models.SourceTypeGit,
+	})
+
+	r := chi.NewRouter()
+	r.Get("/applications/{id}/status", h.Status)
+
+	req := httptest.NewRequest(http.MethodGet, "/applications/"+app.ID+"/status", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, `id="status-badge"`)
+	assert.Contains(t, body, `/applications/`+app.ID+`/status`)
+}
+

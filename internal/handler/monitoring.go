@@ -4,24 +4,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/components"
 )
 
 type MonitoringHandler struct {
-	appRepo   *repo.ApplicationRepo
-	dbRepo    *repo.DatabaseRepo
-	dockerCli any
+	appRepo      *repo.ApplicationRepo
+	dbRepo       *repo.DatabaseRepo
+	dockerClient *docker.Client
 }
 
 func NewMonitoringHandler(appRepo *repo.ApplicationRepo, dbRepo *repo.DatabaseRepo, dockerCli any) *MonitoringHandler {
+	var dc *docker.Client
+	if cli, ok := dockerCli.(*docker.Client); ok {
+		dc = cli
+	}
 	return &MonitoringHandler{
-		appRepo:   appRepo,
-		dbRepo:    dbRepo,
-		dockerCli: dockerCli,
+		appRepo:      appRepo,
+		dbRepo:       dbRepo,
+		dockerClient: dc,
 	}
 }
 
@@ -46,12 +54,24 @@ func (h *MonitoringHandler) ApplicationStats(w http.ResponseWriter, r *http.Requ
 		NetworkTx:   0,
 	}
 
-	if app.ContainerID != nil && *app.ContainerID != "" {
-		_ = h.dockerCli
+	if h.dockerClient != nil && app.ContainerID != nil && *app.ContainerID != "" {
+		cpu, mem, limit, rx, tx, err := h.dockerClient.GetContainerStats(r.Context(), *app.ContainerID)
+		if err == nil {
+			stats.CPUPercent = cpu
+			stats.MemoryUsage = mem
+			stats.MemoryLimit = limit
+			stats.NetworkRx = rx
+			stats.NetworkTx = tx
+		}
+	}
+
+	if r.Header.Get("HX-Request") == "true" || strings.Contains(r.Header.Get("Accept"), "text/html") {
+		templ.Handler(components.MetricsCard(stats, "/applications/"+id+"/stats")).ServeHTTP(w, r)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	_ = json.NewEncoder(w).Encode(stats)
 }
 
 func (h *MonitoringHandler) DatabaseStats(w http.ResponseWriter, r *http.Request) {
@@ -75,12 +95,24 @@ func (h *MonitoringHandler) DatabaseStats(w http.ResponseWriter, r *http.Request
 		NetworkTx:   0,
 	}
 
-	if dbService.ContainerID != nil && *dbService.ContainerID != "" {
-		_ = h.dockerCli
+	if h.dockerClient != nil && dbService.ContainerID != nil && *dbService.ContainerID != "" {
+		cpu, mem, limit, rx, tx, err := h.dockerClient.GetContainerStats(r.Context(), *dbService.ContainerID)
+		if err == nil {
+			stats.CPUPercent = cpu
+			stats.MemoryUsage = mem
+			stats.MemoryLimit = limit
+			stats.NetworkRx = rx
+			stats.NetworkTx = tx
+		}
+	}
+
+	if r.Header.Get("HX-Request") == "true" || strings.Contains(r.Header.Get("Accept"), "text/html") {
+		templ.Handler(components.MetricsCard(stats, "/databases/"+id+"/stats")).ServeHTTP(w, r)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	_ = json.NewEncoder(w).Encode(stats)
 }
 
 func FormatBytes(b uint64) string {

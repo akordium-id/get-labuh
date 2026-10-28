@@ -131,21 +131,24 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 		<div class="flex justify-between items-center mb-6">
 			<div>
 				<h1 class="text-3xl font-bold text-gray-900">{ app.Name }</h1>
-				<p class="text-gray-600 mt-1">{ app.Slug }</p>
+				<p class="text-gray-600 mt-1 font-mono text-sm">{ app.Slug }</p>
 			</div>
-			<div class="flex gap-2">
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/start") } method="post" class="inline">
-					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Start</button>
+			<div class="flex items-center gap-2">
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/start") } method="post" class="inline"
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Starting...'">
+					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 shadow-sm font-medium flex items-center transition-colors">Start</button>
 				</form>
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/stop") } method="post" class="inline">
-					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Stop</button>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/stop") } method="post" class="inline"
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Stopping...'">
+					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 shadow-sm font-medium flex items-center transition-colors">Stop</button>
 				</form>
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/restart") } method="post" class="inline">
-					<button type="submit" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700">Restart</button>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/restart") } method="post" class="inline"
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Restarting...'">
+					<button type="submit" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 shadow-sm font-medium flex items-center transition-colors">Restart</button>
 				</form>
-				<a href={ templ.SafeURL("/applications/" + app.ID + "/deploy") } class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Deploy</a>
+				<a href={ templ.SafeURL("/applications/" + app.ID + "/deploy") } class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 shadow-sm font-medium flex items-center transition-colors">Deploy</a>
 				if app.ContainerID != nil && *app.ContainerID != "" {
-					<a href={ templ.SafeURL("/applications/" + app.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-1.5 font-medium">
+					<a href={ templ.SafeURL("/applications/" + app.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-1.5 font-medium shadow-sm transition-colors">
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
 						Terminal
 					</a>
@@ -157,9 +160,11 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
 				<h2 class="text-xl font-bold text-gray-900 mb-4">Application Info</h2>
 				<dl class="space-y-3">
-					<div class="flex justify-between">
+					<div class="flex justify-between items-center">
 						<dt class="text-gray-600">Status</dt>
-						<dd class="text-gray-900">{ app.Status }</dd>
+						<dd>
+							@components.PollingStatusBadge(string(app.Status), "/applications/" + app.ID + "/status")
+						</dd>
 					</div>
 					<div class="flex justify-between">
 						<dt class="text-gray-600">Source Type</dt>
@@ -246,6 +251,17 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 						Save & Apply Limits
 					</button>
 				</form>
+			</div>
+		</div>
+
+		<div class="mt-6">
+			<div id="metrics-card" hx-get={ templ.SafeURL("/applications/" + app.ID + "/stats") } hx-trigger="load, every 3s" hx-swap="outerHTML">
+				<div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex items-center justify-between">
+					<span class="text-sm text-gray-500 flex items-center gap-2">
+						@components.Spinner("sm", "blue")
+						Connecting to container metrics...
+					</span>
+				</div>
 			</div>
 		</div>
 

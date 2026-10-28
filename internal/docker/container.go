@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -511,4 +512,52 @@ func (c *Client) ResizeExec(ctx context.Context, execID string, height, width ui
 		Height: height,
 		Width:  width,
 	})
+}
+
+// GetContainerStats mengambil snapshot metrik pemakaian CPU, Memory, dan Network container
+func (c *Client) GetContainerStats(ctx context.Context, containerID string) (cpuPercent float64, memUsage, memLimit, rx, tx uint64, err error) {
+	if c.cli == nil {
+		return 0, 0, 0, 0, 0, fmt.Errorf("docker client not initialized")
+	}
+
+	statsJSON, err := c.cli.ContainerStatsOneShot(ctx, containerID)
+	if err != nil {
+		return 0, 0, 0, 0, 0, err
+	}
+	defer statsJSON.Body.Close()
+
+	var stats container.StatsResponse
+	if err := json.NewDecoder(statsJSON.Body).Decode(&stats); err != nil {
+		return 0, 0, 0, 0, 0, err
+	}
+
+	// Hitung Memory
+	memUsage = stats.MemoryStats.Usage
+	if cache, ok := stats.MemoryStats.Stats["inactive_file"]; ok && memUsage > cache {
+		memUsage -= cache
+	}
+	memLimit = stats.MemoryStats.Limit
+
+	// Hitung CPU Percentage
+	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage) - float64(stats.PreCPUStats.CPUUsage.TotalUsage)
+	systemDelta := float64(stats.CPUStats.SystemUsage) - float64(stats.PreCPUStats.SystemUsage)
+	onlineCPUs := float64(stats.CPUStats.OnlineCPUs)
+	if onlineCPUs == 0 {
+		onlineCPUs = float64(len(stats.CPUStats.CPUUsage.PercpuUsage))
+	}
+	if onlineCPUs == 0 {
+		onlineCPUs = 1
+	}
+
+	if systemDelta > 0 && cpuDelta > 0 {
+		cpuPercent = (cpuDelta / systemDelta) * onlineCPUs * 100.0
+	}
+
+	// Hitung Network Rx & Tx
+	for _, n := range stats.Networks {
+		rx += n.RxBytes
+		tx += n.TxBytes
+	}
+
+	return cpuPercent, memUsage, memLimit, rx, tx, nil
 }

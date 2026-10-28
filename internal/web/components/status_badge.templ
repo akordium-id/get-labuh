@@ -3,7 +3,23 @@ package components
 import "github.com/akordium-id/get-labuh/internal/models"
 
 templ StatusBadge(status string) {
-	<span class={ "px-2 inline-flex text-xs leading-5 font-semibold rounded-full " + statusColor(status) }>
+	<span class={ "px-2.5 py-0.5 inline-flex items-center gap-1.5 text-xs leading-5 font-semibold rounded-full " + statusColor(status) }>
+		if isLiveStatus(status) {
+			<span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+		}
+		{ status }
+	</span>
+}
+
+templ PollingStatusBadge(status, endpoint string) {
+	<span id="status-badge"
+	      class={ "px-2.5 py-0.5 inline-flex items-center gap-1.5 text-xs leading-5 font-semibold rounded-full " + statusColor(status) }
+	      hx-get={ endpoint }
+	      hx-trigger={ getPollingTrigger(status) }
+	      hx-swap="outerHTML">
+		if isLiveStatus(status) {
+			<span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+		}
 		{ status }
 	</span>
 }
@@ -32,5 +48,30 @@ func statusColor(status string) string {
 		return "bg-gray-100 text-gray-800"
 	default:
 		return "bg-gray-100 text-gray-800"
+	}
+}
+
+func isLiveStatus(status string) bool {
+	switch status {
+	case string(models.AppStatusRunning),
+		string(models.DeployStatusCloning),
+		string(models.DeployStatusBuilding),
+		string(models.DeployStatusDeploying):
+		return true
+	default:
+		return false
+	}
+}
+
+func getPollingTrigger(status string) string {
+	// Jika sedang proses transisi deploy, polling lebih cepat (2s).
+	// Jika sudah terminal/stabil, polling santai tiap 4s agar server tetap ringan.
+	switch status {
+	case string(models.DeployStatusCloning),
+		string(models.DeployStatusBuilding),
+		string(models.DeployStatusDeploying):
+		return "every 2s"
+	default:
+		return "every 4s"
 	}
 }

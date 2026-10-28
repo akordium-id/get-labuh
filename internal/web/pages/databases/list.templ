@@ -136,20 +136,23 @@ templ DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models
 		<div class="flex justify-between items-center mb-6">
 			<div>
 				<h1 class="text-3xl font-bold text-gray-900">{ dbService.Name }</h1>
-				<p class="text-gray-600 mt-1">{ dbService.Slug }</p>
+				<p class="text-gray-600 mt-1 font-mono text-sm">{ dbService.Slug }</p>
 			</div>
-			<div class="flex gap-2">
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/start") } method="post" class="inline">
-					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Start</button>
+			<div class="flex items-center gap-2">
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/start") } method="post" class="inline"
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Starting...'">
+					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 shadow-sm font-medium flex items-center transition-colors">Start</button>
 				</form>
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/stop") } method="post" class="inline">
-					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Stop</button>
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/stop") } method="post" class="inline"
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Stopping...'">
+					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 shadow-sm font-medium flex items-center transition-colors">Stop</button>
 				</form>
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete this database?')">
-					<button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">Delete</button>
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete this database?')"
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Deleting...'">
+					<button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 shadow-sm font-medium flex items-center transition-colors">Delete</button>
 				</form>
 				if dbService.ContainerID != nil && *dbService.ContainerID != "" {
-					<a href={ templ.SafeURL("/databases/" + dbService.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-1.5 font-medium">
+					<a href={ templ.SafeURL("/databases/" + dbService.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-1.5 font-medium shadow-sm transition-colors">
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
 						Terminal
 					</a>
@@ -161,9 +164,11 @@ templ DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models
 			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
 				<h2 class="text-xl font-bold text-gray-900 mb-4">Database Info</h2>
 				<dl class="space-y-3">
-					<div class="flex justify-between">
+					<div class="flex justify-between items-center">
 						<dt class="text-gray-600">Status</dt>
-						<dd class="text-gray-900">{ dbService.Status }</dd>
+						<dd>
+							@components.PollingStatusBadge(string(dbService.Status), "/databases/" + dbService.ID + "/status")
+						</dd>
 					</div>
 					<div class="flex justify-between">
 						<dt class="text-gray-600">Engine</dt>
@@ -194,10 +199,12 @@ templ DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models
 				</dl>
 			</div>
 
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<h2 class="text-xl font-bold text-gray-900 mb-4">Monitoring</h2>
-				<div id="stats" hx-get={ templ.SafeURL("/databases/" + dbService.ID + "/stats") } hx-trigger="load, every 2s" hx-swap="innerHTML">
-					<div class="text-gray-500">Loading stats...</div>
+			<div id="metrics-card" hx-get={ templ.SafeURL("/databases/" + dbService.ID + "/stats") } hx-trigger="load, every 3s" hx-swap="outerHTML">
+				<div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex items-center justify-between">
+					<span class="text-sm text-gray-500 flex items-center gap-2">
+						@components.Spinner("sm", "blue")
+						Connecting to database metrics...
+					</span>
 				</div>
 			</div>
 

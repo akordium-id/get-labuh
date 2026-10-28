@@ -141,7 +141,7 @@ func main() {
 
 	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
-	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
+	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
 	notificationsHandler := handler.NewNotificationsHandler(notifRepo, projectRepo, notifier)
@@ -230,6 +230,7 @@ func main() {
 		r.Post("/applications/{id}/domain/remove", applicationsHandler.RemoveDomain)
 		r.Post("/applications/{id}/resources", applicationsHandler.UpdateResourceLimits)
 		r.Post("/applications/{id}/webhook/regenerate", applicationsHandler.RegenerateWebhookSecret)
+		r.Get("/applications/{id}/status", applicationsHandler.Status)
 		r.Get("/applications/{id}/stats", monitoringHandler.ApplicationStats)
 
 		r.Get("/projects/{project_id}/environments/{env_id}/compose-apps", composeHandler.List)
@@ -254,6 +255,7 @@ func main() {
 		r.Post("/databases/{id}/stop", databasesHandler.Stop)
 		r.Post("/databases/{id}/delete", databasesHandler.Delete)
 		r.Post("/databases/{id}/resources", databasesHandler.UpdateResourceLimits)
+		r.Get("/databases/{id}/status", databasesHandler.Status)
 		r.Get("/databases/{id}/stats", monitoringHandler.DatabaseStats)
 		r.Get("/databases/{id}/terminal", terminalHandler.DatabaseTerminal)
 		r.Post("/databases/{id}/backups/config", databasesHandler.UpdateBackupConfig)

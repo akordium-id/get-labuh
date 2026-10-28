@@ -20,6 +20,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/components"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 )
@@ -586,6 +587,37 @@ func (h *DatabasesHandler) UpdateResourceLimits(w http.ResponseWriter, r *http.R
 	}
 
 	http.Redirect(w, r, "/databases/"+id, http.StatusFound)
+}
+
+func (h *DatabasesHandler) Status(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	dbService, err := h.dbRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	// Sinkronisasi status dari Docker container jika ada
+	if h.dockerClient != nil && dbService.ContainerID != nil && *dbService.ContainerID != "" {
+		running, err := h.dockerClient.IsContainerRunning(r.Context(), *dbService.ContainerID)
+		if err == nil {
+			newStatus := models.DatabaseStatusStopped
+			if running {
+				newStatus = models.DatabaseStatusRunning
+			}
+			if dbService.Status != newStatus {
+				_ = h.dbRepo.UpdateStatus(dbService.ID, newStatus)
+				dbService.Status = newStatus
+			}
+		}
+	}
+
+	templ.Handler(components.PollingStatusBadge(string(dbService.Status), "/databases/"+id+"/status")).ServeHTTP(w, r)
 }
 
 func generateSecurePassword(length int) string {

@@ -173,3 +173,34 @@ func TestGenerateConnectionString(t *stdtesting.T) {
 	mongoConn := GenerateConnectionString(models.DatabaseEngineMongoDB, "admin", "secret123", "labuh-db-prod-mongo", 27017, "mydb")
 	assert.Equal(t, "mongodb://admin:secret123@labuh-db-prod-mongo:27017/mydb?authSource=admin", mongoConn)
 }
+
+func TestDatabasesHandler_Status(t *stdtesting.T) {
+	h, dbRepo, projectRepo := setupDatabasesHandler(t)
+	project, err := projectRepo.Create(models.CreateProjectInput{Name: "DB Status", Slug: "db-status"})
+	require.NoError(t, err)
+	env, err := projectRepo.CreateEnvironment(project.ID, "Production", "prod")
+	require.NoError(t, err)
+
+	dbService, err := dbRepo.Create(models.CreateDatabaseServiceInput{
+		EnvironmentID: env.ID,
+		Name:          "Status DB",
+		Slug:          "status-db",
+		Engine:        "postgres",
+		Version:       "16",
+		Port:          5432,
+	})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Get("/databases/{id}/status", h.Status)
+
+	req := httptest.NewRequest(http.MethodGet, "/databases/"+dbService.ID+"/status", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, `id="status-badge"`)
+	assert.Contains(t, body, `/databases/`+dbService.ID+`/status`)
+}
+

@@ -13,6 +13,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/web/components"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/applications"
 	"github.com/akordium-id/get-labuh/internal/worker"
@@ -609,5 +610,36 @@ func (h *ApplicationsHandler) UpdateResourceLimits(w http.ResponseWriter, r *htt
 	}
 
 	http.Redirect(w, r, "/applications/"+id, http.StatusFound)
+}
+
+func (h *ApplicationsHandler) Status(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	// Sinkronisasi status dari Docker container jika ada
+	if h.dockerClient != nil && app.ContainerID != nil && *app.ContainerID != "" {
+		running, err := h.dockerClient.IsContainerRunning(r.Context(), *app.ContainerID)
+		if err == nil {
+			newStatus := models.AppStatusStopped
+			if running {
+				newStatus = models.AppStatusRunning
+			}
+			if app.Status != newStatus && app.Status != models.AppStatusIdle {
+				_ = h.appRepo.UpdateStatus(app.ID, newStatus)
+				app.Status = newStatus
+			}
+		}
+	}
+
+	templ.Handler(components.PollingStatusBadge(string(app.Status), "/applications/"+id+"/status")).ServeHTTP(w, r)
 }
 
