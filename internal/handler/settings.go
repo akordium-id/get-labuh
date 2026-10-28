@@ -46,6 +46,7 @@ func (h *SettingsHandler) UpdateCaddy(w http.ResponseWriter, r *http.Request) {
 	_ = h.settingRepo.Set("caddy_api_key", caddyAPIKey)
 	_ = h.settingRepo.Set("caddy_network", caddyNetwork)
 
+	SetToast(w, "Pengaturan Caddy berhasil disimpan", ToastSuccess)
 	w.Header().Set("HX-Redirect", "/settings/caddy")
 	w.WriteHeader(http.StatusOK)
 }

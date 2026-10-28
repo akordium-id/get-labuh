@@ -546,6 +546,7 @@ func (h *ApplicationsHandler) RegenerateWebhookSecret(w http.ResponseWriter, r *
 		return
 	}
 
+	SetToast(w, "Webhook secret berhasil diperbarui", ToastSuccess)
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }

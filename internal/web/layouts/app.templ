@@ -69,44 +69,143 @@ templ AppLayout(content templ.Component) {
 	</head>
 	<body class="bg-gray-50" x-data="{ sidebarOpen: false }">
 		<div id="htmx-progress-bar"></div>
+
+		<!-- Global Toast Notifications Container (Alpine.js) -->
+		<div x-data="toastManager()"
+		     @show-toast.window="add($event.detail)"
+		     class="fixed top-5 right-5 z-50 flex flex-col space-y-3 pointer-events-none max-w-sm w-full">
+			<template x-for="item in toasts" :key="item.id">
+				<div x-show="item.visible"
+				     x-transition:enter="transition ease-out duration-300"
+				     x-transition:enter-start="opacity-0 translate-y-[-10px] scale-95"
+				     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+				     x-transition:leave="transition ease-in duration-200"
+				     x-transition:leave-start="opacity-100 scale-100"
+				     x-transition:leave-end="opacity-0 scale-90 translate-y-[-10px]"
+				     :class="getToastClasses(item.type)"
+				     class="pointer-events-auto flex items-start gap-3 p-4 rounded-lg shadow-lg border text-sm backdrop-blur-sm transition-all"
+				     role="alert">
+					<!-- Icon based on type -->
+					<div class="flex-shrink-0 mt-0.5">
+						<template x-if="item.type === 'success'">
+							<svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+						</template>
+						<template x-if="item.type === 'error'">
+							<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+						</template>
+						<template x-if="item.type === 'warning'">
+							<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+						</template>
+						<template x-if="item.type === 'info' || !['success','error','warning'].includes(item.type)">
+							<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+						</template>
+					</div>
+
+					<!-- Content -->
+					<div class="flex-1 min-w-0">
+						<p class="font-medium leading-tight" x-text="item.message"></p>
+					</div>
+
+					<!-- Close Button -->
+					<button @click="remove(item.id)" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+					</button>
+				</div>
+			</template>
+		</div>
+
 		<div class="flex h-screen">
 			@components.Sidebar()
 			<div class="flex-1 flex flex-col min-w-0">
 				@components.Topbar()
-				<div id="toast-container" class="fixed top-4 right-4 z-50 hidden">
-					<div id="toast" class="hidden bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md shadow-lg max-w-sm">
-						<p class="text-sm font-medium" id="toast-message">An error occurred</p>
-					</div>
-				</div>
-				<main id="main-content" class="flex-1 overflow-auto p-6"
-				      hx-on:htmx:error="handleHtmxError(event)">
+				<main id="main-content" class="flex-1 overflow-auto p-6">
 					@content
 				</main>
 			</div>
 		</div>
+
 		<script>
-			function handleHtmxError(event) {
-				var toast = document.getElementById('toast');
-				var toastMessage = document.getElementById('toast-message');
-				var toastContainer = document.getElementById('toast-container');
-				if (toast && toastMessage && toastContainer) {
-					var status = event.detail.xhr ? event.detail.xhr.status : 0;
-					var message = 'Request failed with status ' + status;
-					if (event.detail.xhr && event.detail.xhr.responseText) {
-						try {
-							var json = JSON.parse(event.detail.xhr.responseText);
-							if (json.error) message = json.error;
-						} catch(e) {}
+			function toastManager() {
+				return {
+					toasts: [],
+					add(toast) {
+						if (!toast || !toast.message) return;
+						var id = Date.now() + Math.random().toString(36).substr(2, 4);
+						var item = {
+							id: id,
+							message: toast.message,
+							type: toast.type || 'info',
+							visible: true
+						};
+						this.toasts.push(item);
+
+						var duration = toast.duration || 4500;
+						var self = this;
+						setTimeout(function() {
+							self.remove(id);
+						}, duration);
+					},
+					remove(id) {
+						var item = this.toasts.find(function(t) { return t.id === id; });
+						if (item) {
+							item.visible = false;
+							var self = this;
+							setTimeout(function() {
+								self.toasts = self.toasts.filter(function(t) { return t.id !== id; });
+							}, 300);
+						}
+					},
+					getToastClasses(type) {
+						switch (type) {
+							case 'success':
+								return 'bg-emerald-50/95 border-emerald-200 text-emerald-900 shadow-emerald-500/10';
+							case 'error':
+								return 'bg-red-50/95 border-red-200 text-red-900 shadow-red-500/10';
+							case 'warning':
+								return 'bg-amber-50/95 border-amber-200 text-amber-900 shadow-amber-500/10';
+							default:
+								return 'bg-blue-50/95 border-blue-200 text-blue-900 shadow-blue-500/10';
+						}
 					}
-					toastMessage.textContent = message;
-					toast.classList.remove('hidden');
-					toastContainer.classList.remove('hidden');
-					setTimeout(function() {
-						toast.classList.add('hidden');
-						toastContainer.classList.add('hidden');
-					}, 5000);
-				}
+				};
 			}
+
+			// Helper JS untuk dispatch toast manual
+			window.showToast = function(message, type, duration) {
+				window.dispatchEvent(new CustomEvent('show-toast', {
+					detail: { message: message, type: type || 'info', duration: duration }
+				}));
+			};
+
+			// Global listener HTMX response errors (4xx / 5xx / Network Error)
+			document.addEventListener('htmx:responseError', function(event) {
+				var status = event.detail.xhr ? event.detail.xhr.status : 0;
+				var message = 'Request failed (' + status + ')';
+				if (event.detail.xhr && event.detail.xhr.responseText) {
+					try {
+						var json = JSON.parse(event.detail.xhr.responseText);
+						if (json.error) message = json.error;
+						else if (json.message) message = json.message;
+					} catch(e) {
+						var text = event.detail.xhr.responseText.trim();
+						if (text && text.length < 120 && !text.startsWith('<')) {
+							message = text;
+						}
+					}
+				}
+				window.showToast(message, 'error', 6000);
+			});
+
+			document.addEventListener('htmx:sendError', function() {
+				window.showToast('Gagal terhubung ke server. Periksa koneksi jaringan.', 'error', 6000);
+			});
+
+			// Tangkap event showToast dari header HX-Trigger
+			document.addEventListener('showToast', function(event) {
+				if (event.detail) {
+					window.showToast(event.detail.message, event.detail.type, event.detail.duration);
+				}
+			});
 		</script>
 	</body>
 	</html>
