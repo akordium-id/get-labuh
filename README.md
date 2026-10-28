@@ -11,12 +11,16 @@
 
 Proyek ini terinspirasi oleh platform hebat [Coolify](https://coolify.io) dengan fokus pada performa tinggi, jejak memori yang sangat kecil (~30-50MB), dan kesederhanaan operasional.
 
-## 🚀 Fitur Utama
+## 🚀 Fitur Unggulan
 
-- **Deployment Otomatis**: Siapkan server Anda sekali dan deployment dapat dilakukan hanya dengan beberapa klik.
-- **Manajemen Server**: Tambahkan, kelola, dan amankan server Anda melalui dasbor terpusat.
-- **Portal Layanan**: Hubungkan ke layanan yang sudah ada atau deploy layanan baru dengan mudah.
-- **Integrasi Docker**: Pemanfaatan penuh teknologi kontainer untuk konsistensi dan skalabilitas.
+- **Git Webhook Auto-Deploy**: Integrasi instan dengan GitHub, GitLab, dan Gitea via verifikasi signature HMAC SHA256.
+- **Zero-Downtime Blue/Green Deployments**: Healthcheck gating otomatis sebelum mengalihkan traffic Caddy ke container baru.
+- **Real-Time Streaming**: Streaming log build langsung ke browser via Server-Sent Events (SSE).
+- **Interactive Web Terminal Console**: Konsol shell container in-browser berbasis xterm.js dan WebSocket dengan PTY auto-resize.
+- **Multi-Config S3/R2 Database Backup Engine**: Auto-backup terenkripsi untuk PostgreSQL, MySQL, Redis, dan MongoDB ke Cloudflare R2, AWS S3, atau MinIO dengan retention pruning.
+- **Notification Channels**: Kirim alert otomatis ke Discord Webhooks dan Telegram Bot dengan format Rich Embed & HTML (Global & Per-Project scope).
+- **Container Resource Limits & Live Throttling**: Batasi CPU Cores dan RAM (hard & soft limits) pada container yang sedang berjalan secara live tanpa restart.
+- **Jejak Memori Ultra-Kecil**: Dibangun dengan Go murni, hanya membutuhkan ~30-50MB RAM dibandingkan platform berbasis Node.js/PHP.
 
 ## 🔧 Persiapan
 
