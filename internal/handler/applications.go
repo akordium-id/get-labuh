@@ -515,3 +515,25 @@ func (h *ApplicationsHandler) RemoveDomain(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *ApplicationsHandler) RegenerateWebhookSecret(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	secret, err := repo.GenerateRandomSecret(32)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.appRepo.UpdateWebhookSecret(id, &secret); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+id)
+	w.WriteHeader(http.StatusOK)
+}

@@ -1,7 +1,9 @@
 package repo
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"strings"
 	"time"
 
@@ -53,6 +55,11 @@ func (r *ApplicationRepo) Create(input models.CreateApplicationInput) (*models.A
 	}
 	if app.AppPort == 0 {
 		app.AppPort = 8080
+	}
+	if app.WebhookSecret == nil || *app.WebhookSecret == "" {
+		if secret, err := GenerateRandomSecret(32); err == nil {
+			app.WebhookSecret = &secret
+		}
 	}
 
 	containerName := generateContainerName("env", app.Slug, app.ID)
@@ -312,6 +319,22 @@ func (r *ApplicationRepo) UpdateCustomDomain(id string, customDomain *string) er
 		customDomain, time.Now(), id,
 	)
 	return err
+}
+
+func (r *ApplicationRepo) UpdateWebhookSecret(id string, secret *string) error {
+	_, err := r.db.Exec(
+		`UPDATE applications SET webhook_secret = ?, updated_at = ? WHERE id = ?`,
+		secret, time.Now(), id,
+	)
+	return err
+}
+
+func GenerateRandomSecret(byteLen int) (string, error) {
+	b := make([]byte, byteLen)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func generateContainerName(envSlug, appSlug, appID string) string {

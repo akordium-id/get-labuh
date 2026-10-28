@@ -205,6 +205,7 @@ func main() {
 		r.Post("/applications/{id}/env-vars/{var_id}/delete", applicationsHandler.DeleteEnvVar)
 		r.Post("/applications/{id}/domain", applicationsHandler.SetDomain)
 		r.Post("/applications/{id}/domain/remove", applicationsHandler.RemoveDomain)
+		r.Post("/applications/{id}/webhook/regenerate", applicationsHandler.RegenerateWebhookSecret)
 		r.Get("/applications/{id}/stats", monitoringHandler.ApplicationStats)
 
 		r.Get("/projects/{project_id}/environments/{env_id}/compose-apps", composeHandler.List)
@@ -275,6 +276,8 @@ func main() {
 	})
 
 	r.Post("/webhooks/deploy/{application_id}", webhooksHandler.Deploy)
+	r.Post("/webhooks/github/{application_id}", webhooksHandler.GitHub)
+	r.Post("/webhooks/gitlab/{application_id}", webhooksHandler.GitLab)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)

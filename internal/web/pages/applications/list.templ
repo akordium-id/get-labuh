@@ -170,6 +170,55 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 		</div>
 
 		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
+			<div class="flex justify-between items-center mb-4">
+				<div>
+					<h2 class="text-xl font-bold text-gray-900">Git Webhook & Auto-Deploy</h2>
+					<p class="text-xs text-gray-500 mt-1">Otomatiskan deploy setiap kali ada push commit ke target branch.</p>
+				</div>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/webhook/regenerate") } method="post" class="inline">
+					<button type="submit" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border border-gray-300 font-medium">
+						Regenerate Secret
+					</button>
+				</form>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+				<div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">GitHub Webhook URL</span>
+					<div class="flex items-center gap-2">
+						<input type="text" readonly value={ "/webhooks/github/" + app.ID } class="font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800" onclick="this.select()"/>
+					</div>
+					<span class="text-[11px] text-gray-400 mt-1 block">Content type: application/json • Secret token: required</span>
+				</div>
+				<div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">GitLab Webhook URL</span>
+					<div class="flex items-center gap-2">
+						<input type="text" readonly value={ "/webhooks/gitlab/" + app.ID } class="font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800" onclick="this.select()"/>
+					</div>
+					<span class="text-[11px] text-gray-400 mt-1 block">Trigger: Push events • Secret token: required</span>
+				</div>
+			</div>
+
+			<div class="p-3 bg-gray-50 rounded-lg border border-gray-200 mb-4">
+				<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Webhook Secret</span>
+				if app.WebhookSecret != nil && *app.WebhookSecret != "" {
+					<input type="text" readonly value={ *app.WebhookSecret } class="font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800" onclick="this.select()"/>
+				} else {
+					<span class="text-xs text-amber-600 italic">Belum ada secret. Klik Regenerate Secret di atas untuk mengaktifkannya.</span>
+				}
+			</div>
+
+			<div class="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3">
+				<strong class="text-blue-800">Petunjuk Konfigurasi:</strong>
+				<ul class="list-disc list-inside mt-1 space-y-1 text-blue-700">
+					<li><strong>GitHub:</strong> Buka Repo Settings &rarr; Webhooks &rarr; Add Webhook. Masukkan URL GitHub di atas, pilih Content type: <code class="bg-blue-100 px-1 py-0.5 rounded">application/json</code>, isi Secret, dan pilih event <em>Just the push event</em>.</li>
+					<li><strong>GitLab:</strong> Buka Repo Settings &rarr; Webhooks. Masukkan URL GitLab, paste Secret Token, dan centang event <em>Push events</em>.</li>
+					<li><strong>Filter Otomatis:</strong> Push ke branch lain akan diabaikan tanpa error demi menghemat resource server.</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
 			<h2 class="text-xl font-bold text-gray-900 mb-4">Environment Variables</h2>
 			<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars") } method="post" class="mb-4 flex gap-2">
 				<input type="text" name="key" placeholder="KEY" class="border border-gray-300 rounded px-2 py-1 text-sm w-32" required>
