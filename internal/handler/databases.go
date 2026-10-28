@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/akordium-id/get-labuh/internal/backup"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
@@ -25,6 +28,9 @@ type DatabasesHandler struct {
 	dbRepo       *repo.DatabaseRepo
 	envRepo      *repo.ProjectRepo
 	dockerClient *docker.Client
+	backupRepo   *repo.DatabaseBackupRepo
+	storageRepo  *repo.StorageDestinationRepo
+	backupRunner *backup.DatabaseBackupRunner
 }
 
 func NewDatabasesHandler(dbRepo *repo.DatabaseRepo, envRepo *repo.ProjectRepo) *DatabasesHandler {
@@ -36,6 +42,16 @@ func NewDatabasesHandler(dbRepo *repo.DatabaseRepo, envRepo *repo.ProjectRepo) *
 
 func (h *DatabasesHandler) SetDockerClient(client *docker.Client) {
 	h.dockerClient = client
+}
+
+func (h *DatabasesHandler) SetBackupDependencies(
+	backupRepo *repo.DatabaseBackupRepo,
+	storageRepo *repo.StorageDestinationRepo,
+	runner *backup.DatabaseBackupRunner,
+) {
+	h.backupRepo = backupRepo
+	h.storageRepo = storageRepo
+	h.backupRunner = runner
 }
 
 func (h *DatabasesHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +217,168 @@ func (h *DatabasesHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templ.Handler(layouts.AppLayout(databases.DatabaseDetailPage(dbService))).ServeHTTP(w, r)
+	var backupConfig *models.DatabaseBackupConfig
+	var destinations []*models.StorageDestination
+	var backups []*models.DatabaseBackup
+	if h.backupRepo != nil {
+		backupConfig, _ = h.backupRepo.GetConfig(id)
+		backups, _ = h.backupRepo.ListByDatabaseID(id)
+	}
+	if h.storageRepo != nil {
+		destinations, _ = h.storageRepo.List()
+	}
+
+	templ.Handler(layouts.AppLayout(databases.DatabaseDetailPage(dbService, backupConfig, destinations, backups))).ServeHTTP(w, r)
+}
+
+func (h *DatabasesHandler) UpdateBackupConfig(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	enabled := r.FormValue("enabled") == "true"
+	destID := r.FormValue("storage_destination_id")
+	cronExpr := r.FormValue("cron_expression")
+	retentionStr := r.FormValue("retention_count")
+	prefix := r.FormValue("custom_prefix")
+
+	retention, _ := strconv.Atoi(retentionStr)
+	if retention <= 0 {
+		retention = 7
+	}
+	if cronExpr == "" {
+		cronExpr = "0 2 * * *"
+	}
+
+	var destIDPtr *string
+	if destID != "" {
+		destIDPtr = &destID
+	}
+	var prefixPtr *string
+	if prefix != "" {
+		prefixPtr = &prefix
+	}
+
+	cfg := &models.DatabaseBackupConfig{
+		DatabaseID:           id,
+		StorageDestinationID: destIDPtr,
+		Enabled:              enabled,
+		CronExpression:       cronExpr,
+		RetentionCount:       retention,
+		CustomPrefix:         prefixPtr,
+	}
+
+	if h.backupRepo != nil {
+		if err := h.backupRepo.UpsertConfig(cfg); err != nil {
+			http.Error(w, "Failed to update backup config: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("HX-Redirect", "/databases/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *DatabasesHandler) CreateBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.backupRunner == nil {
+		http.Error(w, "Backup runner not configured", http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	_, err := h.backupRunner.RunBackup(ctx, id)
+	if err != nil {
+		http.Error(w, "Backup failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/databases/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *DatabasesHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	backupID := chi.URLParam(r, "backup_id")
+	if id == "" || backupID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.backupRepo == nil {
+		http.Error(w, "Backup repo not configured", http.StatusInternalServerError)
+		return
+	}
+
+	backupRecord, err := h.backupRepo.GetByID(backupID)
+	if err != nil {
+		http.Error(w, "Backup record not found", http.StatusNotFound)
+		return
+	}
+
+	baseDir := "/var/lib/labuh/backups/databases"
+	localPath := filepath.Join(baseDir, id, backupRecord.Filename)
+	if _, err := os.Stat(localPath); os.IsNotExist(err) {
+		// Fallback ke ./backups/databases jika testing
+		localPath = filepath.Join("./backups/databases", id, backupRecord.Filename)
+	}
+
+	f, err := os.Open(localPath)
+	if err != nil {
+		http.Error(w, "Backup file not found on local disk", http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", backupRecord.Filename))
+	w.Header().Set("Content-Type", "application/gzip")
+	http.ServeContent(w, r, backupRecord.Filename, backupRecord.CreatedAt, f)
+}
+
+func (h *DatabasesHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	backupID := chi.URLParam(r, "backup_id")
+	if id == "" || backupID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.backupRepo != nil {
+		backupRecord, err := h.backupRepo.GetByID(backupID)
+		if err == nil {
+			localPath := filepath.Join("/var/lib/labuh/backups/databases", id, backupRecord.Filename)
+			_ = os.Remove(localPath)
+			_ = os.Remove(filepath.Join("./backups/databases", id, backupRecord.Filename))
+
+			// Remote S3 deletion if configured
+			if backupRecord.S3Key != nil && h.storageRepo != nil && backupRecord.StorageDestinationID != nil {
+				if dest, err := h.storageRepo.GetByID(*backupRecord.StorageDestinationID); err == nil {
+					if client, err := backup.NewS3ClientFromDestination(dest); err == nil {
+						_ = client.DeleteObject(r.Context(), *backupRecord.S3Key)
+					}
+				}
+			}
+
+			_ = h.backupRepo.Delete(backupID)
+		}
+	}
+
+	w.Header().Set("HX-Redirect", "/databases/"+id)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *DatabasesHandler) Start(w http.ResponseWriter, r *http.Request) {

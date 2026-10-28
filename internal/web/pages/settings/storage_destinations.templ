@@ -1,0 +1,111 @@
+package settings
+
+import "github.com/akordium-id/get-labuh/internal/models"
+
+templ StorageDestinationsPage(destinations []*models.StorageDestination) {
+	<div>
+		<div class="flex justify-between items-center mb-6">
+			<div>
+				<h1 class="text-3xl font-bold text-gray-900">S3 Storage Destinations</h1>
+				<p class="text-gray-600 mt-1">Konfigurasi penyimpanan cadangan remote S3-compatible (Cloudflare R2, AWS S3, MinIO, Wasabi).</p>
+			</div>
+			<a href="/settings/backup" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded border border-gray-300">
+				&larr; Back to Labuh Backup
+			</a>
+		</div>
+
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+			<div class="lg:col-span-2 space-y-4">
+				<h2 class="text-xl font-bold text-gray-900">Tersedia ({ string(rune('0' + len(destinations))) })</h2>
+				if len(destinations) == 0 {
+					<div class="bg-white rounded-lg shadow border border-dashed border-gray-300 p-8 text-center">
+						<p class="text-gray-500 text-sm">Belum ada storage destination yang dikonfigurasi.</p>
+						<p class="text-gray-400 text-xs mt-1">Gunakan form di samping untuk menambahkan akun Cloudflare R2 atau AWS S3 pertama Anda.</p>
+					</div>
+				}
+				for _, d := range destinations {
+					<div class="bg-white rounded-lg shadow border border-gray-200 p-5">
+						<div class="flex justify-between items-start">
+							<div>
+								<div class="flex items-center gap-2">
+									<h3 class="text-lg font-bold text-gray-900">{ d.Name }</h3>
+									if d.IsDefault {
+										<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">Default Global</span>
+									}
+								</div>
+								<p class="text-xs text-gray-500 font-mono mt-1">{ d.Endpoint } &bull; Bucket: <span class="text-gray-700 font-semibold">{ d.Bucket }</span></p>
+								<p class="text-xs text-gray-400 mt-0.5">Region: { d.Region } &bull; Prefix: { d.Prefix } &bull; SSL: { getSSLText(d.UseSSL) }</p>
+							</div>
+							<div class="flex items-center gap-2">
+								if !d.IsDefault {
+									<form action={ templ.SafeURL("/settings/storage-destinations/" + d.ID + "/default") } method="post" class="inline">
+										<button type="submit" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1.5 rounded font-medium border border-gray-300">
+											Set Default
+										</button>
+									</form>
+								}
+								<form action={ templ.SafeURL("/settings/storage-destinations/" + d.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Hapus storage destination ini?')">
+									<button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded font-medium border border-red-200">
+										Delete
+									</button>
+								</form>
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<h2 class="text-xl font-bold text-gray-900 mb-4">Add S3 Destination</h2>
+				<form action="/settings/storage-destinations" method="post" class="space-y-3">
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Nama Profile</label>
+						<input type="text" name="name" placeholder="Cloudflare R2 Backup" required class="mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm"/>
+					</div>
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider">S3 Endpoint URL</label>
+						<input type="text" name="endpoint" placeholder="https://<account_id>.r2.cloudflarestorage.com" required class="mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono"/>
+					</div>
+					<div class="grid grid-cols-2 gap-2">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Bucket</label>
+							<input type="text" name="bucket" placeholder="labuh-backups" required class="mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Region</label>
+							<input type="text" name="region" value="auto" class="mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm"/>
+						</div>
+					</div>
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Access Key ID</label>
+						<input type="text" name="access_key_id" required class="mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono"/>
+					</div>
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Secret Access Key</label>
+						<input type="password" name="secret_access_key" required class="mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono"/>
+					</div>
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Base Prefix (Path Folder)</label>
+						<input type="text" name="prefix" value="database-backups" class="mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono"/>
+					</div>
+					<div class="flex items-center gap-4 pt-1">
+						<label class="flex items-center text-sm text-gray-700">
+							<input type="checkbox" name="is_default" value="true" class="mr-2"/>
+							Jadikan Default Global
+						</label>
+					</div>
+					<button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm mt-2">
+						Simpan Destination
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+func getSSLText(ssl bool) string {
+	if ssl {
+		return "Enabled (HTTPS)"
+	}
+	return "Disabled (HTTP)"
+}

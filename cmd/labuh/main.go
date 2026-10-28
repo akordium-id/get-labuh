@@ -14,6 +14,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/akordium-id/get-labuh/internal/api"
 	"github.com/akordium-id/get-labuh/internal/auth"
+	"github.com/akordium-id/get-labuh/internal/backup"
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
@@ -76,6 +77,8 @@ func main() {
 	apiKeyRepo := repo.NewApiKeyRepo(db)
 	settingRepo := repo.NewSettingRepo(db)
 	auditRepo := repo.NewAuditLogRepo(db)
+	storageRepo := repo.NewStorageDestinationRepo(db)
+	databaseBackupRepo := repo.NewDatabaseBackupRepo(db)
 
 	_ = settingRepo.InitializeDefaults()
 
@@ -119,6 +122,15 @@ func main() {
 	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo, caddyClient, settingRepo)
 	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
 	databasesHandler.SetDockerClient(dockerClient)
+	storageDestinationsHandler := handler.NewStorageDestinationsHandler(storageRepo)
+
+	databaseBackupRunner := backup.NewDatabaseBackupRunner(dockerClient, databaseBackupRepo, storageRepo, databaseRepo, backupDir+"/databases")
+	databasesHandler.SetBackupDependencies(databaseBackupRepo, storageRepo, databaseBackupRunner)
+
+	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
+	backupScheduler.Start()
+	defer backupScheduler.Stop()
+
 	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
@@ -230,6 +242,10 @@ func main() {
 		r.Post("/databases/{id}/stop", databasesHandler.Stop)
 		r.Post("/databases/{id}/delete", databasesHandler.Delete)
 		r.Get("/databases/{id}/stats", monitoringHandler.DatabaseStats)
+		r.Post("/databases/{id}/backups/config", databasesHandler.UpdateBackupConfig)
+		r.Post("/databases/{id}/backups/create", databasesHandler.CreateBackup)
+		r.Get("/databases/{id}/backups/{backup_id}/download", databasesHandler.DownloadBackup)
+		r.Post("/databases/{id}/backups/{backup_id}/delete", databasesHandler.DeleteBackup)
 
 		r.Get("/deployments/{id}", deploymentsHandler.Get)
 		r.Get("/deployments/{id}/logs", deploymentsHandler.Logs)
@@ -243,6 +259,12 @@ func main() {
 		r.Get("/settings/caddy", settingsHandler.Caddy)
 		r.Post("/settings/caddy", settingsHandler.UpdateCaddy)
 		r.Post("/settings/caddy/test", settingsHandler.TestCaddy)
+
+		r.Get("/settings/storage-destinations", storageDestinationsHandler.List)
+		r.Post("/settings/storage-destinations", storageDestinationsHandler.Create)
+		r.Post("/settings/storage-destinations/{id}/default", storageDestinationsHandler.SetDefault)
+		r.Post("/settings/storage-destinations/{id}/delete", storageDestinationsHandler.Delete)
+		r.Post("/settings/storage-destinations/{id}/test", storageDestinationsHandler.TestConnection)
 
 		r.Get("/settings/backup", backupHandler.BackupPage)
 		r.Post("/settings/backup/create", backupHandler.CreateBackup)

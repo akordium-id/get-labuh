@@ -1,8 +1,10 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -362,4 +365,46 @@ func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imag
 	}
 
 	return containerID, nil
+}
+
+// ExecStream menjalankan command di dalam container dan mengalirkan stdout secara langsung ke writer
+func (c *Client) ExecStream(ctx context.Context, containerID string, cmd []string, env []string, stdout io.Writer) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+
+	execConfig := container.ExecOptions{
+		Cmd:          cmd,
+		Env:          env,
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execCreateResp, err := c.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create exec instance: %w", err)
+	}
+
+	attachResp, err := c.cli.ContainerExecAttach(ctx, execCreateResp.ID, container.ExecAttachOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to attach exec instance: %w", err)
+	}
+	defer attachResp.Close()
+
+	var stderrBuf bytes.Buffer
+	_, err = stdcopy.StdCopy(stdout, &stderrBuf, attachResp.Reader)
+	if err != nil {
+		return fmt.Errorf("failed during exec stream copy: %w", err)
+	}
+
+	inspectResp, err := c.cli.ContainerExecInspect(ctx, execCreateResp.ID)
+	if err != nil {
+		return fmt.Errorf("failed to inspect exec exit code: %w", err)
+	}
+
+	if inspectResp.ExitCode != 0 {
+		return fmt.Errorf("command exited with code %d: %s", inspectResp.ExitCode, strings.TrimSpace(stderrBuf.String()))
+	}
+
+	return nil
 }

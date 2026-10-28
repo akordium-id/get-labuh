@@ -88,7 +88,7 @@ func formatInt(n int) string {
 	return string(result)
 }
 
-templ DatabaseDetailPage(dbService *models.DatabaseService) {
+templ DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.DatabaseBackupConfig, destinations []*models.StorageDestination, backups []*models.DatabaseBackup) {
 	<div>
 		<div class="flex justify-between items-center mb-6">
 			<div>
@@ -108,7 +108,7 @@ templ DatabaseDetailPage(dbService *models.DatabaseService) {
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
 				<h2 class="text-xl font-bold text-gray-900 mb-4">Database Info</h2>
 				<dl class="space-y-3">
@@ -152,7 +152,137 @@ templ DatabaseDetailPage(dbService *models.DatabaseService) {
 				</div>
 			</div>
 		</div>
+
+		<!-- Database Backups Card -->
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+			<div class="flex justify-between items-center mb-6">
+				<div>
+					<h2 class="text-xl font-bold text-gray-900">Database Backups & S3 Automation</h2>
+					<p class="text-xs text-gray-500 mt-1">Dump otomatis terkompresi gzip langsung dialirkan ke S3 / Cloudflare R2 / MinIO atau penyimpanan lokal.</p>
+				</div>
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/create") } method="post" class="inline">
+					<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded text-sm shadow-sm">
+						Backup Now
+					</button>
+				</form>
+			</div>
+
+			<!-- Form Konfigurasi Auto Backup -->
+			<div class="bg-gray-50 border border-gray-200 rounded-lg p-5 mb-6">
+				<h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">Auto Backup Configuration</h3>
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/config") } method="post" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Status Auto-Backup</label>
+						<select name="enabled" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white">
+							if backupConfig != nil && backupConfig.Enabled {
+								<option value="true" selected>Enabled</option>
+								<option value="false">Disabled</option>
+							} else {
+								<option value="false" selected>Disabled</option>
+								<option value="true">Enabled</option>
+							}
+						</select>
+					</div>
+
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Storage Destination</label>
+						<select name="storage_destination_id" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white">
+							<option value="">(Default Global / Local Only)</option>
+							for _, dest := range destinations {
+								if backupConfig != nil && backupConfig.StorageDestinationID != nil && *backupConfig.StorageDestinationID == dest.ID {
+									<option value={ dest.ID } selected>{ dest.Name } (Bucket: { dest.Bucket })</option>
+								} else {
+									<option value={ dest.ID }>{ dest.Name } (Bucket: { dest.Bucket })</option>
+								}
+							}
+						</select>
+					</div>
+
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Jadwal (Cron)</label>
+						<select name="cron_expression" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white">
+							<option value="0 2 * * *">Harian (Jam 02:00 Pagi)</option>
+							<option value="0 0 * * *">Tengah Malam (00:00)</option>
+							<option value="@hourly">Setiap Jam</option>
+						</select>
+					</div>
+
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Retensi (Simpan Terakhir)</label>
+						<div class="flex gap-2">
+							<input type="number" name="retention_count" value="7" min="1" max="100" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white"/>
+							<button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white font-medium px-4 py-1.5 rounded text-sm whitespace-nowrap">
+								Save
+							</button>
+						</div>
+					</div>
+				</form>
+			</div>
+
+			<!-- Tabel Riwayat Backup -->
+			<h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">Backup History ({ string(rune('0' + len(backups))) })</h3>
+			if len(backups) == 0 {
+				<div class="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500 text-sm">
+					Belum ada riwayat backup untuk database ini. Klik <strong>Backup Now</strong> di atas untuk membuat snapshot pertama.
+				</div>
+			} else {
+				<div class="overflow-x-auto border border-gray-200 rounded-lg">
+					<table class="min-w-full divide-y divide-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Filename</th>
+								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Size</th>
+								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Storage</th>
+								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
+								<th class="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Action</th>
+							</tr>
+						</thead>
+						<tbody class="bg-white divide-y divide-gray-200 text-sm">
+							for _, b := range backups {
+								<tr>
+									<td class="px-4 py-3 font-mono text-xs text-gray-900">{ b.Filename }</td>
+									<td class="px-4 py-3 text-gray-600 text-xs">{ formatBytes(b.FileSize) }</td>
+									<td class="px-4 py-3 text-xs">
+										if b.StorageType == "s3" {
+											<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium border border-indigo-200">S3 / R2</span>
+										} else {
+											<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200">Local Disk</span>
+										}
+									</td>
+									<td class="px-4 py-3">
+										if b.Status == "completed" {
+											<span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">Completed</span>
+										} else if b.Status == "pending" {
+											<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded">Pending</span>
+										} else {
+											<span class="bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded">Failed</span>
+										}
+									</td>
+									<td class="px-4 py-3 text-xs text-gray-500">{ b.CreatedAt.Format("2006-01-02 15:04:05") }</td>
+									<td class="px-4 py-3 text-right text-xs">
+										<a href={ templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/download") } class="text-blue-600 hover:text-blue-900 font-medium mr-3">Download</a>
+										<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Hapus file backup ini?')">
+											<button type="submit" class="text-red-600 hover:text-red-900 font-medium">Delete</button>
+										</form>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
 	</div>
+}
+
+func formatBytes(bytes int64) string {
+	if bytes < 1024 {
+		return formatInt(int(bytes)) + " B"
+	} else if bytes < 1024*1024 {
+		return formatInt(int(bytes/1024)) + " KB"
+	}
+	return formatInt(int(bytes/(1024*1024))) + " MB"
 }
 
 templ DatabaseCreatePage() {
