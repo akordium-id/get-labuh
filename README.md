@@ -7,7 +7,9 @@
 > [!WARNING]
 > **Proyek ini sedang dalam pengembangan aktif.** Antarmuka pengguna, fungsionalitas, dan struktur data dapat berubah secara signifikan di masa mendatang.
 
-**Get-Labuh** adalah platform web sumber terbuka yang dirancang untuk menyederhanakan proses deployment aplikasi ke server eksternal. Dengan menyediakan antarmuka yang intuitif dan otomatisasi berbasis Docker, Get-Labuh memungkinkan tim teknis mengelola dan meluncurkan layanan mereka dengan cepat dan aman.
+**Get-Labuh** adalah platform self-hosted PaaS sumber terbuka yang dirancang sebagai alternatif ultra-ringan (single Go binary) untuk menyederhanakan proses deployment aplikasi dan database ke server sendiri. 
+
+Proyek ini terinspirasi oleh platform hebat [Coolify](https://coolify.io) dengan fokus pada performa tinggi, jejak memori yang sangat kecil (~30-50MB), dan kesederhanaan operasional.
 
 ## 🚀 Fitur Utama
 
@@ -83,11 +85,15 @@ Kontribusi sangat diterima! Silakan ikuti langkah-langkah berikut:
 4. **Push** ke branch (`git push origin feature/AmazingFeature`).
 5. Buka **Pull Request**.
 
+## 🙏 Apresiasi & Atribusi
+
+Proyek ini terinspirasi secara mendalam oleh [Coolify](https://coolify.io) karya Andras Bacsai dan komunitas open source. Labuh dibangun sebagai eksplorasi arsitektur alternatif yang ultra-ringan (single Go binary) dengan filosofi kesederhanaan dan kemudahan self-hosting yang dirintis oleh Coolify.
+
 ## 📝 Lisensi
 
 Proyek ini dirilis di bawah Lisensi MIT. Lihat file [LICENSE](LICENSE) untuk detail lebih lanjut.
 
 ## 📞 Hubungi
 
-- **Email**: [EMAIL_ADDRESS]`
+- **Email**: [EMAIL_ADDRESS]
 - **GitHub**: [Link Repositori]
