@@ -8,11 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
-}
-
 func TestProjectRepo_Create(t *stdtesting.T) {
 	db := testhelpers.SetupTestDB(t)
 	defer db.Close()

@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 
 	"github.com/a-h/templ"
@@ -144,39 +143,4 @@ func encryptAES(plaintext, keyString string) (string, error) {
 
 	result := append(iv, ciphertext...)
 	return base64.StdEncoding.EncodeToString(result), nil
-}
-
-func decryptAES(ciphertextB64, keyString string) (string, error) {
-	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextB64)
-	if err != nil {
-		return "", err
-	}
-
-	key := []byte(keyString)
-	if len(key) > 32 {
-		key = key[:32]
-	}
-	if len(key) < 32 {
-		padded := make([]byte, 32)
-		copy(padded, key)
-		key = padded
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-
-	if len(ciphertext) < aes.BlockSize {
-		return "", fmt.Errorf("ciphertext too short")
-	}
-
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-	plaintext := make([]byte, len(ciphertext))
-	stream.XORKeyStream(plaintext, ciphertext)
-
-	return string(plaintext), nil
 }

@@ -15,11 +15,17 @@ import (
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
+type EventNotifier interface {
+	Dispatch(event models.NotificationEvent)
+}
+
 type DatabaseBackupRunner struct {
 	dockerClient *docker.Client
 	backupRepo   *repo.DatabaseBackupRepo
 	storageRepo  *repo.StorageDestinationRepo
 	dbRepo       *repo.DatabaseRepo
+	projectRepo  *repo.ProjectRepo
+	notifier     EventNotifier
 	localBaseDir string
 }
 
@@ -42,6 +48,11 @@ func NewDatabaseBackupRunner(
 		dbRepo:       dbRepo,
 		localBaseDir: localBaseDir,
 	}
+}
+
+func (r *DatabaseBackupRunner) SetNotifier(n EventNotifier, projectRepo *repo.ProjectRepo) {
+	r.notifier = n
+	r.projectRepo = projectRepo
 }
 
 func (r *DatabaseBackupRunner) RunBackup(ctx context.Context, databaseID string) (*models.DatabaseBackup, error) {
@@ -177,6 +188,35 @@ func (r *DatabaseBackupRunner) RunBackup(ctx context.Context, databaseID string)
 		keepCount = cfg.RetentionCount
 	}
 	r.pruneOldBackups(ctx, db.ID, keepCount, storageDest)
+
+	if r.notifier != nil {
+		var projectID *string
+		if r.projectRepo != nil {
+			if env, envErr := r.projectRepo.GetEnvironmentByID(db.EnvironmentID); envErr == nil && env != nil {
+				projectID = &env.ProjectID
+			}
+		}
+
+		storageLabel := "Local Disk"
+		if storageDest != nil {
+			storageLabel = fmt.Sprintf("S3 (%s)", storageDest.Name)
+		}
+
+		r.notifier.Dispatch(models.NotificationEvent{
+			Title:       fmt.Sprintf("Backup Database Sukses: %s", db.Name),
+			Description: fmt.Sprintf("Backup untuk database %s berhasil dibuat dan disimpan ke %s.", db.Name, storageLabel),
+			Status:      "success",
+			EventType:   "backup_success",
+			ProjectID:   projectID,
+			Fields: map[string]string{
+				"Database": db.Name,
+				"Engine":   string(db.Engine),
+				"Filename": filename,
+				"Size":     fmt.Sprintf("%d KB", fileSize/1024),
+				"Storage":  storageLabel,
+			},
+		})
+	}
 
 	return backupRecord, nil
 }

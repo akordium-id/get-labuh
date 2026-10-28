@@ -15,11 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
-}
-
 func setupApplicationsHandler(t *stdtesting.T) (*ApplicationsHandler, *repo.ApplicationRepo, *repo.ProjectRepo) {
 	t.Helper()
 	db, err := database.Connect("file::memory:?cache=shared")

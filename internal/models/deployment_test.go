@@ -6,11 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
-}
-
 func TestDeployStepConstants(t *stdtesting.T) {
 	assert.Equal(t, DeployStep("clone"), DeployStepClone)
 	assert.Equal(t, DeployStep("build"), DeployStepBuild)

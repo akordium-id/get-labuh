@@ -23,6 +23,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/handler"
 	"github.com/akordium-id/get-labuh/internal/middleware"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/notification"
 	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/runner"
 	"github.com/akordium-id/get-labuh/internal/server"
@@ -79,6 +80,8 @@ func main() {
 	auditRepo := repo.NewAuditLogRepo(db)
 	storageRepo := repo.NewStorageDestinationRepo(db)
 	databaseBackupRepo := repo.NewDatabaseBackupRepo(db)
+	notifRepo := repo.NewNotificationRepo(db)
+	notifier := notification.NewNotifier(notifRepo)
 
 	_ = settingRepo.InitializeDefaults()
 
@@ -125,6 +128,7 @@ func main() {
 	storageDestinationsHandler := handler.NewStorageDestinationsHandler(storageRepo)
 
 	databaseBackupRunner := backup.NewDatabaseBackupRunner(dockerClient, databaseBackupRepo, storageRepo, databaseRepo, backupDir+"/databases")
+	databaseBackupRunner.SetNotifier(notifier, projectRepo)
 	databasesHandler.SetBackupDependencies(databaseBackupRepo, storageRepo, databaseBackupRunner)
 
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
@@ -136,10 +140,12 @@ func main() {
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
+	notificationsHandler := handler.NewNotificationsHandler(notifRepo, projectRepo, notifier)
 
 	deployWorker := worker.NewDeployWorker(10)
 	deployWorker.SetMaxConcurrent(3)
 	deployWorker.SetWorkerCount(1)
+	deployWorker.SetNotifier(notifier, projectRepo)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 	defer deployWorker.Stop()
 
@@ -276,6 +282,11 @@ func main() {
 		r.Get("/settings/backup/download", backupHandler.DownloadBackup)
 		r.Post("/settings/restore", backupHandler.RestoreBackup)
 
+		r.Get("/settings/notifications", notificationsHandler.List)
+		r.Post("/settings/notifications", notificationsHandler.Create)
+		r.Post("/settings/notifications/{id}/delete", notificationsHandler.Delete)
+		r.Post("/settings/notifications/{id}/test", notificationsHandler.Test)
+
 		r.Get("/settings/audit-logs", auditHandler.AuditLogsPage)
 	})
 
@@ -390,11 +401,6 @@ func seedTemplates(templateRepo *repo.TemplateRepo) {
 	for _, t := range templatesToSeed {
 		_, _ = templateRepo.Create(t)
 	}
-}
-
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
 }
 
 func runRunnerMode(args []string) {

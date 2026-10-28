@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
 	"sync"
 	"time"
 
@@ -15,6 +14,10 @@ import (
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
+type EventNotifier interface {
+	Dispatch(event models.NotificationEvent)
+}
+
 type DeployWorker struct {
 	jobQueue      chan models.DeploymentJob
 	ctx           context.Context
@@ -23,6 +26,8 @@ type DeployWorker struct {
 	semaphore     chan struct{}
 	maxConcurrent int
 	workerCount   int
+	notifier      EventNotifier
+	envRepo       *repo.ProjectRepo
 }
 
 func NewDeployWorker(bufferSize int) *DeployWorker {
@@ -34,6 +39,11 @@ func NewDeployWorker(bufferSize int) *DeployWorker {
 		maxConcurrent: 3,
 		workerCount:   1,
 	}
+}
+
+func (w *DeployWorker) SetNotifier(n EventNotifier, envRepo *repo.ProjectRepo) {
+	w.notifier = n
+	w.envRepo = envRepo
 }
 
 func (w *DeployWorker) SetMaxConcurrent(max int) {
@@ -83,8 +93,49 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 					err := pipeline.Execute(jobCtx, deployJob)
 					cancel()
 					<-w.semaphore
+
+					var appName = job.ApplicationID
+					var projectID *string
+					if app, getErr := appRepo.GetByID(job.ApplicationID); getErr == nil && app != nil {
+						appName = app.Name
+						if w.envRepo != nil {
+							if env, envErr := w.envRepo.GetEnvironmentByID(app.EnvironmentID); envErr == nil && env != nil {
+								projectID = &env.ProjectID
+							}
+						}
+					}
+
 					if err != nil {
 						slog.Error("deployment job failed", "error", err, "deployment_id", job.DeploymentID)
+						if w.notifier != nil {
+							w.notifier.Dispatch(models.NotificationEvent{
+								Title:       fmt.Sprintf("Deploy Gagal: %s", appName),
+								Description: fmt.Sprintf("Deployment untuk aplikasi %s gagal: %v", appName, err),
+								Status:      "failure",
+								EventType:   "deploy_failure",
+								ProjectID:   projectID,
+								Fields: map[string]string{
+									"Application": appName,
+									"Branch":      job.Branch,
+									"Error":       err.Error(),
+								},
+							})
+						}
+					} else {
+						if w.notifier != nil {
+							w.notifier.Dispatch(models.NotificationEvent{
+								Title:       fmt.Sprintf("Deploy Sukses: %s", appName),
+								Description: fmt.Sprintf("Aplikasi %s berhasil di-deploy dan traffic aktif.", appName),
+								Status:      "success",
+								EventType:   "deploy_success",
+								ProjectID:   projectID,
+								Fields: map[string]string{
+									"Application":   appName,
+									"Branch":        job.Branch,
+									"Deployment ID": job.DeploymentID,
+								},
+							})
+						}
 					}
 				case <-w.ctx.Done():
 					return
@@ -166,15 +217,4 @@ func (w *DeployWorker) Stop() {
 	w.cancel()
 	close(w.jobQueue)
 	w.wg.Wait()
-}
-
-type jobPriority struct {
-	job models.DeploymentJob
-	idx int
-}
-
-func sortJobsByPriority(jobs []models.DeploymentJob) {
-	sort.SliceStable(jobs, func(i, j int) bool {
-		return jobs[i].Priority > jobs[j].Priority
-	})
 }

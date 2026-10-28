@@ -1,11 +1,9 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
@@ -127,29 +125,4 @@ func readLogFile(path string) ([]string, error) {
 		}
 	}
 	return lines, nil
-}
-
-func formatTime(t *time.Time) string {
-	if t == nil {
-		return "-"
-	}
-	return t.Format("2006-01-02 15:04:05")
-}
-
-func calculateDuration(started, finished *time.Time) string {
-	if started == nil || finished == nil {
-		return "-"
-	}
-	d := finished.Sub(*started)
-	if d < time.Minute {
-		return d.String()
-	}
-	if d < time.Hour {
-		m := int(d.Minutes())
-		s := int(d.Seconds()) % 60
-		return fmt.Sprintf("%dm %ds", m, s)
-	}
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	return fmt.Sprintf("%dh %dm", h, m)
 }
