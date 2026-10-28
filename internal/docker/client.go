@@ -228,4 +228,3 @@ func DemultiplexLogs(dst io.Writer, src io.Reader) error {
 	_, err := stdcopy.StdCopy(dst, dst, src)
 	return err
 }
-

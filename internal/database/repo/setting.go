@@ -32,9 +32,9 @@ func (r *SettingRepo) Set(key, value string) error {
 
 func (r *SettingRepo) InitializeDefaults() error {
 	defaults := map[string]string{
-		"caddy_api_url":  "http://localhost:2019",
-		"caddy_api_key":  "",
-		"caddy_network":  "labuh-network",
+		"caddy_api_url": "http://localhost:2019",
+		"caddy_api_key": "",
+		"caddy_network": "labuh-network",
 	}
 
 	for key, value := range defaults {

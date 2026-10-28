@@ -7,9 +7,9 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/akordium-id/get-labuh/internal/ssh"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/ssh"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/settings"
 )

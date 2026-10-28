@@ -81,8 +81,8 @@ func (h *ComposeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.composeRepo.Create(models.CreateComposeApplicationInput{
 		EnvironmentID:      envID,
-		Name:              name,
-		Slug:              slug,
+		Name:               name,
+		Slug:               slug,
 		ComposeFilePath:    composeFilePath,
 		ComposeProjectName: composeProjectNamePtr,
 		CustomDomain:       customDomainPtr,

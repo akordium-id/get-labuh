@@ -93,10 +93,10 @@ func (h *DeploymentsHandler) Rollback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rollbackDeployment, err := h.deployRepo.Create(models.CreateDeploymentInput{
-		ApplicationID:  deployment.ApplicationID,
-		CommitHash:     prevDeployment.CommitHash,
-		CommitMessage:  prevDeployment.CommitMessage,
-		LogPath:        prevDeployment.LogPath,
+		ApplicationID: deployment.ApplicationID,
+		CommitHash:    prevDeployment.CommitHash,
+		CommitMessage: prevDeployment.CommitMessage,
+		LogPath:       prevDeployment.LogPath,
 	})
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

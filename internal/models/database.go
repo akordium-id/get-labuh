@@ -14,47 +14,47 @@ const (
 type DatabaseStatus string
 
 const (
-	DatabaseStatusIdle     DatabaseStatus = "idle"
-	DatabaseStatusRunning  DatabaseStatus = "running"
-	DatabaseStatusStopped  DatabaseStatus = "stopped"
-	DatabaseStatusFailed   DatabaseStatus = "failed"
+	DatabaseStatusIdle    DatabaseStatus = "idle"
+	DatabaseStatusRunning DatabaseStatus = "running"
+	DatabaseStatusStopped DatabaseStatus = "stopped"
+	DatabaseStatusFailed  DatabaseStatus = "failed"
 )
 
 type DatabaseService struct {
-	ID              string
-	EnvironmentID   string
-	Name            string
-	Slug            string
-	Engine          DatabaseEngine
-	Version         string
-	Username        string
-	Password        string
-	DatabaseName    string
-	Port            int
-	ContainerID     *string
-	ContainerName   *string
-	Status          DatabaseStatus
+	ID               string
+	EnvironmentID    string
+	Name             string
+	Slug             string
+	Engine           DatabaseEngine
+	Version          string
+	Username         string
+	Password         string
+	DatabaseName     string
+	Port             int
+	ContainerID      *string
+	ContainerName    *string
+	Status           DatabaseStatus
 	ConnectionString *string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type CreateDatabaseServiceInput struct {
-	EnvironmentID   string
-	Name            string
-	Slug            string
-	Engine          DatabaseEngine
-	Version         string
-	Username        string
-	Password        string
-	DatabaseName    string
-	Port            int
+	EnvironmentID string
+	Name          string
+	Slug          string
+	Engine        DatabaseEngine
+	Version       string
+	Username      string
+	Password      string
+	DatabaseName  string
+	Port          int
 }
 
 type ContainerStats struct {
-	CPUPercent    float64
-	MemoryUsage   uint64
-	MemoryLimit   uint64
-	NetworkRx     uint64
-	NetworkTx     uint64
+	CPUPercent  float64
+	MemoryUsage uint64
+	MemoryLimit uint64
+	NetworkRx   uint64
+	NetworkTx   uint64
 }

@@ -1,9 +1,9 @@
 package testing
 
 import (
-	stdtesting "testing"
 	"net/http"
 	"net/http/httptest"
+	stdtesting "testing"
 
 	"golang.org/x/crypto/bcrypt"
 

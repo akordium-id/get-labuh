@@ -22,13 +22,13 @@ import (
 const encryptionKey = "labuh-deploy-key-encryption-key-32b!!"
 
 type DeployKeysHandler struct {
-	keyRepo *repo.DeployKeyRepo
+	keyRepo  *repo.DeployKeyRepo
 	projRepo *repo.ProjectRepo
 }
 
 func NewDeployKeysHandler(keyRepo *repo.DeployKeyRepo, projRepo *repo.ProjectRepo) *DeployKeysHandler {
 	return &DeployKeysHandler{
-		keyRepo: keyRepo,
+		keyRepo:  keyRepo,
 		projRepo: projRepo,
 	}
 }

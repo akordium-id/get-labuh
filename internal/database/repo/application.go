@@ -21,21 +21,21 @@ func NewApplicationRepo(db *sql.DB) *ApplicationRepo {
 
 func (r *ApplicationRepo) Create(input models.CreateApplicationInput) (*models.Application, error) {
 	app := &models.Application{
-		ID:            uuid.New().String(),
-		EnvironmentID: input.EnvironmentID,
-		Name:          input.Name,
-		Slug:          input.Slug,
-		SourceType:    input.SourceType,
-		RepositoryURL: input.RepositoryURL,
-		Branch:        input.Branch,
-		BuildPath:     input.BuildPath,
+		ID:             uuid.New().String(),
+		EnvironmentID:  input.EnvironmentID,
+		Name:           input.Name,
+		Slug:           input.Slug,
+		SourceType:     input.SourceType,
+		RepositoryURL:  input.RepositoryURL,
+		Branch:         input.Branch,
+		BuildPath:      input.BuildPath,
 		DockerfilePath: input.DockerfilePath,
-		DockerImage:   input.DockerImage,
-		CustomDomain:  input.CustomDomain,
-		AppPort:       input.AppPort,
-		Status:        models.AppStatusIdle,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		DockerImage:    input.DockerImage,
+		CustomDomain:   input.CustomDomain,
+		AppPort:        input.AppPort,
+		Status:         models.AppStatusIdle,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}
 
 	if app.Slug == "" {
@@ -273,21 +273,21 @@ func (r *ApplicationRepo) Delete(id string) error {
 
 func (r *ApplicationRepo) Clone(srcApp *models.Application, targetEnvID, newName string) (*models.Application, error) {
 	app := &models.Application{
-		ID:            uuid.New().String(),
-		EnvironmentID: targetEnvID,
-		Name:          newName,
-		Slug:          GenerateSlug(newName),
-		SourceType:    srcApp.SourceType,
-		RepositoryURL: srcApp.RepositoryURL,
-		Branch:        srcApp.Branch,
-		BuildPath:     srcApp.BuildPath,
+		ID:             uuid.New().String(),
+		EnvironmentID:  targetEnvID,
+		Name:           newName,
+		Slug:           GenerateSlug(newName),
+		SourceType:     srcApp.SourceType,
+		RepositoryURL:  srcApp.RepositoryURL,
+		Branch:         srcApp.Branch,
+		BuildPath:      srcApp.BuildPath,
 		DockerfilePath: srcApp.DockerfilePath,
-		DockerImage:   srcApp.DockerImage,
-		CustomDomain:  srcApp.CustomDomain,
-		AppPort:       srcApp.AppPort,
-		Status:        models.AppStatusIdle,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		DockerImage:    srcApp.DockerImage,
+		CustomDomain:   srcApp.CustomDomain,
+		AppPort:        srcApp.AppPort,
+		Status:         models.AppStatusIdle,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}
 
 	containerName := generateContainerName("env", app.Slug, app.ID)

@@ -18,10 +18,10 @@ func NewApiKeyRepo(db *sql.DB) *ApiKeyRepo {
 
 func (r *ApiKeyRepo) Create(input models.CreateApiKeyInput) (*models.ApiKey, error) {
 	apiKey := &models.ApiKey{
-		ID:       uuid.New().String(),
-		UserID:   input.UserID,
-		Name:     input.Name,
-		KeyHash:  input.KeyHash,
+		ID:        uuid.New().String(),
+		UserID:    input.UserID,
+		Name:      input.Name,
+		KeyHash:   input.KeyHash,
 		CreatedAt: time.Now(),
 	}
 

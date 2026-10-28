@@ -13,11 +13,11 @@ const (
 type TemplateCategory string
 
 const (
-	TemplateCategoryCMS      TemplateCategory = "cms"
-	TemplateCategoryDatabase TemplateCategory = "database"
+	TemplateCategoryCMS        TemplateCategory = "cms"
+	TemplateCategoryDatabase   TemplateCategory = "database"
 	TemplateCategoryMonitoring TemplateCategory = "monitoring"
-	TemplateCategoryStorage  TemplateCategory = "storage"
-	TemplateCategoryOther    TemplateCategory = "other"
+	TemplateCategoryStorage    TemplateCategory = "storage"
+	TemplateCategoryOther      TemplateCategory = "other"
 )
 
 type ServiceTemplate struct {
@@ -48,14 +48,14 @@ type CreateServiceTemplateInput struct {
 }
 
 type TemplateVariable struct {
-	ID          string
-	TemplateID  string
-	Key         string
-	DisplayName string
-	Description *string
-	Required    bool
+	ID           string
+	TemplateID   string
+	Key          string
+	DisplayName  string
+	Description  *string
+	Required     bool
 	DefaultValue *string
-	CreatedAt   time.Time
+	CreatedAt    time.Time
 }
 
 type CreateTemplateVariableInput struct {

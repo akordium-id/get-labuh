@@ -216,7 +216,7 @@ func (h *WebhooksHandler) handleGitHub(w http.ResponseWriter, r *http.Request, a
 		if pushedBranch != targetBranch {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":        "ignored",
 				"reason":        "branch mismatch",
 				"pushed_branch": pushedBranch,
@@ -268,7 +268,7 @@ func (h *WebhooksHandler) handleGitLab(w http.ResponseWriter, r *http.Request, a
 		if pushedBranch != targetBranch {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":        "ignored",
 				"reason":        "branch mismatch",
 				"pushed_branch": pushedBranch,
@@ -329,7 +329,7 @@ func (h *WebhooksHandler) handleGeneric(w http.ResponseWriter, r *http.Request, 
 	if payload.Branch != "" && payload.Branch != targetBranch {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status":        "ignored",
 			"reason":        "branch mismatch",
 			"pushed_branch": payload.Branch,
@@ -380,7 +380,7 @@ func (h *WebhooksHandler) dispatchDeployment(w http.ResponseWriter, app *models.
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status":         "queued",
 		"deployment_id":  deployment.ID,
 		"application_id": app.ID,

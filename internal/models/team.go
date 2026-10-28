@@ -5,10 +5,10 @@ import "time"
 type TeamRole string
 
 const (
-	TeamRoleOwner   TeamRole = "owner"
-	TeamRoleAdmin   TeamRole = "admin"
+	TeamRoleOwner     TeamRole = "owner"
+	TeamRoleAdmin     TeamRole = "admin"
 	TeamRoleDeveloper TeamRole = "developer"
-	TeamRoleViewer  TeamRole = "viewer"
+	TeamRoleViewer    TeamRole = "viewer"
 )
 
 type Team struct {

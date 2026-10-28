@@ -76,8 +76,8 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 }
 
 type RateLimiterConfig struct {
-	Rate   rate.Limit
-	Burst  int
+	Rate  rate.Limit
+	Burst int
 }
 
 var globalRateLimiter *RateLimiter

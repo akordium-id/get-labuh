@@ -10,11 +10,11 @@ import (
 )
 
 type RuntimeMetrics struct {
-	MemoryAlloc       uint64 `json:"memory_alloc"`
-	MemoryTotalAlloc  uint64 `json:"memory_total_alloc"`
-	MemorySys         uint64 `json:"memory_sys"`
-	NumGC             uint32 `json:"num_gc"`
-	NumGoroutine      int    `json:"num_goroutine"`
+	MemoryAlloc      uint64 `json:"memory_alloc"`
+	MemoryTotalAlloc uint64 `json:"memory_total_alloc"`
+	MemorySys        uint64 `json:"memory_sys"`
+	NumGC            uint32 `json:"num_gc"`
+	NumGoroutine     int    `json:"num_goroutine"`
 }
 
 func GetRuntimeMetrics() RuntimeMetrics {
@@ -30,16 +30,16 @@ func GetRuntimeMetrics() RuntimeMetrics {
 }
 
 type Metrics struct {
-	Timestamp         time.Time      `json:"timestamp"`
-	Uptime            string         `json:"uptime"`
-	GoVersion         string         `json:"go_version"`
-	NumGoroutine      int            `json:"num_goroutine"`
-	NumGC             uint32         `json:"num_gc"`
-	Runtime           RuntimeMetrics `json:"runtime"`
-	DeploymentDurations []float64    `json:"deployment_durations"`
-	BuildDurations      []float64    `json:"build_durations"`
-	ContainerCount      int          `json:"container_count"`
-	RequestDurations    []float64    `json:"request_durations"`
+	Timestamp           time.Time      `json:"timestamp"`
+	Uptime              string         `json:"uptime"`
+	GoVersion           string         `json:"go_version"`
+	NumGoroutine        int            `json:"num_goroutine"`
+	NumGC               uint32         `json:"num_gc"`
+	Runtime             RuntimeMetrics `json:"runtime"`
+	DeploymentDurations []float64      `json:"deployment_durations"`
+	BuildDurations      []float64      `json:"build_durations"`
+	ContainerCount      int            `json:"container_count"`
+	RequestDurations    []float64      `json:"request_durations"`
 }
 
 var (
@@ -90,12 +90,12 @@ func MetricsHandler(w http.ResponseWriter, r *http.Request) {
 	metricsMu.RUnlock()
 
 	metrics := Metrics{
-		Timestamp:         time.Now(),
-		Uptime:            time.Since(startTime).String(),
-		GoVersion:         runtime.Version(),
-		NumGoroutine:      runtime.NumGoroutine(),
-		NumGC:             m.NumGC,
-		Runtime:           GetRuntimeMetrics(),
+		Timestamp:           time.Now(),
+		Uptime:              time.Since(startTime).String(),
+		GoVersion:           runtime.Version(),
+		NumGoroutine:        runtime.NumGoroutine(),
+		NumGC:               m.NumGC,
+		Runtime:             GetRuntimeMetrics(),
 		DeploymentDurations: deployDurs,
 		BuildDurations:      buildDurs,
 		ContainerCount:      containerC,

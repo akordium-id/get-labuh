@@ -9,8 +9,8 @@ import (
 )
 
 type CacheStats struct {
-	TotalSize int64 `json:"total_size"`
-	EntryCount int `json:"entry_count"`
+	TotalSize  int64 `json:"total_size"`
+	EntryCount int   `json:"entry_count"`
 }
 
 const DefaultCacheDir = "/var/lib/labuh/docker-cache"

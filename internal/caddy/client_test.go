@@ -1,10 +1,10 @@
 package caddy
 
 import (
-	stdtesting "testing"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"encoding/json"
+	stdtesting "testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -60,7 +60,7 @@ func TestClient_RouteExists(t *stdtesting.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		routes := []Route{
 			{Match: []Match{{Host: []string{"example.com"}}},
-			 Handle: []Handle{{Handler: "reverse_proxy"}}},
+				Handle: []Handle{{Handler: "reverse_proxy"}}},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(routes)
@@ -98,9 +98,9 @@ func TestClient_ListRoutes(t *stdtesting.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		routes := []Route{
 			{Match: []Match{{Host: []string{"example.com"}}},
-			 Handle: []Handle{{Handler: "reverse_proxy"}}},
+				Handle: []Handle{{Handler: "reverse_proxy"}}},
 			{Match: []Match{{Host: []string{"test.com"}}},
-			 Handle: []Handle{{Handler: "reverse_proxy"}}},
+				Handle: []Handle{{Handler: "reverse_proxy"}}},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(routes)

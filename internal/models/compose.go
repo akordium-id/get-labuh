@@ -13,31 +13,31 @@ const (
 )
 
 type ComposeApplication struct {
-	ID                  string
-	EnvironmentID       string
-	Name                string
-	Slug                string
-	ComposeFilePath     string
-	ComposeProjectName  *string
-	CustomDomain        *string
-	Status              ComposeStatus
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID                 string
+	EnvironmentID      string
+	Name               string
+	Slug               string
+	ComposeFilePath    string
+	ComposeProjectName *string
+	CustomDomain       *string
+	Status             ComposeStatus
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type CreateComposeApplicationInput struct {
-	EnvironmentID       string
-	Name                string
-	Slug                string
-	ComposeFilePath     string
-	ComposeProjectName  *string
-	CustomDomain        *string
+	EnvironmentID      string
+	Name               string
+	Slug               string
+	ComposeFilePath    string
+	ComposeProjectName *string
+	CustomDomain       *string
 }
 
 type ComposeDeployJob struct {
-	ComposeID           string
-	EnvironmentID       string
-	ComposeFilePath     string
-	ComposeProjectName  string
-	LogPath             string
+	ComposeID          string
+	EnvironmentID      string
+	ComposeFilePath    string
+	ComposeProjectName string
+	LogPath            string
 }

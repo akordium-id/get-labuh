@@ -18,16 +18,16 @@ func NewComposeRepo(db *sql.DB) *ComposeRepo {
 
 func (r *ComposeRepo) Create(input models.CreateComposeApplicationInput) (*models.ComposeApplication, error) {
 	compose := &models.ComposeApplication{
-		ID:                uuid.New().String(),
-		EnvironmentID:     input.EnvironmentID,
-		Name:              input.Name,
-		Slug:              input.Slug,
-		ComposeFilePath:   input.ComposeFilePath,
+		ID:                 uuid.New().String(),
+		EnvironmentID:      input.EnvironmentID,
+		Name:               input.Name,
+		Slug:               input.Slug,
+		ComposeFilePath:    input.ComposeFilePath,
 		ComposeProjectName: input.ComposeProjectName,
-		CustomDomain:      input.CustomDomain,
-		Status:            models.ComposeStatusIdle,
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
+		CustomDomain:       input.CustomDomain,
+		Status:             models.ComposeStatusIdle,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 
 	if compose.Slug == "" {

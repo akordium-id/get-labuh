@@ -23,24 +23,24 @@ const (
 )
 
 type Application struct {
-	ID              string
-	EnvironmentID   string
-	Name            string
-	Slug            string
-	SourceType      SourceType
-	RepositoryURL   *string
-	Branch          *string
-	BuildPath       *string
-	DockerfilePath  *string
-	DockerImage     *string
-	CustomDomain    *string
-	AppPort         int
-	ContainerID     *string
-	ContainerName   *string
-	Status          AppStatus
-	WebhookSecret   *string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID             string
+	EnvironmentID  string
+	Name           string
+	Slug           string
+	SourceType     SourceType
+	RepositoryURL  *string
+	Branch         *string
+	BuildPath      *string
+	DockerfilePath *string
+	DockerImage    *string
+	CustomDomain   *string
+	AppPort        int
+	ContainerID    *string
+	ContainerName  *string
+	Status         AppStatus
+	WebhookSecret  *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type CreateApplicationInput struct {
@@ -90,28 +90,26 @@ const (
 )
 
 type Deployment struct {
-	ID             string
-	ApplicationID  string
-	CommitHash     *string
-	CommitMessage  *string
-	Status         DeployStatus
-	Step           *string
-	Output         *string
-	ErrorMessage   *string
-	LogPath        *string
-	StartedAt      *time.Time
-	FinishedAt     *time.Time
-	CreatedAt      time.Time
-	Priority       int
+	ID            string
+	ApplicationID string
+	CommitHash    *string
+	CommitMessage *string
+	Status        DeployStatus
+	Step          *string
+	Output        *string
+	ErrorMessage  *string
+	LogPath       *string
+	StartedAt     *time.Time
+	FinishedAt    *time.Time
+	CreatedAt     time.Time
+	Priority      int
 }
 
 type CreateDeploymentInput struct {
-	ApplicationID  string
-	CommitHash     *string
-	CommitMessage  *string
-	LogPath        *string
-	Step           *string
-	Output         *string
+	ApplicationID string
+	CommitHash    *string
+	CommitMessage *string
+	LogPath       *string
+	Step          *string
+	Output        *string
 }
-
-

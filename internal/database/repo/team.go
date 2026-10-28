@@ -180,10 +180,10 @@ func (r *TeamRepo) GetUserTeams(userID string) ([]*models.Team, error) {
 
 func HasRole(userRole, requiredRole models.TeamRole) bool {
 	roleHierarchy := map[models.TeamRole]int{
-		models.TeamRoleOwner:    4,
-		models.TeamRoleAdmin:    3,
+		models.TeamRoleOwner:     4,
+		models.TeamRoleAdmin:     3,
 		models.TeamRoleDeveloper: 2,
-		models.TeamRoleViewer:   1,
+		models.TeamRoleViewer:    1,
 	}
 
 	userLevel := roleHierarchy[userRole]

@@ -135,6 +135,7 @@ func main() {
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, nil)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
+	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
 
 	deployWorker := worker.NewDeployWorker(10)
 	deployWorker.SetMaxConcurrent(3)
@@ -242,10 +243,14 @@ func main() {
 		r.Post("/databases/{id}/stop", databasesHandler.Stop)
 		r.Post("/databases/{id}/delete", databasesHandler.Delete)
 		r.Get("/databases/{id}/stats", monitoringHandler.DatabaseStats)
+		r.Get("/databases/{id}/terminal", terminalHandler.DatabaseTerminal)
 		r.Post("/databases/{id}/backups/config", databasesHandler.UpdateBackupConfig)
 		r.Post("/databases/{id}/backups/create", databasesHandler.CreateBackup)
 		r.Get("/databases/{id}/backups/{backup_id}/download", databasesHandler.DownloadBackup)
 		r.Post("/databases/{id}/backups/{backup_id}/delete", databasesHandler.DeleteBackup)
+
+		r.Get("/applications/{id}/terminal", terminalHandler.ApplicationTerminal)
+		r.Get("/containers/{container_id}/terminal/ws", terminalHandler.ContainerTerminalWS)
 
 		r.Get("/deployments/{id}", deploymentsHandler.Get)
 		r.Get("/deployments/{id}/logs", deploymentsHandler.Logs)
@@ -444,4 +449,3 @@ func runRunnerMode(args []string) {
 	}
 	slog.Info("runner shut down gracefully")
 }
-

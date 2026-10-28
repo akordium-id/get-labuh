@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	"github.com/a-h/templ"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/akordium-id/get-labuh/internal/auth"
 	"github.com/akordium-id/get-labuh/internal/database/repo"

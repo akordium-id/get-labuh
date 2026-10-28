@@ -24,9 +24,7 @@ func NewBackupScheduler(runner *DatabaseBackupRunner) *BackupScheduler {
 }
 
 func (s *BackupScheduler) Start() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
@@ -38,7 +36,7 @@ func (s *BackupScheduler) Start() {
 				s.checkAndRunBackups(now)
 			}
 		}
-	}()
+	})
 	slog.Info("database backup scheduler started")
 }
 

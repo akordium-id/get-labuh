@@ -12,12 +12,12 @@ import (
 )
 
 type RotatingWriter struct {
-	mu        sync.Mutex
-	path      string
-	maxSize   int64
-	maxFiles  int
-	current   *os.File
-	size      int64
+	mu       sync.Mutex
+	path     string
+	maxSize  int64
+	maxFiles int
+	current  *os.File
+	size     int64
 }
 
 func NewRotatingWriter(path string, maxSize int64, maxFiles int) (*RotatingWriter, error) {

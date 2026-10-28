@@ -269,395 +269,418 @@ func DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" method=\"post\" class=\"inline\" onsubmit=\"return confirm('Are you sure you want to delete this database?')\"><button type=\"submit\" class=\"bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700\">Delete</button></form></div></div><div class=\"grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6\"><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Database Info</h2><dl class=\"space-y-3\"><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Status</dt><dd class=\"text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" method=\"post\" class=\"inline\" onsubmit=\"return confirm('Are you sure you want to delete this database?')\"><button type=\"submit\" class=\"bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700\">Delete</button></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Status)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 117, Col: 50}
+		if dbService.ContainerID != nil && *dbService.ContainerID != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var15 string
+			templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/terminal")).ResolveURL(ctx)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 109, Col: 72}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" target=\"_blank\" class=\"bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-1.5 font-medium\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z\"></path></svg> Terminal</a>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Engine</dt><dd class=\"text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div></div><div class=\"grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6\"><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Database Info</h2><dl class=\"space-y-3\"><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Status</dt><dd class=\"text-gray-900\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Engine)
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Status)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 121, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 123, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Version</dt><dd class=\"text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Engine</dt><dd class=\"text-gray-900\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Version)
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Engine)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 125, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 127, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Port</dt><dd class=\"text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Version</dt><dd class=\"text-gray-900\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(formatInt(dbService.Port))
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Version)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 129, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 131, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Username</dt><dd class=\"text-gray-900 font-mono text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Port</dt><dd class=\"text-gray-900\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
-		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Username)
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(formatInt(dbService.Port))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 133, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 135, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Database</dt><dd class=\"text-gray-900 font-mono text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Username</dt><dd class=\"text-gray-900 font-mono text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var20 string
-		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.DatabaseName)
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.Username)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 137, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 139, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</dd></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Database</dt><dd class=\"text-gray-900 font-mono text-sm\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var21 string
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(dbService.DatabaseName)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 143, Col: 74}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</dd></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if dbService.ConnectionString != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<div class=\"flex justify-between\"><dt class=\"text-gray-600\">Connection String</dt><dd class=\"text-gray-900 font-mono text-sm\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"flex justify-between\"><dt class=\"text-gray-600\">Connection String</dt><dd class=\"text-gray-900 font-mono text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var21 string
-			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(*dbService.ConnectionString)
+			var templ_7745c5c3_Var22 string
+			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(*dbService.ConnectionString)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 142, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 148, Col: 80}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</dd></div>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</dd></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</dl></div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Monitoring</h2><div id=\"stats\" hx-get=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var22 string
-		templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/stats")).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 150, Col: 83}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\" hx-trigger=\"load, every 2s\" hx-swap=\"innerHTML\"><div class=\"text-gray-500\">Loading stats...</div></div></div></div><!-- Database Backups Card --><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-6\"><div><h2 class=\"text-xl font-bold text-gray-900\">Database Backups & S3 Automation</h2><p class=\"text-xs text-gray-500 mt-1\">Dump otomatis terkompresi gzip langsung dialirkan ke S3 / Cloudflare R2 / MinIO atau penyimpanan lokal.</p></div><form action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</dl></div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Monitoring</h2><div id=\"stats\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var23 string
-		templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/create")).ResolveURL(ctx)
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/stats")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 163, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 156, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded text-sm shadow-sm\">Backup Now</button></form></div><!-- Form Konfigurasi Auto Backup --><div class=\"bg-gray-50 border border-gray-200 rounded-lg p-5 mb-6\"><h3 class=\"text-sm font-bold text-gray-800 uppercase tracking-wider mb-3\">Auto Backup Configuration</h3><form action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" hx-trigger=\"load, every 2s\" hx-swap=\"innerHTML\"><div class=\"text-gray-500\">Loading stats...</div></div></div></div><!-- Database Backups Card --><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-6\"><div><h2 class=\"text-xl font-bold text-gray-900\">Database Backups & S3 Automation</h2><p class=\"text-xs text-gray-500 mt-1\">Dump otomatis terkompresi gzip langsung dialirkan ke S3 / Cloudflare R2 / MinIO atau penyimpanan lokal.</p></div><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/config")).ResolveURL(ctx)
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/create")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 173, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 169, Col: 82}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" method=\"post\" class=\"grid grid-cols-1 md:grid-cols-4 gap-4 items-end\"><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Status Auto-Backup</label> <select name=\"enabled\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded text-sm shadow-sm\">Backup Now</button></form></div><!-- Form Konfigurasi Auto Backup --><div class=\"bg-gray-50 border border-gray-200 rounded-lg p-5 mb-6\"><h3 class=\"text-sm font-bold text-gray-800 uppercase tracking-wider mb-3\">Auto Backup Configuration</h3><form action=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var25 string
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/config")).ResolveURL(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 179, Col: 82}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" method=\"post\" class=\"grid grid-cols-1 md:grid-cols-4 gap-4 items-end\"><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Status Auto-Backup</label> <select name=\"enabled\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if backupConfig != nil && backupConfig.Enabled {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<option value=\"true\" selected>Enabled</option> <option value=\"false\">Disabled</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<option value=\"true\" selected>Enabled</option> <option value=\"false\">Disabled</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<option value=\"false\" selected>Disabled</option> <option value=\"true\">Enabled</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<option value=\"false\" selected>Disabled</option> <option value=\"true\">Enabled</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Storage Destination</label> <select name=\"storage_destination_id\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\"><option value=\"\">(Default Global / Local Only)</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Storage Destination</label> <select name=\"storage_destination_id\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\"><option value=\"\">(Default Global / Local Only)</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, dest := range destinations {
 			if backupConfig != nil && backupConfig.StorageDestinationID != nil && *backupConfig.StorageDestinationID == dest.ID {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<option value=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var25 string
-				templ_7745c5c3_Var25, templ_7745c5c3_Err = templruntime.NewAttributeExpression(dest.ID).Resolve(ctx)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 193, Col: 32}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" selected>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var26 string
-				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Name)
+				templ_7745c5c3_Var26, templ_7745c5c3_Err = templruntime.NewAttributeExpression(dest.ID).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 193, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 199, Col: 32}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, " (Bucket: ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" selected>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var27 string
-				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Bucket)
+				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 193, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 199, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, ")</option>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<option value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, " (Bucket: ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var28 string
-				templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(dest.ID).Resolve(ctx)
+				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Bucket)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 195, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 199, Col: 80}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, ")</option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var29 string
-				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Name)
+				templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(dest.ID).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 195, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 201, Col: 32}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, " (Bucket: ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var30 string
-				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Bucket)
+				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 195, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 201, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, ")</option>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, " (Bucket: ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var31 string
+				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(dest.Bucket)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 201, Col: 71}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, ")</option>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Jadwal (Cron)</label> <select name=\"cron_expression\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\"><option value=\"0 2 * * *\">Harian (Jam 02:00 Pagi)</option> <option value=\"0 0 * * *\">Tengah Malam (00:00)</option> <option value=\"@hourly\">Setiap Jam</option></select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Retensi (Simpan Terakhir)</label><div class=\"flex gap-2\"><input type=\"number\" name=\"retention_count\" value=\"7\" min=\"1\" max=\"100\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\"> <button type=\"submit\" class=\"bg-gray-800 hover:bg-gray-900 text-white font-medium px-4 py-1.5 rounded text-sm whitespace-nowrap\">Save</button></div></div></form></div><!-- Tabel Riwayat Backup --><h3 class=\"text-sm font-bold text-gray-800 uppercase tracking-wider mb-3\">Backup History (")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Jadwal (Cron)</label> <select name=\"cron_expression\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\"><option value=\"0 2 * * *\">Harian (Jam 02:00 Pagi)</option> <option value=\"0 0 * * *\">Tengah Malam (00:00)</option> <option value=\"@hourly\">Setiap Jam</option></select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Retensi (Simpan Terakhir)</label><div class=\"flex gap-2\"><input type=\"number\" name=\"retention_count\" value=\"7\" min=\"1\" max=\"100\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white\"> <button type=\"submit\" class=\"bg-gray-800 hover:bg-gray-900 text-white font-medium px-4 py-1.5 rounded text-sm whitespace-nowrap\">Save</button></div></div></form></div><!-- Tabel Riwayat Backup --><h3 class=\"text-sm font-bold text-gray-800 uppercase tracking-wider mb-3\">Backup History (")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var31 string
-		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(string(rune('0' + len(backups))))
+		var templ_7745c5c3_Var32 string
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(string(rune('0' + len(backups))))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 223, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 229, Col: 127}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, ")</h3>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, ")</h3>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(backups) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div class=\"bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500 text-sm\">Belum ada riwayat backup untuk database ini. Klik <strong>Backup Now</strong> di atas untuk membuat snapshot pertama.</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<div class=\"bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500 text-sm\">Belum ada riwayat backup untuk database ini. Klik <strong>Backup Now</strong> di atas untuk membuat snapshot pertama.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<div class=\"overflow-x-auto border border-gray-200 rounded-lg\"><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Filename</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Size</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Storage</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Status</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Date</th><th class=\"px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200 text-sm\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div class=\"overflow-x-auto border border-gray-200 rounded-lg\"><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Filename</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Size</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Storage</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Status</th><th class=\"px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase\">Date</th><th class=\"px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200 text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, b := range backups {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<tr><td class=\"px-4 py-3 font-mono text-xs text-gray-900\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var32 string
-				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(b.Filename)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 244, Col: 75}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</td><td class=\"px-4 py-3 text-gray-600 text-xs\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<tr><td class=\"px-4 py-3 font-mono text-xs text-gray-900\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var33 string
-				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(formatBytes(b.FileSize))
+				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(b.Filename)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 245, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 250, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</td><td class=\"px-4 py-3 text-xs\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if b.StorageType == "s3" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<span class=\"bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium border border-indigo-200\">S3 / R2</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<span class=\"bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200\">Local Disk</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</td><td class=\"px-4 py-3\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if b.Status == "completed" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<span class=\"bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded\">Completed</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else if b.Status == "pending" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<span class=\"bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded\">Pending</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<span class=\"bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded\">Failed</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</td><td class=\"px-4 py-3 text-xs text-gray-500\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</td><td class=\"px-4 py-3 text-gray-600 text-xs\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var34 string
-				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(b.CreatedAt.Format("2006-01-02 15:04:05"))
+				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(formatBytes(b.FileSize))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 262, Col: 96}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 251, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</td><td class=\"px-4 py-3 text-right text-xs\"><a href=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</td><td class=\"px-4 py-3 text-xs\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if b.StorageType == "s3" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<span class=\"bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium border border-indigo-200\">S3 / R2</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<span class=\"bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200\">Local Disk</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</td><td class=\"px-4 py-3\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if b.Status == "completed" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<span class=\"bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded\">Completed</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else if b.Status == "pending" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<span class=\"bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded\">Pending</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<span class=\"bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded\">Failed</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</td><td class=\"px-4 py-3 text-xs text-gray-500\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var35 string
-				templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/download")).ResolveURL(ctx)
+				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(b.CreatedAt.Format("2006-01-02 15:04:05"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 264, Col: 98}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 268, Col: 96}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" class=\"text-blue-600 hover:text-blue-900 font-medium mr-3\">Download</a><form action=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</td><td class=\"px-4 py-3 text-right text-xs\"><a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var36 string
-				templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/delete")).ResolveURL(ctx)
+				templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/download")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 265, Col: 101}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 270, Col: 98}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" method=\"post\" class=\"inline\" onsubmit=\"return confirm('Hapus file backup ini?')\"><button type=\"submit\" class=\"text-red-600 hover:text-red-900 font-medium\">Delete</button></form></td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" class=\"text-blue-600 hover:text-blue-900 font-medium mr-3\">Download</a><form action=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var37 string
+				templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/delete")).ResolveURL(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 271, Col: 101}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" method=\"post\" class=\"inline\" onsubmit=\"return confirm('Hapus file backup ini?')\"><button type=\"submit\" class=\"text-red-600 hover:text-red-900 font-medium\">Delete</button></form></td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</tbody></table></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -691,7 +714,7 @@ func DatabaseCreatePage() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Database</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/databases\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Slug</label> <input type=\"text\" name=\"slug\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Engine</label> <select name=\"engine\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"postgres\">PostgreSQL</option> <option value=\"mysql\">MySQL</option> <option value=\"redis\">Redis</option> <option value=\"mongodb\">MongoDB</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Version</label> <input type=\"text\" name=\"version\" value=\"latest\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Username <span class=\"text-gray-400 font-normal\">(optional, default auto-set)</span></label> <input type=\"text\" name=\"username\" placeholder=\"e.g. postgres, root, default\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Password <span class=\"text-gray-400 font-normal\">(optional, auto-generated if empty)</span></label> <input type=\"password\" name=\"password\" placeholder=\"Leave empty for auto-generated secure password\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Database Name <span class=\"text-gray-400 font-normal\">(optional, defaults to slug)</span></label> <input type=\"text\" name=\"database_name\" placeholder=\"e.g. app_production\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Port</label> <input type=\"number\" name=\"port\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Database</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/databases\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Slug</label> <input type=\"text\" name=\"slug\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Engine</label> <select name=\"engine\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"postgres\">PostgreSQL</option> <option value=\"mysql\">MySQL</option> <option value=\"redis\">Redis</option> <option value=\"mongodb\">MongoDB</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Version</label> <input type=\"text\" name=\"version\" value=\"latest\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Username <span class=\"text-gray-400 font-normal\">(optional, default auto-set)</span></label> <input type=\"text\" name=\"username\" placeholder=\"e.g. postgres, root, default\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Password <span class=\"text-gray-400 font-normal\">(optional, auto-generated if empty)</span></label> <input type=\"password\" name=\"password\" placeholder=\"Leave empty for auto-generated secure password\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Database Name <span class=\"text-gray-400 font-normal\">(optional, defaults to slug)</span></label> <input type=\"text\" name=\"database_name\" placeholder=\"e.g. app_production\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Port</label> <input type=\"number\" name=\"port\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

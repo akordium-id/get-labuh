@@ -439,7 +439,7 @@ func (h *ApplicationsHandler) Clone(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("HX-Redirect", "/applications/" + clonedApp.ID)
+	w.Header().Set("HX-Redirect", "/applications/"+clonedApp.ID)
 	w.WriteHeader(http.StatusOK)
 }
 

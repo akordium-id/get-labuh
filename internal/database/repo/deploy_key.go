@@ -19,14 +19,14 @@ func NewDeployKeyRepo(db *sql.DB) *DeployKeyRepo {
 
 func (r *DeployKeyRepo) Create(input models.CreateDeployKeyInput) (*models.DeployKey, error) {
 	deployKey := &models.DeployKey{
-		ID:                uuid.New().String(),
-		ProjectID:         input.ProjectID,
-		Name:              input.Name,
-		PublicKey:         input.PublicKey,
+		ID:                  uuid.New().String(),
+		ProjectID:           input.ProjectID,
+		Name:                input.Name,
+		PublicKey:           input.PublicKey,
 		PrivateKeyEncrypted: input.PrivateKeyEncrypted,
-		Fingerprint:       input.Fingerprint,
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
+		Fingerprint:         input.Fingerprint,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
 	}
 
 	_, err := r.db.Exec(

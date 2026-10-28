@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/go-chi/chi/v5"
 )
 
 type contextKey string

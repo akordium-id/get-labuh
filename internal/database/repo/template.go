@@ -132,14 +132,14 @@ func (r *TemplateRepo) Delete(id string) error {
 
 func (r *TemplateRepo) CreateVariable(input models.CreateTemplateVariableInput) (*models.TemplateVariable, error) {
 	variable := &models.TemplateVariable{
-		ID:          uuid.New().String(),
-		TemplateID:  input.TemplateID,
-		Key:         input.Key,
-		DisplayName: input.DisplayName,
-		Description: input.Description,
-		Required:    input.Required,
+		ID:           uuid.New().String(),
+		TemplateID:   input.TemplateID,
+		Key:          input.Key,
+		DisplayName:  input.DisplayName,
+		Description:  input.Description,
+		Required:     input.Required,
 		DefaultValue: input.DefaultValue,
-		CreatedAt:   time.Now(),
+		CreatedAt:    time.Now(),
 	}
 
 	_, err := r.db.Exec(

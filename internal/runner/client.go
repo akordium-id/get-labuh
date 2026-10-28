@@ -23,14 +23,14 @@ type Config struct {
 }
 
 type Client struct {
-	config     Config
-	executor   *Executor
-	collector  *MetricsCollector
-	conn       *websocket.Conn
-	connMu     sync.Mutex
-	writeMu    sync.Mutex
-	isClosed   bool
-	closeChan  chan struct{}
+	config    Config
+	executor  *Executor
+	collector *MetricsCollector
+	conn      *websocket.Conn
+	connMu    sync.Mutex
+	writeMu   sync.Mutex
+	isClosed  bool
+	closeChan chan struct{}
 }
 
 func NewClient(cfg Config, executor *Executor, collector *MetricsCollector) *Client {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -407,4 +408,45 @@ func (c *Client) ExecStream(ctx context.Context, containerID string, cmd []strin
 	}
 
 	return nil
+}
+
+// ExecTTY membuat sesi exec interaktif dengan PTY untuk terminal web WebSocket
+func (c *Client) ExecTTY(ctx context.Context, containerID string, cmd []string, env []string) (string, types.HijackedResponse, error) {
+	if c.cli == nil {
+		return "", types.HijackedResponse{}, fmt.Errorf("docker client not initialized")
+	}
+
+	execConfig := container.ExecOptions{
+		Cmd:          cmd,
+		Env:          env,
+		Tty:          true,
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execCreateResp, err := c.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return "", types.HijackedResponse{}, fmt.Errorf("failed to create tty exec: %w", err)
+	}
+
+	attachResp, err := c.cli.ContainerExecAttach(ctx, execCreateResp.ID, container.ExecAttachOptions{
+		Tty: true,
+	})
+	if err != nil {
+		return "", types.HijackedResponse{}, fmt.Errorf("failed to attach tty exec: %w", err)
+	}
+
+	return execCreateResp.ID, attachResp, nil
+}
+
+// ResizeExec mengubah ukuran terminal PTY pada container exec
+func (c *Client) ResizeExec(ctx context.Context, execID string, height, width uint) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+	return c.cli.ContainerExecResize(ctx, execID, container.ResizeOptions{
+		Height: height,
+		Width:  width,
+	})
 }

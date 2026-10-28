@@ -4,8 +4,8 @@ import (
 	stdtesting "testing"
 
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/stretchr/testify/assert"
 	testhelpers "github.com/akordium-id/get-labuh/internal/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDeploymentRepo_Create(t *stdtesting.T) {

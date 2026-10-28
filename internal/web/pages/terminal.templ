@@ -1,0 +1,184 @@
+package pages
+
+templ ContainerTerminalPage(title, subtitle, wsURL, backURL string) {
+	<!DOCTYPE html>
+	<html lang="en" class="h-full bg-gray-950">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>Terminal - { title } | Labuh</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<!-- xterm.js CDN -->
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css"/>
+		<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+		<style>
+			.xterm .xterm-viewport {
+				overflow-y: auto !important;
+			}
+		</style>
+	</head>
+	<body class="h-full flex flex-col text-gray-200">
+		<!-- Top Bar -->
+		<header class="bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center justify-between">
+			<div class="flex items-center gap-3">
+				<a href={ templ.SafeURL(backURL) } class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-700 flex items-center gap-1">
+					&larr; Back
+				</a>
+				<div>
+					<h1 class="text-sm font-bold text-white flex items-center gap-2">
+						<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+						{ title }
+					</h1>
+					<p class="text-[11px] text-gray-400 font-mono">{ subtitle }</p>
+				</div>
+			</div>
+
+			<div class="flex items-center gap-2">
+				<select id="shell-select" class="bg-gray-800 text-gray-300 text-xs rounded border border-gray-700 px-2.5 py-1">
+					<option value="/bin/sh" selected>/bin/sh (Standard)</option>
+					<option value="/bin/bash">/bin/bash (If available)</option>
+				</select>
+				<button onclick="reconnectTerminal()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded font-medium">
+					Reconnect
+				</button>
+				<button onclick="term.clear()" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2.5 py-1 rounded border border-gray-700">
+					Clear
+				</button>
+			</div>
+		</header>
+
+		<!-- Terminal Viewport -->
+		<main class="flex-1 bg-black p-2 overflow-hidden relative">
+			<div id="terminal" data-ws-url={ wsURL } class="h-full w-full"></div>
+		</main>
+
+		<!-- Footer Status -->
+		<footer class="bg-gray-900 border-t border-gray-800 px-4 py-1.5 text-[11px] text-gray-400 flex justify-between items-center font-mono">
+			<div id="status-text">Status: Connecting...</div>
+			<div class="text-gray-500">Labuh Web Console &bull; xterm.js</div>
+		</footer>
+
+		<script>
+			let baseWsURL = '';
+			let socket = null;
+			let term = null;
+			let fitAddon = null;
+
+			function initTerminal() {
+				const termEl = document.getElementById('terminal');
+				baseWsURL = termEl.dataset.wsUrl;
+				term = new Terminal({
+					cursorBlink: true,
+					cursorStyle: 'block',
+					fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+					fontSize: 13,
+					theme: {
+						background: '#09090b',
+						foreground: '#f4f4f5',
+						cursor: '#38bdf8',
+						selectionBackground: '#1e3a8a',
+					}
+				});
+
+				fitAddon = new FitAddon.FitAddon();
+				term.loadAddon(fitAddon);
+				if (typeof WebLinksAddon !== 'undefined') {
+					term.loadAddon(new WebLinksAddon.WebLinksAddon());
+				}
+
+				term.open(document.getElementById('terminal'));
+				fitAddon.fit();
+
+				window.addEventListener('resize', () => {
+					fitAddon.fit();
+					sendResize();
+				});
+
+				connectSocket();
+			}
+
+			function getWebSocketURL() {
+				const shell = document.getElementById('shell-select').value;
+				const loc = window.location;
+				let wsProtocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+				return `${wsProtocol}//${loc.host}${baseWsURL}?shell=${encodeURIComponent(shell)}`;
+			}
+
+			function connectSocket() {
+				const statusEl = document.getElementById('status-text');
+				statusEl.textContent = 'Status: Connecting to container...';
+				statusEl.className = 'text-yellow-400';
+
+				if (socket) {
+					socket.close();
+				}
+
+				term.write('\r\n\x1b[33m[Labuh]\x1b[0m Connecting to container exec shell...\r\n');
+
+				const url = getWebSocketURL();
+				socket = new WebSocket(url);
+				socket.binaryType = 'arraybuffer';
+
+				socket.onopen = () => {
+					statusEl.textContent = 'Status: Connected (Online)';
+					statusEl.className = 'text-green-400';
+					term.write('\x1b[32m[Labuh]\x1b[0m Session opened. Ready.\r\n\r\n');
+					sendResize();
+					term.focus();
+				};
+
+				socket.onmessage = (event) => {
+					if (typeof event.data === 'string') {
+						term.write(event.data);
+					} else {
+						term.write(new Uint8Array(event.data));
+					}
+				};
+
+				socket.onclose = (event) => {
+					statusEl.textContent = 'Status: Disconnected';
+					statusEl.className = 'text-red-400';
+					term.write('\r\n\x1b[31m[Labuh]\x1b[0m Terminal session disconnected.\r\n');
+				};
+
+				socket.onerror = (err) => {
+					statusEl.textContent = 'Status: Connection Error';
+					statusEl.className = 'text-red-400';
+				};
+
+				term.onData((data) => {
+					if (socket && socket.readyState === WebSocket.OPEN) {
+						socket.send(data);
+					}
+				});
+			}
+
+			function sendResize() {
+				if (socket && socket.readyState === WebSocket.OPEN && fitAddon) {
+					const dims = fitAddon.proposeDimensions();
+					if (dims) {
+						socket.send(JSON.stringify({
+							type: 'resize',
+							cols: dims.cols,
+							rows: dims.rows
+						}));
+					}
+				}
+			}
+
+			function reconnectTerminal() {
+				term.clear();
+				connectSocket();
+			}
+
+			document.getElementById('shell-select').addEventListener('change', () => {
+				reconnectTerminal();
+			});
+
+			document.addEventListener('DOMContentLoaded', initTerminal);
+		</script>
+	</body>
+	</html>
+}

@@ -104,7 +104,7 @@ func TestWebhooksHandler_GitHub_Push_Success(t *stdtesting.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "queued", resp["status"])
@@ -155,7 +155,7 @@ func TestWebhooksHandler_GitHub_BranchMismatch_Ignored(t *stdtesting.T) {
 
 	// Status harus 200 OK tetapi diabaikan (ignored)
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "ignored", resp["status"])
@@ -194,7 +194,7 @@ func TestWebhooksHandler_GitLab_Push_Success(t *stdtesting.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "queued", resp["status"])
@@ -239,7 +239,7 @@ func TestWebhooksHandler_Deploy_AutoDetect(t *stdtesting.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "queued", resp["status"])
