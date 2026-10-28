@@ -153,7 +153,13 @@ func (c *Client) RunContainer(ctx context.Context, appID, envSlug, appSlug, imag
 	return c.RunContainerWithCustomName(ctx, appID, containerName, imageName, appPort, envVars)
 }
 
-func (c *Client) RunContainerWithCustomName(ctx context.Context, appID, containerName, imageName string, appPort int, envVars []struct{ Key, Value string }) (string, error) {
+type ContainerResourceLimits struct {
+	CPULimit          *float64 // e.g. 0.5 cores -> 500,000,000 NanoCPUs
+	MemoryLimit       *int64   // in MB -> converted to bytes
+	MemoryReservation *int64   // in MB -> converted to bytes
+}
+
+func (c *Client) RunContainerWithCustomName(ctx context.Context, appID, containerName, imageName string, appPort int, envVars []struct{ Key, Value string }, limits ...ContainerResourceLimits) (string, error) {
 	if c.cli == nil {
 		return "", fmt.Errorf("docker client not initialized")
 	}
@@ -177,6 +183,19 @@ func (c *Client) RunContainerWithCustomName(ctx context.Context, appID, containe
 		RestartPolicy: container.RestartPolicy{
 			Name: "unless-stopped",
 		},
+	}
+
+	if len(limits) > 0 {
+		l := limits[0]
+		if l.CPULimit != nil && *l.CPULimit > 0 {
+			hostCfg.NanoCPUs = int64(*l.CPULimit * 1e9)
+		}
+		if l.MemoryLimit != nil && *l.MemoryLimit > 0 {
+			hostCfg.Memory = *l.MemoryLimit * 1024 * 1024
+		}
+		if l.MemoryReservation != nil && *l.MemoryReservation > 0 {
+			hostCfg.MemoryReservation = *l.MemoryReservation * 1024 * 1024
+		}
 	}
 
 	if appPort > 0 {
@@ -206,6 +225,36 @@ func (c *Client) RunContainerWithCustomName(ctx context.Context, appID, containe
 	}
 
 	return containerID, nil
+}
+
+// UpdateContainerResources memperbarui resource limits container yang sedang berjalan tanpa restart
+func (c *Client) UpdateContainerResources(ctx context.Context, containerID string, limits ContainerResourceLimits) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+	if containerID == "" {
+		return fmt.Errorf("empty container ID")
+	}
+
+	updateCfg := container.UpdateConfig{}
+	if limits.CPULimit != nil && *limits.CPULimit > 0 {
+		updateCfg.NanoCPUs = int64(*limits.CPULimit * 1e9)
+	}
+	if limits.MemoryLimit != nil && *limits.MemoryLimit > 0 {
+		updateCfg.Memory = *limits.MemoryLimit * 1024 * 1024
+	}
+	if limits.MemoryReservation != nil && *limits.MemoryReservation > 0 {
+		updateCfg.MemoryReservation = *limits.MemoryReservation * 1024 * 1024
+	}
+
+	resp, err := c.cli.ContainerUpdate(ctx, containerID, updateCfg)
+	if err != nil {
+		return fmt.Errorf("failed to live update container resources: %w", err)
+	}
+	if len(resp.Warnings) > 0 {
+		slog.Warn("container resource update warnings", "warnings", resp.Warnings, "container_id", containerID)
+	}
+	return nil
 }
 
 func (c *Client) GetContainerIP(ctx context.Context, containerID, networkName string) (string, error) {
@@ -307,7 +356,7 @@ func (c *Client) WaitForHealth(ctx context.Context, containerID string, appPort 
 	}
 }
 
-func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imageName string, envVars map[string]string, ports []string, volumeName string) (string, error) {
+func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imageName string, envVars map[string]string, ports []string, volumeName string, limits ...ContainerResourceLimits) (string, error) {
 	if c.cli == nil {
 		return "", fmt.Errorf("docker client not initialized")
 	}
@@ -331,6 +380,19 @@ func (c *Client) RunDatabaseContainer(ctx context.Context, envSlug, dbSlug, imag
 		RestartPolicy: container.RestartPolicy{
 			Name: "unless-stopped",
 		},
+	}
+
+	if len(limits) > 0 {
+		l := limits[0]
+		if l.CPULimit != nil && *l.CPULimit > 0 {
+			hostCfg.NanoCPUs = int64(*l.CPULimit * 1e9)
+		}
+		if l.MemoryLimit != nil && *l.MemoryLimit > 0 {
+			hostCfg.Memory = *l.MemoryLimit * 1024 * 1024
+		}
+		if l.MemoryReservation != nil && *l.MemoryReservation > 0 {
+			hostCfg.MemoryReservation = *l.MemoryReservation * 1024 * 1024
+		}
 	}
 
 	// Engine-specific data directory inside the container

@@ -537,3 +537,66 @@ func (h *ApplicationsHandler) RegenerateWebhookSecret(w http.ResponseWriter, r *
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *ApplicationsHandler) UpdateResourceLimits(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	var cpuLimit *float64
+	if cpuStr := strings.TrimSpace(r.FormValue("cpu_limit")); cpuStr != "" {
+		if val, err := strconv.ParseFloat(cpuStr, 64); err == nil && val > 0 {
+			cpuLimit = &val
+		}
+	}
+
+	var memoryLimit *int64
+	if memStr := strings.TrimSpace(r.FormValue("memory_limit")); memStr != "" {
+		if val, err := strconv.ParseInt(memStr, 10, 64); err == nil && val > 0 {
+			memoryLimit = &val
+		}
+	}
+
+	var memoryReservation *int64
+	if resStr := strings.TrimSpace(r.FormValue("memory_reservation")); resStr != "" {
+		if val, err := strconv.ParseInt(resStr, 10, 64); err == nil && val > 0 {
+			memoryReservation = &val
+		}
+	}
+
+	if err := h.appRepo.UpdateResourceLimits(id, cpuLimit, memoryLimit, memoryReservation); err != nil {
+		http.Error(w, "Failed to update resource limits: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Live update ke Docker container jika sedang running
+	if h.dockerClient != nil && app.ContainerID != nil && *app.ContainerID != "" {
+		running, _ := h.dockerClient.IsContainerRunning(r.Context(), *app.ContainerID)
+		if running {
+			limits := docker.ContainerResourceLimits{
+				CPULimit:          cpuLimit,
+				MemoryLimit:       memoryLimit,
+				MemoryReservation: memoryReservation,
+			}
+			if err := h.dockerClient.UpdateContainerResources(r.Context(), *app.ContainerID, limits); err != nil {
+				slog.Warn("live update container resources failed", "error", err, "container_id", *app.ContainerID)
+			}
+		}
+	}
+
+	http.Redirect(w, r, "/applications/"+id, http.StatusFound)
+}
+

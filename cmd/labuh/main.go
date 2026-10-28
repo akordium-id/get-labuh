@@ -228,6 +228,7 @@ func main() {
 		r.Post("/applications/{id}/env-vars/{var_id}/delete", applicationsHandler.DeleteEnvVar)
 		r.Post("/applications/{id}/domain", applicationsHandler.SetDomain)
 		r.Post("/applications/{id}/domain/remove", applicationsHandler.RemoveDomain)
+		r.Post("/applications/{id}/resources", applicationsHandler.UpdateResourceLimits)
 		r.Post("/applications/{id}/webhook/regenerate", applicationsHandler.RegenerateWebhookSecret)
 		r.Get("/applications/{id}/stats", monitoringHandler.ApplicationStats)
 
@@ -252,6 +253,7 @@ func main() {
 		r.Post("/databases/{id}/start", databasesHandler.Start)
 		r.Post("/databases/{id}/stop", databasesHandler.Stop)
 		r.Post("/databases/{id}/delete", databasesHandler.Delete)
+		r.Post("/databases/{id}/resources", databasesHandler.UpdateResourceLimits)
 		r.Get("/databases/{id}/stats", monitoringHandler.DatabaseStats)
 		r.Get("/databases/{id}/terminal", terminalHandler.DatabaseTerminal)
 		r.Post("/databases/{id}/backups/config", databasesHandler.UpdateBackupConfig)

@@ -281,6 +281,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	var appPort = job.AppPort
 	var oldContainerID string
 
+	var resLimits docker.ContainerResourceLimits
 	if p.appRepo != nil {
 		app, err := p.appRepo.GetByID(job.ApplicationID)
 		if err == nil && app != nil {
@@ -293,6 +294,11 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			}
 			if app.ContainerID != nil {
 				oldContainerID = *app.ContainerID
+			}
+			resLimits = docker.ContainerResourceLimits{
+				CPULimit:          app.CPULimit,
+				MemoryLimit:       app.MemoryLimit,
+				MemoryReservation: app.MemoryReservation,
 			}
 		}
 	}
@@ -313,7 +319,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	candidateName := fmt.Sprintf("%s-%d", p.dockerClient.GenerateContainerName("prod", appSlug, job.ApplicationID), time.Now().Unix())
 	writeLog(activeLogWriter, fmt.Sprintf("Launching new candidate container (%s)...", candidateName))
 
-	candidateContainerID, err := p.dockerClient.RunContainerWithCustomName(ctx, job.ApplicationID, candidateName, imageName, appPort, dockerEnvVars)
+	candidateContainerID, err := p.dockerClient.RunContainerWithCustomName(ctx, job.ApplicationID, candidateName, imageName, appPort, dockerEnvVars, resLimits)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to run candidate container: %v", err)
 		writeLog(activeLogWriter, errMsg)

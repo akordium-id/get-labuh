@@ -21,34 +21,40 @@ const (
 )
 
 type DatabaseService struct {
-	ID               string
-	EnvironmentID    string
-	Name             string
-	Slug             string
-	Engine           DatabaseEngine
-	Version          string
-	Username         string
-	Password         string
-	DatabaseName     string
-	Port             int
-	ContainerID      *string
-	ContainerName    *string
-	Status           DatabaseStatus
-	ConnectionString *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                string
+	EnvironmentID     string
+	Name              string
+	Slug              string
+	Engine            DatabaseEngine
+	Version           string
+	Username          string
+	Password          string
+	DatabaseName      string
+	Port              int
+	ContainerID       *string
+	ContainerName     *string
+	Status            DatabaseStatus
+	ConnectionString  *string
+	CPULimit          *float64
+	MemoryLimit       *int64
+	MemoryReservation *int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type CreateDatabaseServiceInput struct {
-	EnvironmentID string
-	Name          string
-	Slug          string
-	Engine        DatabaseEngine
-	Version       string
-	Username      string
-	Password      string
-	DatabaseName  string
-	Port          int
+	EnvironmentID     string
+	Name              string
+	Slug              string
+	Engine            DatabaseEngine
+	Version           string
+	Username          string
+	Password          string
+	DatabaseName      string
+	Port              int
+	CPULimit          *float64
+	MemoryLimit       *int64
+	MemoryReservation *int64
 }
 
 type ContainerStats struct {

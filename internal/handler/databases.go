@@ -186,7 +186,13 @@ func (h *DatabasesHandler) Create(w http.ResponseWriter, r *http.Request) {
 			volumeName := fmt.Sprintf("labuh-vol-%s-%s", envSlug, db.Slug)
 			containerName := fmt.Sprintf("labuh-db-%s-%s", envSlug, db.Slug)
 
-			containerID, runErr := h.dockerClient.RunDatabaseContainer(ctx, envSlug, db.Slug, imageName, envVars, nil, volumeName)
+			limits := docker.ContainerResourceLimits{
+				CPULimit:          db.CPULimit,
+				MemoryLimit:       db.MemoryLimit,
+				MemoryReservation: db.MemoryReservation,
+			}
+
+			containerID, runErr := h.dockerClient.RunDatabaseContainer(ctx, envSlug, db.Slug, imageName, envVars, nil, volumeName, limits)
 			if runErr != nil {
 				slog.Error("failed to start database container", "error", runErr, "db_id", db.ID)
 				_ = h.dbRepo.UpdateStatus(db.ID, models.DatabaseStatusFailed)
@@ -507,6 +513,68 @@ func GenerateConnectionString(engine models.DatabaseEngine, username, password, 
 	default:
 		return fmt.Sprintf("%s://%s:%s@%s:%d/%s", engine, username, password, host, port, databaseName)
 	}
+}
+
+func (h *DatabasesHandler) UpdateResourceLimits(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	db, err := h.dbRepo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	var cpuLimit *float64
+	if cpuStr := strings.TrimSpace(r.FormValue("cpu_limit")); cpuStr != "" {
+		if val, err := strconv.ParseFloat(cpuStr, 64); err == nil && val > 0 {
+			cpuLimit = &val
+		}
+	}
+
+	var memoryLimit *int64
+	if memStr := strings.TrimSpace(r.FormValue("memory_limit")); memStr != "" {
+		if val, err := strconv.ParseInt(memStr, 10, 64); err == nil && val > 0 {
+			memoryLimit = &val
+		}
+	}
+
+	var memoryReservation *int64
+	if resStr := strings.TrimSpace(r.FormValue("memory_reservation")); resStr != "" {
+		if val, err := strconv.ParseInt(resStr, 10, 64); err == nil && val > 0 {
+			memoryReservation = &val
+		}
+	}
+
+	if err := h.dbRepo.UpdateResourceLimits(id, cpuLimit, memoryLimit, memoryReservation); err != nil {
+		http.Error(w, "Failed to update database resource limits: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Live update ke Docker database container jika sedang running
+	if h.dockerClient != nil && db.ContainerID != nil && *db.ContainerID != "" {
+		running, _ := h.dockerClient.IsContainerRunning(r.Context(), *db.ContainerID)
+		if running {
+			limits := docker.ContainerResourceLimits{
+				CPULimit:          cpuLimit,
+				MemoryLimit:       memoryLimit,
+				MemoryReservation: memoryReservation,
+			}
+			if err := h.dockerClient.UpdateContainerResources(r.Context(), *db.ContainerID, limits); err != nil {
+				slog.Warn("live update database container resources failed", "error", err, "container_id", *db.ContainerID)
+			}
+		}
+	}
+
+	http.Redirect(w, r, "/databases/"+id, http.StatusFound)
 }
 
 func generateSecurePassword(length int) string {

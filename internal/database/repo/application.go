@@ -66,13 +66,17 @@ func (r *ApplicationRepo) Create(input models.CreateApplicationInput) (*models.A
 	app.ContainerName = &containerName
 
 	_, err := r.db.Exec(
-		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, app.CreatedAt, app.UpdatedAt,
+		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, input.CPULimit, input.MemoryLimit, input.MemoryReservation, app.CreatedAt, app.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	app.CPULimit = input.CPULimit
+	app.MemoryLimit = input.MemoryLimit
+	app.MemoryReservation = input.MemoryReservation
 
 	return app, nil
 }
@@ -80,10 +84,10 @@ func (r *ApplicationRepo) Create(input models.CreateApplicationInput) (*models.A
 func (r *ApplicationRepo) GetByID(id string) (*models.Application, error) {
 	app := &models.Application{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE id = ?`,
 		id,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -94,10 +98,10 @@ func (r *ApplicationRepo) GetByID(id string) (*models.Application, error) {
 func (r *ApplicationRepo) GetBySlug(envID, slug string) (*models.Application, error) {
 	app := &models.Application{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE environment_id = ? AND slug = ?`,
 		envID, slug,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +112,10 @@ func (r *ApplicationRepo) GetBySlug(envID, slug string) (*models.Application, er
 func (r *ApplicationRepo) GetByContainerName(containerName string) (*models.Application, error) {
 	app := &models.Application{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE container_name = ?`,
 		containerName,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +125,7 @@ func (r *ApplicationRepo) GetByContainerName(containerName string) (*models.Appl
 
 func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Application, error) {
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC`,
 		envID,
 	)
@@ -133,7 +137,7 @@ func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Applicatio
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +159,7 @@ func (r *ApplicationRepo) GetByEnvironmentIDPaginated(envID string, limit, offse
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, limit, offset,
 	)
@@ -167,7 +171,7 @@ func (r *ApplicationRepo) GetByEnvironmentIDPaginated(envID string, limit, offse
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -190,7 +194,7 @@ func (r *ApplicationRepo) SearchPaginated(envID, search string, limit, offset in
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, searchPattern, searchPattern, limit, offset,
 	)
@@ -202,7 +206,7 @@ func (r *ApplicationRepo) SearchPaginated(envID, search string, limit, offset in
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -218,7 +222,7 @@ func (r *ApplicationRepo) SearchPaginated(envID, search string, limit, offset in
 
 func (r *ApplicationRepo) GetByStatus(status models.AppStatus) ([]*models.Application, error) {
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE status = ? ORDER BY created_at DESC`,
 		status,
 	)
@@ -230,7 +234,7 @@ func (r *ApplicationRepo) GetByStatus(status models.AppStatus) ([]*models.Applic
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -247,10 +251,10 @@ func (r *ApplicationRepo) GetByStatus(status models.AppStatus) ([]*models.Applic
 func (r *ApplicationRepo) GetByCustomDomain(domain string) (*models.Application, error) {
 	app := &models.Application{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM applications WHERE custom_domain = ?`,
 		domain,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -341,6 +345,14 @@ func (r *ApplicationRepo) UpdateWebhookSecret(id string, secret *string) error {
 	_, err := r.db.Exec(
 		`UPDATE applications SET webhook_secret = ?, updated_at = ? WHERE id = ?`,
 		secret, time.Now(), id,
+	)
+	return err
+}
+
+func (r *ApplicationRepo) UpdateResourceLimits(id string, cpuLimit *float64, memoryLimit, memoryReservation *int64) error {
+	_, err := r.db.Exec(
+		`UPDATE applications SET cpu_limit = ?, memory_limit = ?, memory_reservation = ?, updated_at = ? WHERE id = ?`,
+		cpuLimit, memoryLimit, memoryReservation, time.Now(), id,
 	)
 	return err
 }

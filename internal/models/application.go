@@ -23,39 +23,45 @@ const (
 )
 
 type Application struct {
-	ID             string
-	EnvironmentID  string
-	Name           string
-	Slug           string
-	SourceType     SourceType
-	RepositoryURL  *string
-	Branch         *string
-	BuildPath      *string
-	DockerfilePath *string
-	DockerImage    *string
-	CustomDomain   *string
-	AppPort        int
-	ContainerID    *string
-	ContainerName  *string
-	Status         AppStatus
-	WebhookSecret  *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                string
+	EnvironmentID     string
+	Name              string
+	Slug              string
+	SourceType        SourceType
+	RepositoryURL     *string
+	Branch            *string
+	BuildPath         *string
+	DockerfilePath    *string
+	DockerImage       *string
+	CustomDomain      *string
+	AppPort           int
+	ContainerID       *string
+	ContainerName     *string
+	Status            AppStatus
+	WebhookSecret     *string
+	CPULimit          *float64
+	MemoryLimit       *int64
+	MemoryReservation *int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type CreateApplicationInput struct {
-	EnvironmentID  string
-	Name           string
-	Slug           string
-	SourceType     SourceType
-	RepositoryURL  *string
-	Branch         *string
-	BuildPath      *string
-	DockerfilePath *string
-	DockerImage    *string
-	CustomDomain   *string
-	AppPort        int
-	WebhookSecret  *string
+	EnvironmentID     string
+	Name              string
+	Slug              string
+	SourceType        SourceType
+	RepositoryURL     *string
+	Branch            *string
+	BuildPath         *string
+	DockerfilePath    *string
+	DockerImage       *string
+	CustomDomain      *string
+	AppPort           int
+	WebhookSecret     *string
+	CPULimit          *float64
+	MemoryLimit       *int64
+	MemoryReservation *int64
 }
 
 type AppEnvVar struct {

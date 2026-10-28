@@ -53,13 +53,17 @@ func (r *DatabaseRepo) Create(input models.CreateDatabaseServiceInput) (*models.
 	}
 
 	_, err := r.db.Exec(
-		`INSERT INTO database_services (id, environment_id, name, slug, engine, version, username, password, database_name, port, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		dbService.ID, dbService.EnvironmentID, dbService.Name, dbService.Slug, dbService.Engine, dbService.Version, dbService.Username, dbService.Password, dbService.DatabaseName, dbService.Port, dbService.Status, dbService.CreatedAt, dbService.UpdatedAt,
+		`INSERT INTO database_services (id, environment_id, name, slug, engine, version, username, password, database_name, port, status, cpu_limit, memory_limit, memory_reservation, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		dbService.ID, dbService.EnvironmentID, dbService.Name, dbService.Slug, dbService.Engine, dbService.Version, dbService.Username, dbService.Password, dbService.DatabaseName, dbService.Port, dbService.Status, input.CPULimit, input.MemoryLimit, input.MemoryReservation, dbService.CreatedAt, dbService.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	dbService.CPULimit = input.CPULimit
+	dbService.MemoryLimit = input.MemoryLimit
+	dbService.MemoryReservation = input.MemoryReservation
 
 	return dbService, nil
 }
@@ -67,10 +71,10 @@ func (r *DatabaseRepo) Create(input models.CreateDatabaseServiceInput) (*models.
 func (r *DatabaseRepo) GetByID(id string) (*models.DatabaseService, error) {
 	dbService := &models.DatabaseService{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, created_at, updated_at
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM database_services WHERE id = ?`,
 		id,
-	).Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CreatedAt, &dbService.UpdatedAt)
+	).Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CPULimit, &dbService.MemoryLimit, &dbService.MemoryReservation, &dbService.CreatedAt, &dbService.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -81,10 +85,10 @@ func (r *DatabaseRepo) GetByID(id string) (*models.DatabaseService, error) {
 func (r *DatabaseRepo) GetBySlug(envID, slug string) (*models.DatabaseService, error) {
 	dbService := &models.DatabaseService{}
 	err := r.db.QueryRow(
-		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, created_at, updated_at
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM database_services WHERE environment_id = ? AND slug = ?`,
 		envID, slug,
-	).Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CreatedAt, &dbService.UpdatedAt)
+	).Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CPULimit, &dbService.MemoryLimit, &dbService.MemoryReservation, &dbService.CreatedAt, &dbService.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +98,7 @@ func (r *DatabaseRepo) GetBySlug(envID, slug string) (*models.DatabaseService, e
 
 func (r *DatabaseRepo) GetByEnvironmentID(envID string) ([]*models.DatabaseService, error) {
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, created_at, updated_at
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM database_services WHERE environment_id = ? ORDER BY created_at DESC`,
 		envID,
 	)
@@ -106,7 +110,7 @@ func (r *DatabaseRepo) GetByEnvironmentID(envID string) ([]*models.DatabaseServi
 	var dbServices []*models.DatabaseService
 	for rows.Next() {
 		dbService := &models.DatabaseService{}
-		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CreatedAt, &dbService.UpdatedAt)
+		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CPULimit, &dbService.MemoryLimit, &dbService.MemoryReservation, &dbService.CreatedAt, &dbService.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +132,7 @@ func (r *DatabaseRepo) GetByEnvironmentIDPaginated(envID string, limit, offset i
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, created_at, updated_at
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM database_services WHERE environment_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, limit, offset,
 	)
@@ -140,7 +144,7 @@ func (r *DatabaseRepo) GetByEnvironmentIDPaginated(envID string, limit, offset i
 	var dbServices []*models.DatabaseService
 	for rows.Next() {
 		dbService := &models.DatabaseService{}
-		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CreatedAt, &dbService.UpdatedAt)
+		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CPULimit, &dbService.MemoryLimit, &dbService.MemoryReservation, &dbService.CreatedAt, &dbService.UpdatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -163,7 +167,7 @@ func (r *DatabaseRepo) SearchPaginated(envID, search string, limit, offset int) 
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, created_at, updated_at
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
 		 FROM database_services WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, searchPattern, searchPattern, limit, offset,
 	)
@@ -175,7 +179,7 @@ func (r *DatabaseRepo) SearchPaginated(envID, search string, limit, offset int) 
 	var dbServices []*models.DatabaseService
 	for rows.Next() {
 		dbService := &models.DatabaseService{}
-		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CreatedAt, &dbService.UpdatedAt)
+		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CPULimit, &dbService.MemoryLimit, &dbService.MemoryReservation, &dbService.CreatedAt, &dbService.UpdatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -217,6 +221,14 @@ func (r *DatabaseRepo) UpdateConnectionString(id, connectionString string) error
 	_, err := r.db.Exec(
 		`UPDATE database_services SET connection_string = ?, updated_at = ? WHERE id = ?`,
 		connectionString, time.Now(), id,
+	)
+	return err
+}
+
+func (r *DatabaseRepo) UpdateResourceLimits(id string, cpuLimit *float64, memoryLimit, memoryReservation *int64) error {
+	_, err := r.db.Exec(
+		`UPDATE database_services SET cpu_limit = ?, memory_limit = ?, memory_reservation = ?, updated_at = ? WHERE id = ?`,
+		cpuLimit, memoryLimit, memoryReservation, time.Now(), id,
 	)
 	return err
 }
