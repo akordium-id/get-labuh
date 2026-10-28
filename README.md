@@ -1,6 +1,7 @@
 # get-labuh
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/akordium-id/get-labuh
+)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.24+-blue.svg)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
