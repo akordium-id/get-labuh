@@ -3,11 +3,13 @@ package models
 type DeployStep string
 
 const (
-	DeployStepClone   DeployStep = "clone"
-	DeployStepBuild   DeployStep = "build"
-	DeployStepPush    DeployStep = "push"
-	DeployStepDeploy  DeployStep = "deploy"
-	DeployStepCleanup DeployStep = "cleanup"
+	DeployStepClone       DeployStep = "clone"
+	DeployStepBuild       DeployStep = "build"
+	DeployStepPush        DeployStep = "push"
+	DeployStepDeploy      DeployStep = "deploy"
+	DeployStepHealthcheck DeployStep = "healthcheck"
+	DeployStepCleanup     DeployStep = "cleanup"
+	DeployStepDone        DeployStep = "done"
 )
 
 type DeploymentJob struct {

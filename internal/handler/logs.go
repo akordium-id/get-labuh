@@ -75,6 +75,7 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 	defer ticker.Stop()
 
 	var lastOffset int64 = 0
+	var lastStep string = ""
 	for {
 		select {
 		case <-r.Context().Done():
@@ -98,8 +99,36 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 
 			latestDeploy, dErr := h.deployRepo.GetByID(id)
 			if dErr == nil && latestDeploy != nil {
-				if latestDeploy.Status == models.DeployStatusSuccess || latestDeploy.Status == models.DeployStatusFailed {
-					sendEvent("done", fmt.Sprintf(`{"status": "%s"}`, latestDeploy.Status))
+				currentStep := ""
+				if latestDeploy.Step != nil {
+					currentStep = *latestDeploy.Step
+				}
+				if currentStep != "" && currentStep != lastStep {
+					lastStep = currentStep
+					sendEvent("step-changed", fmt.Sprintf(`{"step": "%s", "status": "%s"}`, currentStep, latestDeploy.Status))
+				}
+
+				if latestDeploy.Status == models.DeployStatusSuccess || latestDeploy.Status == models.DeployStatusFailed || latestDeploy.Status == models.DeployStatusCancelled {
+					// Final log drain
+					if file, err := os.Open(logPath); err == nil {
+						stat, sErr := file.Stat()
+						if sErr == nil && stat.Size() > lastOffset {
+							_, _ = file.Seek(lastOffset, io.SeekStart)
+							scanner := bufio.NewScanner(file)
+							for scanner.Scan() {
+								line := scanner.Text()
+								if line != "" {
+									sendEvent("log-message", fmt.Sprintf(`{"output": "%s", "timestamp": "%s"}`, escapeJSON(line), time.Now().Format(time.RFC3339)))
+								}
+							}
+						}
+						_ = file.Close()
+					}
+					errMsg := ""
+					if latestDeploy.ErrorMessage != nil {
+						errMsg = *latestDeploy.ErrorMessage
+					}
+					sendEvent("done", fmt.Sprintf(`{"status": "%s", "error": "%s"}`, latestDeploy.Status, escapeJSON(errMsg)))
 					return
 				}
 			}

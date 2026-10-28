@@ -88,7 +88,26 @@ Labuh menyediakan provisioning database terisolasi siap pakai dalam bridge netwo
 
 ---
 
-## 5. Persyaratan Host
+## 5. Real-Time Deployment Log Streaming & Interactive Terminal
+
+Antarmuka deployment Labuh menghadirkan pengalaman live streaming log modern setara Coolify / Railway via Server-Sent Events (SSE) dan Alpine.js:
+
+### Arsitektur Aliran Log:
+1. **Endpoint SSE (`/deployments/{id}/logs/stream`)**:
+   - Membaca file log output secara inkremental via byte offset cursor tanpa re-read dari awal.
+   - Mengirim event terstruktur:
+     - `log-message`: baris log baru beserta timestamp.
+     - `step-changed`: notifikasi transisi tahap build (`clone` → `build` → `deploy` → `healthcheck` → `done`).
+     - `done`: status akhir deployment (`success` / `failed`) dan error trace.
+2. **Interactive Terminal UI ([internal/web/pages/deployments/detail.templ](file:///home/orin/code/archive/get-labuh/internal/web/pages/deployments/detail.templ))**:
+   - **Live Progress Stepper**: Indikator visual 5 tahap (Clone, Build, Deploy, Healthcheck, Traffic Live) dengan animasi pulsa/spinner saat aktif dan centang hijau saat selesai.
+   - **Terminal Console**: Dark mode console dengan syntax highlight otomatis (baris error/merah, sukses/hijau, progress/biru, warning/kuning).
+   - **Controls**: Auto-scroll toggle, Copy all logs, Clear log window, dan Reconnect stream.
+   - **Graceful Fallback**: Jika deployment sudah selesai saat halaman dibuka, logs otomatis di-fetch dari static endpoint (`/deployments/{id}/logs`).
+
+---
+
+## 6. Persyaratan Host
 
 - **Docker Engine**: Docker CE versi 24+ dengan user Labuh tergabung dalam group `docker`.
 - **Git**: Binary `git` terinstall di sistem host.

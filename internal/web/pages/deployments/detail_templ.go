@@ -9,28 +9,38 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"time"
+	"fmt"
 
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web"
-	"github.com/akordium-id/get-labuh/internal/web/components"
 )
 
-func statusColor(status models.DeployStatus) string {
-	switch status {
-	case models.DeployStatusSuccess:
-		return "bg-green-100 text-green-800"
-	case models.DeployStatusFailed:
-		return "bg-red-100 text-red-800"
-	case models.DeployStatusCloning, models.DeployStatusBuilding, models.DeployStatusDeploying:
-		return "bg-blue-100 text-blue-800"
-	case models.DeployStatusQueued:
-		return "bg-gray-100 text-gray-800"
-	case models.DeployStatusCancelled:
-		return "bg-yellow-100 text-yellow-800"
-	default:
-		return "bg-gray-100 text-gray-800"
+func getDeploymentData(deployment interface{}) (id, status, currentStep, errMsg, startedAtStr string, isDone bool) {
+	if d, ok := deployment.(*models.Deployment); ok && d != nil {
+		id = d.ID
+		status = string(d.Status)
+		if d.Step != nil {
+			currentStep = *d.Step
+		}
+		if d.ErrorMessage != nil {
+			errMsg = *d.ErrorMessage
+		}
+		if d.StartedAt != nil {
+			startedAtStr = web.FormatDateTime(*d.StartedAt)
+		} else {
+			startedAtStr = web.FormatDateTime(d.CreatedAt)
+		}
+		isDone = (d.Status == models.DeployStatusSuccess || d.Status == models.DeployStatusFailed || d.Status == models.DeployStatusCancelled)
+		return
 	}
+	return "", "queued", "init", "", "-", false
+}
+
+func getApplicationName(app interface{}) string {
+	if a, ok := app.(*models.Application); ok && a != nil {
+		return a.Name
+	}
+	return "Application"
 }
 
 func DeploymentDetailPage(deployment interface{}, app interface{}) templ.Component {
@@ -54,199 +64,194 @@ func DeploymentDetailPage(deployment interface{}, app interface{}) templ.Compone
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">Deployment Detail</h1>")
+		deployID, status, currentStep, errMsg, startedAtStr, isDone := getDeploymentData(deployment)
+		appName := getApplicationName(app)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if d, ok := deployment.(*models.Deployment); ok && d.ErrorMessage != nil && *d.ErrorMessage != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"bg-red-50 border border-red-200 rounded-md p-4 mb-6\"><p class=\"text-red-800 font-medium\">Deployment Failed</p><p class=\"text-red-600 text-sm mt-1\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
+		var templ_7745c5c3_Var2 string
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf(`{
+			deployId: '%s',
+			status: '%s',
+			currentStep: '%s',
+			isDone: %t,
+			errorMessage: '%s',
+			logs: [],
+			autoScroll: true,
+			eventSource: null,
+
+			init() {
+				if (!this.isDone) {
+					this.connectSSE();
+				} else {
+					this.fetchStaticLogs();
+				}
+			},
+
+			connectSSE() {
+				if (this.eventSource) {
+					this.eventSource.close();
+				}
+				this.eventSource = new EventSource('/deployments/' + this.deployId + '/logs/stream');
+
+				this.eventSource.addEventListener('log-message', (e) => {
+					try {
+						const data = JSON.parse(e.data);
+						this.logs.push(data.output);
+						this.scrollToBottom();
+					} catch(err) {
+						this.logs.push(e.data);
+						this.scrollToBottom();
+					}
+				});
+
+				this.eventSource.addEventListener('step-changed', (e) => {
+					try {
+						const data = JSON.parse(e.data);
+						if (data.step) this.currentStep = data.step;
+						if (data.status) this.status = data.status;
+					} catch(err) {}
+				});
+
+				this.eventSource.addEventListener('done', (e) => {
+					try {
+						const data = JSON.parse(e.data);
+						if (data.status) this.status = data.status;
+						if (data.error) this.errorMessage = data.error;
+					} catch(err) {}
+					this.isDone = true;
+					this.eventSource.close();
+				});
+
+				this.eventSource.onerror = (err) => {
+					console.warn('SSE disconnected or completed');
+				};
+			},
+
+			fetchStaticLogs() {
+				fetch('/deployments/' + this.deployId + '/logs')
+					.then(res => res.text())
+					.then(html => {
+						const parser = new DOMParser();
+						const doc = parser.parseFromString(html, 'text/html');
+						const pre = doc.querySelector('pre');
+						if (pre && pre.textContent.trim()) {
+							this.logs = pre.textContent.trim().split('\\n');
+							this.scrollToBottom();
+						}
+					})
+					.catch(() => {});
+			},
+
+			scrollToBottom() {
+				if (!this.autoScroll) return;
+				this.$nextTick(() => {
+					const el = this.$refs.logContainer;
+					if (el) el.scrollTop = el.scrollHeight;
+				});
+			},
+
+			clearLogs() {
+				this.logs = [];
+			},
+
+			copyLogs() {
+				navigator.clipboard.writeText(this.logs.join('\\n'));
+				alert('Logs copied to clipboard!');
+			},
+
+			isStepCompleted(step) {
+				const steps = ['clone', 'build', 'deploy', 'healthcheck', 'done'];
+				const currIdx = steps.indexOf(this.currentStep);
+				const stepIdx = steps.indexOf(step);
+				if (this.status === 'success') return true;
+				return stepIdx < currIdx;
+			},
+
+			isStepActive(step) {
+				if (this.status === 'success' || this.status === 'failed') return false;
+				return this.currentStep === step;
 			}
-			var templ_7745c5c3_Var2 string
-			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(*d.ErrorMessage)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 35, Col: 58}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</p></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		}`, deployID, status, currentStep, isDone, errMsg))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 146, Col: 52}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"bg-white rounded-lg shadow border border-gray-200 p-6 mb-6\"><div class=\"flex items-center justify-between mb-4\"><div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if d, ok := deployment.(*models.Deployment); ok {
-			templ_7745c5c3_Err = components.StatusBadge(string(d.Status)).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"text-sm text-gray-500\">Started: ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"space-y-6\"><!-- Breadcrumbs & Header --><div class=\"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4\"><div><nav class=\"flex items-center space-x-2 text-sm text-gray-500 mb-1\"><a href=\"/projects\" class=\"hover:text-gray-700\">Projects</a> <span>/</span> <span class=\"text-gray-700 font-medium\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(web.FormatDateTime(time.Now()))
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(appName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 47, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 155, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</span> <span>/</span> <span class=\"text-gray-900 font-semibold font-mono text-xs\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if d, ok := deployment.(*models.Deployment); ok && d.Step != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"mt-4\"><h3 class=\"text-sm font-medium text-gray-700 mb-2\">Deployment Steps</h3><div class=\"flex items-center space-x-2\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var4 = []any{"px-3 py-1 rounded-full text-xs " + stepColor("clone", *d.Step)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var4).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\">Clone</div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var6 = []any{"px-3 py-1 rounded-full text-xs " + stepColor("build", *d.Step)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var6).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\">Build</div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var8 = []any{"px-3 py-1 rounded-full text-xs " + stepColor("push", *d.Step)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var8...)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var8).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\">Push</div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var10 = []any{"px-3 py-1 rounded-full text-xs " + stepColor("deploy", *d.Step)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var10...)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var11 string
-			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var10).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">Deploy</div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var12 = []any{"px-3 py-1 rounded-full text-xs " + stepColor("cleanup", *d.Step)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var12...)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var13 string
-			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var12).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\">Cleanup</div></div></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(deployID)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 157, Col: 75}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><p class=\"text-gray-600\">Deployment logs will appear here.</p></div></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</span></nav><h1 class=\"text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3\">Deployment Details <span class=\"text-xs px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider transition-colors duration-200\" :class=\"{\n\t\t\t\t\t\t\t'bg-emerald-100 text-emerald-800 border border-emerald-300': status === 'success',\n\t\t\t\t\t\t\t'bg-rose-100 text-rose-800 border border-rose-300': status === 'failed',\n\t\t\t\t\t\t\t'bg-sky-100 text-sky-800 border border-sky-300 animate-pulse': !isDone,\n\t\t\t\t\t\t\t'bg-gray-100 text-gray-700 border border-gray-300': isDone && status !== 'success' && status !== 'failed'\n\t\t\t\t\t\t}\" x-text=\"status\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(status)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 171, Col: 14}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</span></h1><p class=\"text-xs text-gray-500 mt-1\">Started: ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(startedAtStr)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 174, Col: 65}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</p></div><!-- Quick Actions --><div class=\"flex items-center gap-2\"><form action=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 templ.SafeURL
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/deployments/%s/rollback", deployID)))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 179, Col: 83}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" method=\"post\"><button type=\"submit\" class=\"inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-white border border-gray-300 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500\" title=\"Rollback to previous successful deployment\"><svg class=\"w-3.5 h-3.5 text-gray-500\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6\"></path></svg> Rollback</button></form><button @click=\"connectSSE()\" type=\"button\" class=\"inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-white border border-gray-300 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500\"><svg class=\"w-3.5 h-3.5 text-gray-500\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15\"></path></svg> Reconnect Logs</button></div></div><!-- Error Banner if any --><template x-if=\"errorMessage\"><div class=\"bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-lg shadow-sm\"><div class=\"flex items-start\"><svg class=\"h-5 w-5 text-rose-500 mt-0.5 mr-3 flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\"></path></svg><div><h3 class=\"text-sm font-semibold text-rose-800\">Deployment Failed</h3><p class=\"text-xs text-rose-700 mt-1 font-mono break-all\" x-text=\"errorMessage\"></p></div></div></div></template><!-- Pipeline Step Progression Stepper --><div class=\"bg-white rounded-xl shadow-sm border border-gray-200 p-5\"><h3 class=\"text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4\">Pipeline Execution Stages</h3><div class=\"grid grid-cols-2 sm:grid-cols-5 gap-3\"><!-- Step 1: Clone --><div class=\"flex items-center gap-3 p-3 rounded-lg border transition-all duration-200\" :class=\"{\n\t\t\t\t\t\t'border-emerald-300 bg-emerald-50/50': isStepCompleted('clone'),\n\t\t\t\t\t\t'border-blue-500 bg-blue-50 ring-2 ring-blue-400/20': isStepActive('clone'),\n\t\t\t\t\t\t'border-gray-200 bg-gray-50/50 text-gray-400': !isStepCompleted('clone') && !isStepActive('clone')\n\t\t\t\t\t}\"><div class=\"w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold\" :class=\"{\n\t\t\t\t\t\t\t'bg-emerald-600 text-white': isStepCompleted('clone'),\n\t\t\t\t\t\t\t'bg-blue-600 text-white animate-spin': isStepActive('clone'),\n\t\t\t\t\t\t\t'bg-gray-200 text-gray-500': !isStepCompleted('clone') && !isStepActive('clone')\n\t\t\t\t\t\t}\"><template x-if=\"isStepCompleted('clone')\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.5\" d=\"M5 13l4 4L19 7\"></path></svg></template><template x-if=\"isStepActive('clone')\"><span>⚡</span></template><template x-if=\"!isStepCompleted('clone') && !isStepActive('clone')\"><span>1</span></template></div><div><p class=\"text-xs font-bold text-gray-800\">1. Clone</p><p class=\"text-[10px] text-gray-500\">Source fetch</p></div></div><!-- Step 2: Build --><div class=\"flex items-center gap-3 p-3 rounded-lg border transition-all duration-200\" :class=\"{\n\t\t\t\t\t\t'border-emerald-300 bg-emerald-50/50': isStepCompleted('build'),\n\t\t\t\t\t\t'border-blue-500 bg-blue-50 ring-2 ring-blue-400/20': isStepActive('build'),\n\t\t\t\t\t\t'border-gray-200 bg-gray-50/50 text-gray-400': !isStepCompleted('build') && !isStepActive('build')\n\t\t\t\t\t}\"><div class=\"w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold\" :class=\"{\n\t\t\t\t\t\t\t'bg-emerald-600 text-white': isStepCompleted('build'),\n\t\t\t\t\t\t\t'bg-blue-600 text-white animate-spin': isStepActive('build'),\n\t\t\t\t\t\t\t'bg-gray-200 text-gray-500': !isStepCompleted('build') && !isStepActive('build')\n\t\t\t\t\t\t}\"><template x-if=\"isStepCompleted('build')\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.5\" d=\"M5 13l4 4L19 7\"></path></svg></template><template x-if=\"isStepActive('build')\"><span>⚡</span></template><template x-if=\"!isStepCompleted('build') && !isStepActive('build')\"><span>2</span></template></div><div><p class=\"text-xs font-bold text-gray-800\">2. Build</p><p class=\"text-[10px] text-gray-500\">Image compiler</p></div></div><!-- Step 3: Deploy --><div class=\"flex items-center gap-3 p-3 rounded-lg border transition-all duration-200\" :class=\"{\n\t\t\t\t\t\t'border-emerald-300 bg-emerald-50/50': isStepCompleted('deploy'),\n\t\t\t\t\t\t'border-blue-500 bg-blue-50 ring-2 ring-blue-400/20': isStepActive('deploy'),\n\t\t\t\t\t\t'border-gray-200 bg-gray-50/50 text-gray-400': !isStepCompleted('deploy') && !isStepActive('deploy')\n\t\t\t\t\t}\"><div class=\"w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold\" :class=\"{\n\t\t\t\t\t\t\t'bg-emerald-600 text-white': isStepCompleted('deploy'),\n\t\t\t\t\t\t\t'bg-blue-600 text-white animate-spin': isStepActive('deploy'),\n\t\t\t\t\t\t\t'bg-gray-200 text-gray-500': !isStepCompleted('deploy') && !isStepActive('deploy')\n\t\t\t\t\t\t}\"><template x-if=\"isStepCompleted('deploy')\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.5\" d=\"M5 13l4 4L19 7\"></path></svg></template><template x-if=\"isStepActive('deploy')\"><span>⚡</span></template><template x-if=\"!isStepCompleted('deploy') && !isStepActive('deploy')\"><span>3</span></template></div><div><p class=\"text-xs font-bold text-gray-800\">3. Deploy</p><p class=\"text-[10px] text-gray-500\">Container spawn</p></div></div><!-- Step 4: Healthcheck --><div class=\"flex items-center gap-3 p-3 rounded-lg border transition-all duration-200\" :class=\"{\n\t\t\t\t\t\t'border-emerald-300 bg-emerald-50/50': isStepCompleted('healthcheck'),\n\t\t\t\t\t\t'border-blue-500 bg-blue-50 ring-2 ring-blue-400/20': isStepActive('healthcheck'),\n\t\t\t\t\t\t'border-gray-200 bg-gray-50/50 text-gray-400': !isStepCompleted('healthcheck') && !isStepActive('healthcheck')\n\t\t\t\t\t}\"><div class=\"w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold\" :class=\"{\n\t\t\t\t\t\t\t'bg-emerald-600 text-white': isStepCompleted('healthcheck'),\n\t\t\t\t\t\t\t'bg-blue-600 text-white animate-spin': isStepActive('healthcheck'),\n\t\t\t\t\t\t\t'bg-gray-200 text-gray-500': !isStepCompleted('healthcheck') && !isStepActive('healthcheck')\n\t\t\t\t\t\t}\"><template x-if=\"isStepCompleted('healthcheck')\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.5\" d=\"M5 13l4 4L19 7\"></path></svg></template><template x-if=\"isStepActive('healthcheck')\"><span>⚡</span></template><template x-if=\"!isStepCompleted('healthcheck') && !isStepActive('healthcheck')\"><span>4</span></template></div><div><p class=\"text-xs font-bold text-gray-800\">4. Healthcheck</p><p class=\"text-[10px] text-gray-500\">Zero-downtime gate</p></div></div><!-- Step 5: Done --><div class=\"flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 col-span-2 sm:col-span-1\" :class=\"{\n\t\t\t\t\t\t'border-emerald-300 bg-emerald-50/50': status === 'success',\n\t\t\t\t\t\t'border-rose-300 bg-rose-50/50': status === 'failed',\n\t\t\t\t\t\t'border-gray-200 bg-gray-50/50 text-gray-400': status !== 'success' && status !== 'failed'\n\t\t\t\t\t}\"><div class=\"w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold\" :class=\"{\n\t\t\t\t\t\t\t'bg-emerald-600 text-white': status === 'success',\n\t\t\t\t\t\t\t'bg-rose-600 text-white': status === 'failed',\n\t\t\t\t\t\t\t'bg-gray-200 text-gray-500': status !== 'success' && status !== 'failed'\n\t\t\t\t\t\t}\"><template x-if=\"status === 'success'\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.5\" d=\"M5 13l4 4L19 7\"></path></svg></template><template x-if=\"status === 'failed'\"><span>✕</span></template><template x-if=\"status !== 'success' && status !== 'failed'\"><span>5</span></template></div><div><p class=\"text-xs font-bold text-gray-800\">5. Traffic Live</p><p class=\"text-[10px] text-gray-500\">Caddy routed</p></div></div></div></div><!-- Interactive Terminal Container --><div class=\"bg-gray-950 rounded-xl shadow-xl border border-gray-800 overflow-hidden flex flex-col\"><!-- Terminal Header Toolbar --><div class=\"bg-gray-900/90 border-b border-gray-800 px-4 py-3 flex items-center justify-between text-xs\"><div class=\"flex items-center space-x-2\"><div class=\"w-3 h-3 rounded-full bg-red-500/80\"></div><div class=\"w-3 h-3 rounded-full bg-yellow-500/80\"></div><div class=\"w-3 h-3 rounded-full bg-green-500/80\"></div><span class=\"ml-2 font-mono text-gray-400 select-none\">build-terminal</span><template x-if=\"!isDone\"><span class=\"inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/60 ml-2\"><span class=\"w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping\"></span> LIVE STREAM</span></template></div><div class=\"flex items-center space-x-3 text-gray-400\"><!-- Auto-scroll checkbox --><label class=\"flex items-center gap-1.5 cursor-pointer hover:text-gray-200 select-none\"><input type=\"checkbox\" x-model=\"autoScroll\" class=\"rounded bg-gray-800 border-gray-700 text-blue-500 focus:ring-0 w-3.5 h-3.5\"> <span>Auto-scroll</span></label> <button @click=\"copyLogs()\" class=\"hover:text-gray-200 transition\" title=\"Copy all logs\">Copy</button> <button @click=\"clearLogs()\" class=\"hover:text-gray-200 transition\" title=\"Clear console\">Clear</button></div></div><!-- Terminal Logs Output Area --><div x-ref=\"logContainer\" class=\"p-4 font-mono text-xs text-gray-200 overflow-y-auto max-h-[550px] min-h-[300px] space-y-1 select-text scrollbar-thin scrollbar-thumb-gray-800\"><template x-if=\"logs.length === 0\"><div class=\"text-gray-500 italic py-8 text-center flex flex-col items-center justify-center gap-2\"><svg class=\"w-6 h-6 animate-spin text-gray-600\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle> <path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v8H4z\"></path></svg> Waiting for logs to stream from deployment worker...</div></template><template x-for=\"(line, idx) in logs\" :key=\"idx\"><div class=\"leading-relaxed hover:bg-gray-900/50 px-1 rounded transition-colors break-words\"><span class=\"text-gray-600 select-none mr-2\" x-text=\"idx + 1\"></span> <span :class=\"{\n\t\t\t\t\t\t\t\t'text-rose-400 font-semibold': line.includes('failed') || line.includes('Error') || line.includes('error'),\n\t\t\t\t\t\t\t\t'text-emerald-400 font-semibold': line.includes('completed successfully') || line.includes('healthy') || line.includes('Started successfully'),\n\t\t\t\t\t\t\t\t'text-sky-400': line.includes('Cloning') || line.includes('Building') || line.includes('Launching'),\n\t\t\t\t\t\t\t\t'text-amber-300': line.includes('Warning') || line.includes('Healthcheck'),\n\t\t\t\t\t\t\t\t'text-gray-300': !line.includes('error') && !line.includes('failed') && !line.includes('completed')\n\t\t\t\t\t\t\t}\" x-text=\"line\"></span></div></template></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		return nil
 	})
-}
-
-func stepColor(step, currentStep string) string {
-	steps := []string{"clone", "build", "push", "deploy", "cleanup"}
-	currentIdx := -1
-	stepIdx := -1
-	for i, s := range steps {
-		if s == currentStep {
-			currentIdx = i
-		}
-		if s == step {
-			stepIdx = i
-		}
-	}
-	if stepIdx < currentIdx {
-		return "bg-green-100 text-green-800"
-	}
-	if stepIdx == currentIdx {
-		return "bg-blue-100 text-blue-800"
-	}
-	return "bg-gray-100 text-gray-800"
 }
 
 func DeploymentLogsPage(deployment interface{}, logs []string) templ.Component {
@@ -265,12 +270,48 @@ func DeploymentLogsPage(deployment interface{}, logs []string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var14 == nil {
-			templ_7745c5c3_Var14 = templ.NopComponent
+		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var8 == nil {
+			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">Deployment Logs</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><pre class=\"bg-gray-900 text-green-400 p-4 rounded-md overflow-auto max-h-96 text-sm font-mono\">Log output will appear here...</pre></div></div>")
+		deployID, _, _, _, _, _ := getDeploymentData(deployment)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div><div class=\"flex justify-between items-center mb-6\"><h1 class=\"text-2xl font-bold text-gray-900\">Raw Deployment Logs</h1><a href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var9 templ.SafeURL
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/deployments/%s", deployID)))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 463, Col: 68}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"text-sm font-medium text-blue-600 hover:text-blue-800\">&larr; Back to Live Deployment</a></div><div class=\"bg-gray-950 rounded-lg shadow border border-gray-800 p-4\"><pre class=\"text-gray-300 overflow-auto max-h-[600px] text-xs font-mono whitespace-pre-wrap\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if len(logs) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "No log entries recorded.")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			for _, l := range logs {
+				var templ_7745c5c3_Var10 string
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(l + "\n")
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/deployments/detail.templ`, Line: 473, Col: 16}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</pre></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

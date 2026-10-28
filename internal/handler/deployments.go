@@ -3,6 +3,8 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -110,8 +112,21 @@ func (h *DeploymentsHandler) Rollback(w http.ResponseWriter, r *http.Request) {
 }
 
 func readLogFile(path string) ([]string, error) {
-	_ = path
-	return nil, nil
+	if path == "" {
+		return nil, nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	rawLines := strings.Split(string(content), "\n")
+	var lines []string
+	for _, l := range rawLines {
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, l)
+		}
+	}
+	return lines, nil
 }
 
 func formatTime(t *time.Time) string {
