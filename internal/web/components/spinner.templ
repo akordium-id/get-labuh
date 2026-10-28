@@ -1,7 +1,14 @@
 package components
 
-templ Spinner(size, color string) {
-	<span class={ "inline-block animate-spin rounded-full border-2 border-t-transparent " + spinnerSize(size) + " " + spinnerColor(color) }></span>
+templ Spinner(size, color string, extraClasses ...string) {
+	<span class={ "inline-block animate-spin rounded-full border-2 border-t-transparent " + spinnerSize(size) + " " + spinnerColor(color) + getExtraClass(extraClasses) }></span>
+}
+
+func getExtraClass(extraClasses []string) string {
+	if len(extraClasses) > 0 && extraClasses[0] != "" {
+		return " " + extraClasses[0]
+	}
+	return ""
 }
 
 func spinnerSize(size string) string {

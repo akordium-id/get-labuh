@@ -642,4 +642,3 @@ func (h *ApplicationsHandler) Status(w http.ResponseWriter, r *http.Request) {
 
 	templ.Handler(components.PollingStatusBadge(string(app.Status), "/applications/"+id+"/status")).ServeHTTP(w, r)
 }
-

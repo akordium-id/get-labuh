@@ -415,8 +415,9 @@ templ DatabaseCreatePage() {
 					<input type="number" name="port" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
 				</div>
 				<div class="flex gap-2">
-					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Create</button>
-					<a href="/projects" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancel</a>
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 font-medium shadow-sm transition-colors"
+					        onclick="if(this.form.checkValidity()){this.disabled=true;this.classList.add('opacity-70');this.innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Creating...';this.form.submit();}">Create</button>
+					<a href="/projects" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 font-medium">Cancel</a>
 				</div>
 			</form>
 		</div>

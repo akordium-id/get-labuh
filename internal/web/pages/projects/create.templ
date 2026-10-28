@@ -22,9 +22,9 @@ templ ProjectCreatePage() {
 			</div>
 			<div class="flex justify-end space-x-3">
 				<a href="/projects" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</a>
-				<button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2">
-					@components.Spinner("sm", "white")
-					Create Project
+				<button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 font-medium shadow-sm transition-colors">
+					@components.Spinner("sm", "white", "htmx-indicator")
+					<span>Create Project</span>
 				</button>
 			</div>
 		</form>

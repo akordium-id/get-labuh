@@ -343,7 +343,7 @@ func TemplateDetailPage(template *models.ServiceTemplate, variables []*models.Te
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"pt-4 border-t border-gray-100 flex gap-3\"><button type=\"submit\" class=\"bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2\"><span>🚀 Deploy Now</span></button> <a href=\"/templates\" class=\"bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg text-sm transition-colors\">Cancel</a></div></form></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"pt-4 border-t border-gray-100 flex gap-3\"><button type=\"submit\" class=\"bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm\" onclick=\"if(this.form.checkValidity()){this.disabled=true;this.classList.add('opacity-70');this.innerHTML='<span class=\\\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\\\'></span>Deploying template...';this.form.submit();}\"><span>🚀 Deploy Now</span></button> <a href=\"/templates\" class=\"bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg text-sm transition-colors\">Cancel</a></div></form></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

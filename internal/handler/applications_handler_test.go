@@ -271,4 +271,3 @@ func TestApplicationsHandler_Status(t *stdtesting.T) {
 	assert.Contains(t, body, `id="status-badge"`)
 	assert.Contains(t, body, `/applications/`+app.ID+`/status`)
 }
-

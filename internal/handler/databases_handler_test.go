@@ -203,4 +203,3 @@ func TestDatabasesHandler_Status(t *stdtesting.T) {
 	assert.Contains(t, body, `id="status-badge"`)
 	assert.Contains(t, body, `/databases/`+dbService.ID+`/status`)
 }
-
