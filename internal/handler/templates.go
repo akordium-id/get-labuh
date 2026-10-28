@@ -56,7 +56,15 @@ func (h *TemplatesHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	variables, _ := h.templateRepo.GetVariablesByTemplateID(id)
 
-	templ.Handler(layouts.AppLayout(templates.TemplateDetailPage(template, variables))).ServeHTTP(w, r)
+	projects, _ := h.projectRepo.GetAll()
+	var allEnvs []*models.Environment
+	for _, p := range projects {
+		if envs, err := h.projectRepo.GetEnvironmentsByProjectID(p.ID); err == nil {
+			allEnvs = append(allEnvs, envs...)
+		}
+	}
+
+	templ.Handler(layouts.AppLayout(templates.TemplateDetailPage(template, variables, allEnvs))).ServeHTTP(w, r)
 }
 
 func (h *TemplatesHandler) Deploy(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +86,11 @@ func (h *TemplatesHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	envID := r.FormValue("environment_id")
+	if envID == "" {
+		http.Error(w, "Please select an environment", http.StatusBadRequest)
+		return
+	}
+
 	appName := r.FormValue("name")
 	if appName == "" {
 		appName = template.Name
@@ -96,7 +109,7 @@ func (h *TemplatesHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 
 	appPort := 8080
 	if portStr := r.FormValue("app_port"); portStr != "" {
-		if port, err := strconv.Atoi(portStr); err == nil {
+		if port, err := strconv.Atoi(portStr); err == nil && port > 0 {
 			appPort = port
 		}
 	}
@@ -111,14 +124,33 @@ func (h *TemplatesHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		AppPort:       appPort,
 	})
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, _ = h.deployRepo.Create(models.CreateDeploymentInput{
-		ApplicationID: app.ID,
-	})
+	// Simpan environment variables yang diinput pengguna
+	variables, _ := h.templateRepo.GetVariablesByTemplateID(id)
+	for _, v := range variables {
+		val := r.FormValue("var_" + v.Key)
+		if val == "" && v.DefaultValue != nil {
+			val = *v.DefaultValue
+		}
+		if val != "" && h.envVarRepo != nil {
+			_, _ = h.envVarRepo.Create(models.CreateAppEnvVarInput{
+				ApplicationID: app.ID,
+				Key:           v.Key,
+				Value:         val,
+				IsSecret:      false,
+			})
+		}
+	}
 
-	w.Header().Set("HX-Redirect", "/applications/"+app.ID)
-	w.WriteHeader(http.StatusOK)
+	// Trigger initial deployment queue
+	if h.deployRepo != nil {
+		_, _ = h.deployRepo.Create(models.CreateDeploymentInput{
+			ApplicationID: app.ID,
+		})
+	}
+
+	http.Redirect(w, r, "/applications/"+app.ID, http.StatusFound)
 }
