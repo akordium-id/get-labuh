@@ -113,6 +113,10 @@ func (r *DatabaseRepo) GetByEnvironmentID(envID string) ([]*models.DatabaseServi
 		dbServices = append(dbServices, dbService)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return dbServices, nil
 }
 
@@ -141,6 +145,10 @@ func (r *DatabaseRepo) GetByEnvironmentIDPaginated(envID string, limit, offset i
 			return nil, 0, err
 		}
 		dbServices = append(dbServices, dbService)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
 	}
 
 	return dbServices, total, nil
@@ -172,6 +180,10 @@ func (r *DatabaseRepo) SearchPaginated(envID, search string, limit, offset int) 
 			return nil, 0, err
 		}
 		dbServices = append(dbServices, dbService)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
 	}
 
 	return dbServices, total, nil

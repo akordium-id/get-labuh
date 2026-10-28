@@ -288,7 +288,7 @@ func (c *Client) WaitForHealth(ctx context.Context, containerID string, appPort 
 						// 2. Fallback to TCP dial
 						conn, tcpErr := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, checkPort), 1*time.Second)
 						if tcpErr == nil {
-							conn.Close()
+							_ = conn.Close()
 							return nil
 						}
 					}

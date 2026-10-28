@@ -79,6 +79,10 @@ func (r *StorageDestinationRepo) List() ([]*models.StorageDestination, error) {
 		}
 		list = append(list, dest)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	return list, nil
 }
 
@@ -169,6 +173,10 @@ func (r *DatabaseBackupRepo) ListActiveConfigs() ([]*models.DatabaseBackupConfig
 		}
 		list = append(list, cfg)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	return list, nil
 }
 
@@ -226,6 +234,10 @@ func (r *DatabaseBackupRepo) ListByDatabaseID(databaseID string) ([]*models.Data
 		}
 		list = append(list, b)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	return list, nil
 }
 
@@ -260,6 +272,10 @@ func (r *DatabaseBackupRepo) GetOldBackupsForPruning(databaseID string, keepCoun
 			return nil, err
 		}
 		list = append(list, b)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	return list, nil
 }

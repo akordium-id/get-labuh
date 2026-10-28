@@ -3,6 +3,7 @@ package runner
 import (
 	"bufio"
 	"context"
+	"log/slog"
 	"os"
 	"runtime"
 	"strconv"
@@ -104,6 +105,10 @@ func (m *MetricsCollector) collectCPU() float64 {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		slog.Debug("scanner error while reading /proc/stat", "error", err)
+	}
+
 	return 0.0
 }
 
@@ -134,6 +139,9 @@ func (m *MetricsCollector) collectMemory() (usedMB uint64, totalMB uint64) {
 					usedMB = (memTotalKB - memAvailableKB) / 1024
 				}
 				return usedMB, totalMB
+			}
+			if err := scanner.Err(); err != nil {
+				slog.Debug("scanner error while reading /proc/meminfo", "error", err)
 			}
 		}
 	}

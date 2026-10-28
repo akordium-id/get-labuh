@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -75,7 +76,7 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 	defer ticker.Stop()
 
 	var lastOffset int64 = 0
-	var lastStep string = ""
+	var lastStep = ""
 	for {
 		select {
 		case <-r.Context().Done():
@@ -91,6 +92,9 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 						if line != "" {
 							sendEvent("log-message", fmt.Sprintf(`{"output": "%s", "timestamp": "%s"}`, escapeJSON(line), time.Now().Format(time.RFC3339)))
 						}
+					}
+					if sErr := scanner.Err(); sErr != nil {
+						slog.Debug("scanner error while reading deploy logs", "error", sErr)
 					}
 					lastOffset = stat.Size()
 				}
@@ -120,6 +124,9 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 								if line != "" {
 									sendEvent("log-message", fmt.Sprintf(`{"output": "%s", "timestamp": "%s"}`, escapeJSON(line), time.Now().Format(time.RFC3339)))
 								}
+							}
+							if sErr := scanner.Err(); sErr != nil {
+								slog.Debug("scanner error while final draining deploy logs", "error", sErr)
 							}
 						}
 						_ = file.Close()
@@ -209,6 +216,10 @@ func (h *LogsHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Request
 				sendEvent("log-message", fmt.Sprintf(`{"output": "%s", "timestamp": "%s"}`, escapeJSON(line), time.Now().Format(time.RFC3339)))
 			}
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		slog.Debug("scanner error while reading container logs", "error", err)
 	}
 
 	sendEvent("done", "{}")

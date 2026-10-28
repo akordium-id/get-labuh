@@ -29,7 +29,6 @@ type Client struct {
 	conn      *websocket.Conn
 	connMu    sync.Mutex
 	writeMu   sync.Mutex
-	isClosed  bool
 	closeChan chan struct{}
 }
 
@@ -93,7 +92,7 @@ func (c *Client) connectAndServe(ctx context.Context, hostname string) error {
 	if err != nil {
 		return fmt.Errorf("websocket dial error: %w", err)
 	}
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 
 	c.connMu.Lock()
 	c.conn = conn

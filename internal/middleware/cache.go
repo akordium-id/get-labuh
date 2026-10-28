@@ -4,9 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 )
 
 func CacheHeadersMiddleware(next http.Handler) http.Handler {
@@ -55,32 +53,6 @@ func generateETag(input string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(input))
 	return hex.EncodeToString(hasher.Sum(nil))
-}
-
-func getCacheEnv(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
-func cacheKeyFromRequest(r *http.Request) string {
-	return r.Method + ":" + r.URL.Path
-}
-
-func parseCacheDuration(durationStr string) (time.Duration, error) {
-	return time.ParseDuration(durationStr)
-}
-
-func matchesCacheControl(cacheControl string, directive string) bool {
-	parts := strings.SplitSeq(cacheControl, ",")
-	for part := range parts {
-		if strings.TrimSpace(strings.ToLower(part)) == directive {
-			return true
-		}
-	}
-	return false
 }
 
 var CacheMiddleware = CacheHeadersMiddleware

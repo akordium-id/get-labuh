@@ -86,6 +86,10 @@ func (r *NotificationRepo) ListGlobal() ([]*models.NotificationChannel, error) {
 		}
 		list = append(list, c)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	return list, nil
 }
 
@@ -116,6 +120,10 @@ func (r *NotificationRepo) ListByProjectID(projectID string) ([]*models.Notifica
 		}
 		list = append(list, c)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	return list, nil
 }
 
@@ -141,7 +149,7 @@ func (r *NotificationRepo) ListActiveForEvent(eventType string, projectID *strin
 			  FROM notification_channels
 			  WHERE enabled = 1 AND ` + column + ` = 1 AND (project_id IS NULL`
 
-	var args []interface{}
+	var args []any
 	if projectID != nil && *projectID != "" {
 		query += ` OR project_id = ?`
 		args = append(args, *projectID)
@@ -166,6 +174,10 @@ func (r *NotificationRepo) ListActiveForEvent(eventType string, projectID *strin
 			return nil, err
 		}
 		list = append(list, c)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	return list, nil
 }

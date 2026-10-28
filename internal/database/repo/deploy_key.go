@@ -76,6 +76,10 @@ func (r *DeployKeyRepo) GetByProjectID(projectID string) ([]*models.DeployKey, e
 		deployKeys = append(deployKeys, deployKey)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return deployKeys, nil
 }
 

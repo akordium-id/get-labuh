@@ -83,6 +83,10 @@ func (r *ProjectRepo) GetAll() ([]*models.Project, error) {
 		projects = append(projects, project)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return projects, nil
 }
 
@@ -110,6 +114,10 @@ func (r *ProjectRepo) GetAllPaginated(limit, offset int) ([]*models.Project, int
 			return nil, 0, err
 		}
 		projects = append(projects, project)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
 	}
 
 	return projects, total, nil
@@ -140,6 +148,10 @@ func (r *ProjectRepo) SearchPaginated(search string, limit, offset int) ([]*mode
 			return nil, 0, err
 		}
 		projects = append(projects, project)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
 	}
 
 	return projects, total, nil
@@ -189,6 +201,10 @@ func (r *ProjectRepo) GetEnvironmentsByProjectID(projectID string) ([]*models.En
 			return nil, err
 		}
 		environments = append(environments, env)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return environments, nil

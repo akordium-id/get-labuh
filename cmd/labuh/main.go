@@ -58,7 +58,11 @@ func main() {
 		slog.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			slog.Warn("Failed to close database", "error", err)
+		}
+	}()
 
 	if err := database.RunAllMigrations(db); err != nil {
 		slog.Error("Failed to run migrations", "error", err)

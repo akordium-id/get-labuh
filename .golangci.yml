@@ -1,0 +1,38 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+      exclude-functions:
+        - (*net/http.ResponseWriter).Write
+        - (net/http.ResponseWriter).Write
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Tx).Rollback
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (os.File).Close
+        - (*encoding/json.Encoder).Encode
+        - os.Remove
+        - os.Rename
+        - io.Copy
+    staticcheck:
+      checks:
+        - "all"
+        - "-SA1019" # Suppress deprecation warnings on external libraries (Docker SDK v28/v29 migration)
+        - "-ST1000" # Missing package comments are optional for internal packages
+        - "-ST1003" # Naming conventions for existing models/repos (e.g. ApiKey vs APIKey)
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - unused

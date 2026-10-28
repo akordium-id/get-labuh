@@ -61,6 +61,10 @@ func (r *AuditLogRepo) GetByUserID(userID string, limit int) ([]*models.AuditLog
 		logs = append(logs, log)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return logs, nil
 }
 
@@ -85,6 +89,10 @@ func (r *AuditLogRepo) GetAll(limit int) ([]*models.AuditLog, error) {
 		logs = append(logs, log)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return logs, nil
 }
 
@@ -107,6 +115,10 @@ func (r *AuditLogRepo) GetByResource(resource, resourceID string, limit int) ([]
 			return nil, err
 		}
 		logs = append(logs, log)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return logs, nil

@@ -55,7 +55,7 @@ func (c *Client) Execute(command string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	output, err := session.CombinedOutput(command)
 	if err != nil {
@@ -70,7 +70,7 @@ func (c *Client) CopyFile(localPath, remotePath string) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	localFile, err := os.Open(localPath)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestConnection(host, user, keyPath string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.Execute("echo 'connected'")
 	return err
@@ -127,6 +127,10 @@ func ParseAuthorizedKey(keyPath string) (string, error) {
 		if len(parts) >= 2 {
 			return parts[1], nil
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", err
 	}
 
 	return "", fmt.Errorf("no valid public key found in %s", keyPath)

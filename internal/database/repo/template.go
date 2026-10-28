@@ -84,6 +84,10 @@ func (r *TemplateRepo) GetAll() ([]*models.ServiceTemplate, error) {
 		templates = append(templates, template)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return templates, nil
 }
 
@@ -108,6 +112,10 @@ func (r *TemplateRepo) GetByCategory(category models.TemplateCategory) ([]*model
 			return nil, err
 		}
 		templates = append(templates, template)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return templates, nil
@@ -173,6 +181,10 @@ func (r *TemplateRepo) GetVariablesByTemplateID(templateID string) ([]*models.Te
 			return nil, err
 		}
 		variables = append(variables, variable)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return variables, nil

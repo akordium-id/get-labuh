@@ -98,6 +98,10 @@ func (r *ComposeRepo) GetByEnvironmentID(envID string) ([]*models.ComposeApplica
 		composes = append(composes, compose)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return composes, nil
 }
 

@@ -72,7 +72,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	if err != nil {
 		return &DeployError{Step: "init", Cause: err}
 	}
-	defer logFile.Close()
+	defer func() { _ = logFile.Close() }()
 
 	activeLogWriter := logging.NewTeeLogWriter(logFile, job.ExtraLogWriter)
 
@@ -273,12 +273,12 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	writeLog(activeLogWriter, "Deploying container...")
 	updateStep("deploy", models.DeployStatusDeploying, "")
 
-	var appSlug string = "app"
+	var appSlug = "app"
 	if job.AppSlug != "" {
 		appSlug = job.AppSlug
 	}
-	var customDomain *string = job.CustomDomain
-	var appPort int = job.AppPort
+	var customDomain = job.CustomDomain
+	var appPort = job.AppPort
 	var oldContainerID string
 
 	if p.appRepo != nil {
@@ -422,10 +422,6 @@ func (p *Pipeline) cleanupFailedContainer(ctx context.Context, job DeploymentJob
 func writeLog(file logging.LogWriter, message string) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	line := fmt.Sprintf("[%s] %s\n", timestamp, message)
-	if _, err := file.Write([]byte(line)); err != nil {
-		// best effort
-	}
-	if err := file.Sync(); err != nil {
-		// best effort
-	}
+	_, _ = file.Write([]byte(line))
+	_ = file.Sync()
 }

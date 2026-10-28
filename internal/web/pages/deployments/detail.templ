@@ -7,7 +7,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/web"
 )
 
-func getDeploymentData(deployment interface{}) (id, status, currentStep, errMsg, startedAtStr string, isDone bool) {
+func getDeploymentData(deployment any) (id, status, currentStep, errMsg, startedAtStr string, isDone bool) {
 	if d, ok := deployment.(*models.Deployment); ok && d != nil {
 		id = d.ID
 		status = string(d.Status)
@@ -28,14 +28,14 @@ func getDeploymentData(deployment interface{}) (id, status, currentStep, errMsg,
 	return "", "queued", "init", "", "-", false
 }
 
-func getApplicationName(app interface{}) string {
+func getApplicationName(app any) string {
 	if a, ok := app.(*models.Application); ok && a != nil {
 		return a.Name
 	}
 	return "Application"
 }
 
-templ DeploymentDetailPage(deployment interface{}, app interface{}) {
+templ DeploymentDetailPage(deployment any, app any) {
 	{{
 		deployID, status, currentStep, errMsg, startedAtStr, isDone := getDeploymentData(deployment)
 		appName := getApplicationName(app)
@@ -453,7 +453,7 @@ templ DeploymentDetailPage(deployment interface{}, app interface{}) {
 	</div>
 }
 
-templ DeploymentLogsPage(deployment interface{}, logs []string) {
+templ DeploymentLogsPage(deployment any, logs []string) {
 	{{
 		deployID, _, _, _, _, _ := getDeploymentData(deployment)
 	}}

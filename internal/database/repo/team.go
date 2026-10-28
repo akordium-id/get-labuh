@@ -67,6 +67,10 @@ func (r *TeamRepo) GetAll() ([]*models.Team, error) {
 		teams = append(teams, team)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return teams, nil
 }
 
@@ -117,6 +121,10 @@ func (r *TeamRepo) GetMembers(teamID string) ([]*models.TeamMember, error) {
 			return nil, err
 		}
 		members = append(members, member)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return members, nil
@@ -173,6 +181,10 @@ func (r *TeamRepo) GetUserTeams(userID string) ([]*models.Team, error) {
 			return nil, err
 		}
 		teams = append(teams, team)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return teams, nil

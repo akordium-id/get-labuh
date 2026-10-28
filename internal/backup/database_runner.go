@@ -79,9 +79,10 @@ func (r *DatabaseBackupRunner) RunBackup(ctx context.Context, databaseID string)
 
 	timestamp := time.Now().UTC().Format("20060102-150405")
 	ext := "sql.gz"
-	if db.Engine == models.DatabaseEngineRedis {
+	switch db.Engine {
+	case models.DatabaseEngineRedis:
 		ext = "rdb.gz"
-	} else if db.Engine == models.DatabaseEngineMongoDB {
+	case models.DatabaseEngineMongoDB:
 		ext = "archive.gz"
 	}
 	filename := fmt.Sprintf("%s-%s-%s.%s", db.Engine, db.Slug, timestamp, ext)

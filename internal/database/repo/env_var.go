@@ -103,6 +103,10 @@ func (r *EnvVarRepo) GetByApplicationID(appID string) ([]*models.AppEnvVar, erro
 		envVars = append(envVars, envVar)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return envVars, nil
 }
 

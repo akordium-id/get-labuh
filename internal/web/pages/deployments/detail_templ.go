@@ -6,17 +6,16 @@ package deployments
 
 //lint:file-ignore SA4006 This context is only used if a nested component is present.
 
-import "github.com/a-h/templ"
-import templruntime "github.com/a-h/templ/runtime"
-
 import (
 	"fmt"
 
+	"github.com/a-h/templ"
+	templruntime "github.com/a-h/templ/runtime"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web"
 )
 
-func getDeploymentData(deployment interface{}) (id, status, currentStep, errMsg, startedAtStr string, isDone bool) {
+func getDeploymentData(deployment any) (id, status, currentStep, errMsg, startedAtStr string, isDone bool) {
 	if d, ok := deployment.(*models.Deployment); ok && d != nil {
 		id = d.ID
 		status = string(d.Status)
@@ -37,14 +36,14 @@ func getDeploymentData(deployment interface{}) (id, status, currentStep, errMsg,
 	return "", "queued", "init", "", "-", false
 }
 
-func getApplicationName(app interface{}) string {
+func getApplicationName(app any) string {
 	if a, ok := app.(*models.Application); ok && a != nil {
 		return a.Name
 	}
 	return "Application"
 }
 
-func DeploymentDetailPage(deployment interface{}, app interface{}) templ.Component {
+func DeploymentDetailPage(deployment any, app any) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -251,7 +250,7 @@ func DeploymentDetailPage(deployment interface{}, app interface{}) templ.Compone
 	})
 }
 
-func DeploymentLogsPage(deployment interface{}, logs []string) templ.Component {
+func DeploymentLogsPage(deployment any, logs []string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {

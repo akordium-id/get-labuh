@@ -131,7 +131,9 @@ func (h *TerminalHandler) ContainerTerminalWS(w http.ResponseWriter, r *http.Req
 		slog.Error("failed to accept websocket connection", "error", err)
 		return
 	}
-	defer wsConn.Close(websocket.StatusInternalError, "closing session")
+	defer func() {
+		_ = wsConn.Close(websocket.StatusInternalError, "closing session")
+	}()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()

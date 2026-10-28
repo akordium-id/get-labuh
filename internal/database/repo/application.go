@@ -140,6 +140,10 @@ func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Applicatio
 		apps = append(apps, app)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return apps, nil
 }
 
@@ -168,6 +172,10 @@ func (r *ApplicationRepo) GetByEnvironmentIDPaginated(envID string, limit, offse
 			return nil, 0, err
 		}
 		apps = append(apps, app)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
 	}
 
 	return apps, total, nil
@@ -201,6 +209,10 @@ func (r *ApplicationRepo) SearchPaginated(envID, search string, limit, offset in
 		apps = append(apps, app)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
 	return apps, total, nil
 }
 
@@ -223,6 +235,10 @@ func (r *ApplicationRepo) GetByStatus(status models.AppStatus) ([]*models.Applic
 			return nil, err
 		}
 		apps = append(apps, app)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return apps, nil

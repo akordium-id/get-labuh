@@ -77,6 +77,10 @@ func (r *DeploymentRepo) GetByApplicationID(appID string) ([]*models.Deployment,
 		deployments = append(deployments, deployment)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return deployments, nil
 }
 
@@ -107,6 +111,10 @@ func (r *DeploymentRepo) GetByApplicationIDPaginated(appID string, limit, offset
 		deployments = append(deployments, deployment)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
 	return deployments, total, nil
 }
 
@@ -135,6 +143,10 @@ func (r *DeploymentRepo) GetByStatusPaginated(status models.DeployStatus, limit,
 			return nil, 0, err
 		}
 		deployments = append(deployments, deployment)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
 	}
 
 	return deployments, total, nil
@@ -219,6 +231,10 @@ func (r *DeploymentRepo) GetByProjectID(projectID string) ([]*models.Deployment,
 		deployments = append(deployments, deployment)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return deployments, nil
 }
 
@@ -244,6 +260,10 @@ func (r *DeploymentRepo) GetByEnvironmentID(envID string) ([]*models.Deployment,
 			return nil, err
 		}
 		deployments = append(deployments, deployment)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return deployments, nil

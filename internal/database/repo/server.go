@@ -82,6 +82,10 @@ func (r *ServerRepo) GetAll() ([]*models.Server, error) {
 		servers = append(servers, server)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return servers, nil
 }
 

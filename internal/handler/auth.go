@@ -54,10 +54,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userRepo.GetByEmail(email)
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		if user != nil && user.ID != "" {
-			h.userRepo.IncrementFailedLogin(user.ID)
+			_ = h.userRepo.IncrementFailedLogin(user.ID)
 			if user.FailedLoginCount+1 >= auth.MaxFailedLogins {
 				lockedUntil := time.Now().Add(auth.LockoutDuration)
-				h.userRepo.LockUser(user.ID, lockedUntil)
+				_ = h.userRepo.LockUser(user.ID, lockedUntil)
 			}
 		}
 
@@ -112,7 +112,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		tokenHash := auth.HashToken(cookie.Value)
 		session, err := h.sessionRepo.FindByToken(tokenHash)
 		if err == nil {
-			h.sessionRepo.Delete(session.ID)
+			_ = h.sessionRepo.Delete(session.ID)
 		}
 	}
 
