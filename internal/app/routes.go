@@ -47,7 +47,6 @@ func SetupRoutes(c *Container) http.Handler {
 
 	r.Group(func(r chi.Router) {
 		r.Use(c.AuthMiddleware)
-		r.Post("/lite/deploy/upload", c.DropzoneHandler.UploadDropzone)
 
 		r.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
 			user, _ := auth.UserFromContext(r.Context())
@@ -71,21 +70,7 @@ func SetupRoutes(c *Container) http.Handler {
 		r.Get("/templates/{id}", c.TemplatesHandler.Get)
 		r.Post("/templates/{id}/deploy", c.TemplatesHandler.Deploy)
 
-		r.Get("/projects/{project_id}/environments/{env_id}/applications", c.ApplicationsHandler.List)
-		r.Post("/projects/{project_id}/environments/{env_id}/applications", c.ApplicationsHandler.Create)
-		r.Get("/applications/{id}", c.ApplicationsHandler.Get)
-		r.Post("/applications/{id}/start", c.ApplicationsHandler.Start)
-		r.Post("/applications/{id}/stop", c.ApplicationsHandler.Stop)
-		r.Post("/applications/{id}/restart", c.ApplicationsHandler.Restart)
-		r.Post("/applications/{id}/deploy", c.ApplicationsHandler.Deploy)
-		r.Post("/applications/{id}/env-vars", c.ApplicationsHandler.CreateEnvVar)
-		r.Post("/applications/{id}/env-vars/{var_id}/delete", c.ApplicationsHandler.DeleteEnvVar)
-		r.Post("/applications/{id}/domain", c.ApplicationsHandler.SetDomain)
-		r.Post("/applications/{id}/domain/remove", c.ApplicationsHandler.RemoveDomain)
-		r.Post("/applications/{id}/resources", c.ApplicationsHandler.UpdateResourceLimits)
-		r.Post("/applications/{id}/webhook/regenerate", c.ApplicationsHandler.RegenerateWebhookSecret)
-		r.Get("/applications/{id}/status", c.ApplicationsHandler.Status)
-		r.Get("/applications/{id}/stats", c.MonitoringHandler.ApplicationStats)
+		c.ApplicationsMod.RegisterRoutes(r)
 
 		c.ComposeMod.RegisterRoutes(r)
 		c.DatabasesMod.RegisterRoutes(r)
@@ -102,9 +87,7 @@ func SetupRoutes(c *Container) http.Handler {
 		c.SettingsMod.RegisterRoutes(r)
 	})
 
-	r.Post("/webhooks/deploy/{application_id}", c.WebhooksHandler.Deploy)
-	r.Post("/webhooks/github/{application_id}", c.WebhooksHandler.GitHub)
-	r.Post("/webhooks/gitlab/{application_id}", c.WebhooksHandler.GitLab)
+	c.ApplicationsMod.RegisterPublicRoutes(r)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)

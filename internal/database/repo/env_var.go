@@ -2,115 +2,14 @@ package repo
 
 import (
 	"database/sql"
-	"strings"
-	"time"
 
-	"github.com/akordium-id/get-labuh/internal/encryption"
-	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/google/uuid"
+	"github.com/akordium-id/get-labuh/internal/modules/applications"
 )
 
-type EnvVarRepo struct {
-	db *sql.DB
-}
+// EnvVarRepo adalah alias backward-compatible menuju applications.EnvVarRepo.
+type EnvVarRepo = applications.EnvVarRepo
 
+// NewEnvVarRepo membuat instance baru EnvVarRepo aplikasi.
 func NewEnvVarRepo(db *sql.DB) *EnvVarRepo {
-	return &EnvVarRepo{db: db}
-}
-
-func (r *EnvVarRepo) Create(input models.CreateAppEnvVarInput) (*models.AppEnvVar, error) {
-	value := input.Value
-	if input.IsSecret && encryption.IsInitialized() {
-		encrypted, err := encryption.Encrypt(value)
-		if err != nil {
-			return nil, err
-		}
-		value = encryption.EncryptedValue(encrypted)
-	}
-
-	envVar := &models.AppEnvVar{
-		ID:            uuid.New().String(),
-		ApplicationID: input.ApplicationID,
-		Key:           input.Key,
-		Value:         value,
-		IsSecret:      input.IsSecret,
-		IsEncrypted:   input.IsSecret && encryption.IsInitialized(),
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-	}
-
-	_, err := r.db.Exec(
-		`INSERT INTO app_env_vars (id, application_id, key, value, is_secret, is_encrypted, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		envVar.ID, envVar.ApplicationID, envVar.Key, envVar.Value, envVar.IsSecret, envVar.IsEncrypted, envVar.CreatedAt, envVar.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return envVar, nil
-}
-
-func (r *EnvVarRepo) GetByID(id string) (*models.AppEnvVar, error) {
-	envVar := &models.AppEnvVar{}
-	err := r.db.QueryRow(
-		`SELECT id, application_id, key, value, is_secret, is_encrypted, created_at, updated_at
-		 FROM app_env_vars WHERE id = ?`,
-		id,
-	).Scan(&envVar.ID, &envVar.ApplicationID, &envVar.Key, &envVar.Value, &envVar.IsSecret, &envVar.IsEncrypted, &envVar.CreatedAt, &envVar.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	if envVar.IsEncrypted && encryption.IsInitialized() {
-		decrypted, err := encryption.Decrypt(strings.TrimPrefix(envVar.Value, "ENC:"))
-		if err != nil {
-			return nil, err
-		}
-		envVar.Value = decrypted
-	}
-
-	return envVar, nil
-}
-
-func (r *EnvVarRepo) GetByApplicationID(appID string) ([]*models.AppEnvVar, error) {
-	rows, err := r.db.Query(
-		`SELECT id, application_id, key, value, is_secret, is_encrypted, created_at, updated_at
-		 FROM app_env_vars WHERE application_id = ? ORDER BY created_at DESC`,
-		appID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var envVars []*models.AppEnvVar
-	for rows.Next() {
-		envVar := &models.AppEnvVar{}
-		err := rows.Scan(&envVar.ID, &envVar.ApplicationID, &envVar.Key, &envVar.Value, &envVar.IsSecret, &envVar.IsEncrypted, &envVar.CreatedAt, &envVar.UpdatedAt)
-		if err != nil {
-			return nil, err
-		}
-
-		if envVar.IsEncrypted && encryption.IsInitialized() {
-			decrypted, err := encryption.Decrypt(strings.TrimPrefix(envVar.Value, "ENC:"))
-			if err != nil {
-				return nil, err
-			}
-			envVar.Value = decrypted
-		}
-
-		envVars = append(envVars, envVar)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return envVars, nil
-}
-
-func (r *EnvVarRepo) Delete(id string) error {
-	_, err := r.db.Exec("DELETE FROM app_env_vars WHERE id = ?", id)
-	return err
+	return applications.NewEnvVarRepo(db)
 }

@@ -1,4 +1,4 @@
-package handler
+package applications
 
 import (
 	"archive/zip"
@@ -11,12 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
-// StackType merepresentasikan deteksi stack aplikasi dari source code
+// StackType merepresentasikan deteksi stack aplikasi dari source code.
 type StackType string
 
 const (
@@ -29,19 +27,21 @@ const (
 	StackGeneric StackType = "Generic App"
 )
 
+// DropzoneHandler menangani upload file zip proyek dan auto deploy.
 type DropzoneHandler struct {
-	appRepo      *repo.ApplicationRepo
-	projectRepo  *repo.ProjectRepo
-	deployRepo   *repo.DeploymentRepo
-	envVarRepo   *repo.EnvVarRepo
-	deployWorker *worker.DeployWorker
+	appRepo      *Repo
+	projectRepo  ProjectEnvironmentProvider
+	deployRepo   DeploymentCreator
+	envVarRepo   *EnvVarRepo
+	deployWorker DeployEnqueuer
 }
 
+// NewDropzoneHandler membuat instance baru DropzoneHandler.
 func NewDropzoneHandler(
-	appRepo *repo.ApplicationRepo,
-	projectRepo *repo.ProjectRepo,
-	deployRepo *repo.DeploymentRepo,
-	envVarRepo *repo.EnvVarRepo,
+	appRepo *Repo,
+	projectRepo ProjectEnvironmentProvider,
+	deployRepo DeploymentCreator,
+	envVarRepo *EnvVarRepo,
 ) *DropzoneHandler {
 	return &DropzoneHandler{
 		appRepo:     appRepo,
@@ -51,13 +51,13 @@ func NewDropzoneHandler(
 	}
 }
 
-func (h *DropzoneHandler) SetDeployWorker(w *worker.DeployWorker) {
+// SetDeployWorker menyetel worker antrean deployment.
+func (h *DropzoneHandler) SetDeployWorker(w DeployEnqueuer) {
 	h.deployWorker = w
 }
 
-// UploadDropzone menangani multipart file upload (.zip) dari Magic Dropzone
+// UploadDropzone menangani multipart file upload (.zip) dari Magic Dropzone.
 func (h *DropzoneHandler) UploadDropzone(w http.ResponseWriter, r *http.Request) {
-	// Batasi ukuran file upload maks 100MB
 	if err := r.ParseMultipartForm(100 * 1024 * 1024); err != nil {
 		http.Error(w, "File terlalu besar (maksimal 100MB)", http.StatusBadRequest)
 		return
@@ -78,16 +78,14 @@ func (h *DropzoneHandler) UploadDropzone(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	slug := repo.GenerateSlug(appName)
+	slug := GenerateSlug(appName)
 
-	// Pastikan Environment default tersedia (misal: "Default Project" / "production")
 	envID, err := h.getOrCreateDefaultEnvironment()
 	if err != nil {
 		http.Error(w, "Gagal menyiapkan environment default: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 1. Buat record aplikasi di database dengan SourceTypeDropzone
 	app, err := h.appRepo.Create(models.CreateApplicationInput{
 		EnvironmentID: envID,
 		Name:          appName,
@@ -100,7 +98,6 @@ func (h *DropzoneHandler) UploadDropzone(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 2. Simpan file zip dan ekstrak ke /tmp/labuh-sources/{app.ID}
 	targetDir := filepath.Join("/tmp/labuh-sources", app.ID)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		http.Error(w, "Gagal membuat direktori sumber: "+err.Error(), http.StatusInternalServerError)
@@ -121,20 +118,16 @@ func (h *DropzoneHandler) UploadDropzone(w http.ResponseWriter, r *http.Request)
 	_ = outZip.Close()
 	defer os.Remove(tempZipPath)
 
-	// Ekstrak ZIP
 	if err := extractZipArchive(tempZipPath, targetDir); err != nil {
 		http.Error(w, "Gagal mengekstrak archive ZIP: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// 3. Deteksi stack & sesuaikan port default jika terdeteksi
 	detectedStack, detectedPort := DetectAppStack(targetDir)
 	if detectedPort > 0 && detectedPort != 8080 {
-		// Update port jika ada port standar terdeteksi
 		app.AppPort = detectedPort
 	}
 
-	// 4. Buat deployment record & masukkan ke queue deployWorker
 	deployment, err := h.deployRepo.Create(models.CreateDeploymentInput{
 		ApplicationID: app.ID,
 	})
@@ -153,7 +146,7 @@ func (h *DropzoneHandler) UploadDropzone(w http.ResponseWriter, r *http.Request)
 		if h.envVarRepo != nil {
 			envVars, _ = h.envVarRepo.GetByApplicationID(app.ID)
 		}
-		job := worker.BuildDeploymentJob(app, deployment.ID, envVars)
+		job := BuildDeploymentJob(app, deployment.ID, envVars)
 		job.LogPath = logPath
 		if err := h.deployWorker.Enqueue(job); err != nil {
 			slog.Error("failed to enqueue dropzone deploy job", "error", err, "deployment_id", deployment.ID)
@@ -161,9 +154,8 @@ func (h *DropzoneHandler) UploadDropzone(w http.ResponseWriter, r *http.Request)
 	}
 
 	toastMsg := fmt.Sprintf("Aplikasi %s berhasil diunggah (%s terdeteksi). Deployment dimulai!", app.Name, detectedStack)
-	SetToast(w, toastMsg, ToastSuccess)
+	setToast(w, toastMsg, "success")
 
-	// Jika request AJAX/HTMX
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/dashboard")
 		w.WriteHeader(http.StatusOK)
@@ -173,13 +165,12 @@ func (h *DropzoneHandler) UploadDropzone(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 
-// DetectAppStack menganalisis isi folder proyek untuk menebak stack bahasa dan port
+// DetectAppStack menganalisis isi folder proyek untuk menebak stack bahasa dan port.
 func DetectAppStack(dir string) (StackType, int) {
 	if fileExists(filepath.Join(dir, "Dockerfile")) {
 		return StackDocker, 8080
 	}
 	if fileExists(filepath.Join(dir, "package.json")) {
-		// Cek apakah Next.js atau Vite
 		if content, err := os.ReadFile(filepath.Join(dir, "package.json")); err == nil {
 			var pkg map[string]any
 			if json.Unmarshal(content, &pkg) == nil {
@@ -222,7 +213,6 @@ func extractZipArchive(zipPath, destDir string) error {
 	}
 	defer func() { _ = r.Close() }()
 
-	// Deteksi jika seluruh file di dalam ZIP berada dalam satu subdirektori pembungkus (misal hasil GitHub download zip)
 	var rootPrefix string
 	if len(r.File) > 0 {
 		firstFile := r.File[0].Name
@@ -250,7 +240,6 @@ func extractZipArchive(zipPath, destDir string) error {
 
 		targetPath := filepath.Join(destDir, cleanName)
 
-		// Cegah Zip Slip vulnerability
 		if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(destDir)) {
 			continue
 		}
@@ -288,6 +277,9 @@ func extractZipArchive(zipPath, destDir string) error {
 }
 
 func (h *DropzoneHandler) getOrCreateDefaultEnvironment() (string, error) {
+	if h.projectRepo == nil {
+		return "default", nil
+	}
 	projects, err := h.projectRepo.GetAll()
 	if err != nil {
 		return "", err

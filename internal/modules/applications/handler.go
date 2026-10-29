@@ -1,6 +1,7 @@
-package handler
+package applications
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -10,75 +11,63 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/akordium-id/get-labuh/internal/caddy"
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/components"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
-	"github.com/akordium-id/get-labuh/internal/web/pages/applications"
-	"github.com/akordium-id/get-labuh/internal/worker"
+	webapp "github.com/akordium-id/get-labuh/internal/web/pages/applications"
 )
 
-type ApplicationsHandler struct {
-	appRepo      *repo.ApplicationRepo
-	envRepo      *repo.ProjectRepo
-	deployRepo   *repo.DeploymentRepo
-	envVarRepo   *repo.EnvVarRepo
+// Handler menangani operasi HTTP untuk domain Applications.
+type Handler struct {
+	appRepo      *Repo
+	envVarRepo   *EnvVarRepo
+	envRepo      EnvironmentProvider
+	deployRepo   DeploymentCreator
+	settingRepo  SettingProvider
 	caddyClient  *caddy.Client
-	settingRepo  *repo.SettingRepo
 	dockerClient *docker.Client
-	deployWorker *worker.DeployWorker
+	deployWorker DeployEnqueuer
 }
 
-func NewApplicationsHandler(appRepo *repo.ApplicationRepo, envRepo *repo.ProjectRepo, deployRepo *repo.DeploymentRepo, envVarRepo *repo.EnvVarRepo, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, dockerClient *docker.Client) *ApplicationsHandler {
-	return &ApplicationsHandler{
+// NewHandler membuat instance baru Handler applications.
+func NewHandler(
+	appRepo *Repo,
+	envVarRepo *EnvVarRepo,
+	envRepo EnvironmentProvider,
+	deployRepo DeploymentCreator,
+	settingRepo SettingProvider,
+	caddyClient *caddy.Client,
+	dockerClient *docker.Client,
+) *Handler {
+	return &Handler{
 		appRepo:      appRepo,
+		envVarRepo:   envVarRepo,
 		envRepo:      envRepo,
 		deployRepo:   deployRepo,
-		envVarRepo:   envVarRepo,
-		caddyClient:  caddyClient,
 		settingRepo:  settingRepo,
+		caddyClient:  caddyClient,
 		dockerClient: dockerClient,
 	}
 }
 
-func (h *ApplicationsHandler) SetDeployWorker(w *worker.DeployWorker) {
+// SetDeployWorker menyetel worker antrean deployment.
+func (h *Handler) SetDeployWorker(w DeployEnqueuer) {
 	h.deployWorker = w
 }
 
-func (h *ApplicationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		if r.URL.Path == "/applications" {
-			h.List(w, r)
-		} else {
-			h.Get(w, r)
-		}
-	case http.MethodPost:
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/start"):
-			h.Start(w, r)
-		case strings.HasSuffix(r.URL.Path, "/stop"):
-			h.Stop(w, r)
-		case strings.HasSuffix(r.URL.Path, "/restart"):
-			h.Restart(w, r)
-		case strings.HasSuffix(r.URL.Path, "/domain/remove"):
-			h.RemoveDomain(w, r)
-		case strings.HasSuffix(r.URL.Path, "/domain"):
-			h.SetDomain(w, r)
-		case strings.HasSuffix(r.URL.Path, "/env-vars"):
-			h.CreateEnvVar(w, r)
-		case strings.HasSuffix(r.URL.Path, "/deploy"):
-			h.Deploy(w, r)
-		default:
-			h.Create(w, r)
-		}
-	default:
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
+// SetDockerClient menyetel docker client.
+func (h *Handler) SetDockerClient(c *docker.Client) {
+	h.dockerClient = c
 }
 
-func (h *ApplicationsHandler) List(w http.ResponseWriter, r *http.Request) {
+// SetCaddyClient menyetel caddy client.
+func (h *Handler) SetCaddyClient(c *caddy.Client) {
+	h.caddyClient = c
+}
+
+// List menampilkan daftar aplikasi pada suatu environment.
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	envID := chi.URLParam(r, "env_id")
 	if envID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -95,9 +84,9 @@ func (h *ApplicationsHandler) List(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if search != "" {
-		apps, total, err = h.appRepo.SearchPaginated(envID, search, limit, offset)
+		apps, total, err = h.appRepo.SearchPaginatedWithContext(r.Context(), envID, search, limit, offset)
 	} else {
-		apps, total, err = h.appRepo.GetByEnvironmentIDPaginated(envID, limit, offset)
+		apps, total, err = h.appRepo.GetByEnvironmentIDPaginatedWithContext(r.Context(), envID, limit, offset)
 	}
 
 	if err != nil {
@@ -117,14 +106,15 @@ func (h *ApplicationsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		templ.Handler(applications.ApplicationsTable(apps, page, totalPages, search, baseURL)).ServeHTTP(w, r)
+		templ.Handler(webapp.ApplicationsTable(apps, page, totalPages, search, baseURL)).ServeHTTP(w, r)
 		return
 	}
 
-	templ.Handler(layouts.AppLayout(applications.ApplicationsListPage(apps, page, totalPages, search, baseURL))).ServeHTTP(w, r)
+	templ.Handler(layouts.AppLayout(webapp.ApplicationsListPage(apps, page, totalPages, search, baseURL))).ServeHTTP(w, r)
 }
 
-func (h *ApplicationsHandler) Create(w http.ResponseWriter, r *http.Request) {
+// Create membuat aplikasi baru.
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	envID := chi.URLParam(r, "env_id")
 	if envID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -146,7 +136,7 @@ func (h *ApplicationsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		appPort = 8080
 	}
 
-	slug := repo.GenerateSlug(name)
+	slug := GenerateSlug(name)
 
 	var repoURLPtr *string
 	if repoURL != "" {
@@ -161,7 +151,7 @@ func (h *ApplicationsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		dockerImagePtr = &dockerImage
 	}
 
-	_, err := h.appRepo.Create(models.CreateApplicationInput{
+	_, err := h.appRepo.CreateWithContext(r.Context(), models.CreateApplicationInput{
 		EnvironmentID: envID,
 		Name:          name,
 		Slug:          slug,
@@ -180,39 +170,42 @@ func (h *ApplicationsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) Get(w http.ResponseWriter, r *http.Request) {
+// Get menampilkan detail aplikasi.
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	deployments, _ := h.deployRepo.GetByApplicationID(id)
-	envVars, _ := h.envVarRepo.GetByApplicationID(id)
+	var deployments []*models.Deployment
+	// Deployments bisa kosong bila belum pernah deploy
+	envVars, _ := h.envVarRepo.GetByApplicationIDWithContext(r.Context(), id)
 
-	templ.Handler(layouts.AppLayout(applications.ApplicationDetailPage(app, deployments, envVars))).ServeHTTP(w, r)
+	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars))).ServeHTTP(w, r)
 }
 
-func (h *ApplicationsHandler) Start(w http.ResponseWriter, r *http.Request) {
+// Start menjalankan kontainer aplikasi.
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	if app.ContainerID != nil && *app.ContainerID != "" {
+	if app.ContainerID != nil && *app.ContainerID != "" && h.dockerClient != nil {
 		running, err := h.dockerClient.IsContainerRunning(r.Context(), *app.ContainerID)
 		if err != nil {
 			slog.Error("failed to check container status", "error", err, "container_id", *app.ContainerID)
@@ -223,7 +216,7 @@ func (h *ApplicationsHandler) Start(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.appRepo.UpdateStatus(id, models.AppStatusRunning); err != nil {
+	if err := h.appRepo.UpdateStatusWithContext(r.Context(), id, models.AppStatusRunning); err != nil {
 		slog.Error("failed to update app status", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -233,26 +226,27 @@ func (h *ApplicationsHandler) Start(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) Stop(w http.ResponseWriter, r *http.Request) {
+// Stop menghentikan kontainer aplikasi.
+func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	if app.ContainerID != nil && *app.ContainerID != "" {
+	if app.ContainerID != nil && *app.ContainerID != "" && h.dockerClient != nil {
 		if err := h.dockerClient.StopContainer(r.Context(), *app.ContainerID, 10); err != nil {
 			slog.Error("failed to stop container", "error", err, "container_id", *app.ContainerID)
 		}
 	}
 
-	if err := h.appRepo.UpdateStatus(id, models.AppStatusStopped); err != nil {
+	if err := h.appRepo.UpdateStatusWithContext(r.Context(), id, models.AppStatusStopped); err != nil {
 		slog.Error("failed to update app status", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -262,20 +256,21 @@ func (h *ApplicationsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) Restart(w http.ResponseWriter, r *http.Request) {
+// Restart me-restart kontainer aplikasi.
+func (h *Handler) Restart(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	if app.ContainerID != nil && *app.ContainerID != "" {
+	if app.ContainerID != nil && *app.ContainerID != "" && h.dockerClient != nil {
 		if err := h.dockerClient.RestartContainer(r.Context(), *app.ContainerID, 10); err != nil {
 			slog.Error("failed to restart container", "error", err, "container_id", *app.ContainerID)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -283,7 +278,7 @@ func (h *ApplicationsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.appRepo.UpdateStatus(id, models.AppStatusRunning); err != nil {
+	if err := h.appRepo.UpdateStatusWithContext(r.Context(), id, models.AppStatusRunning); err != nil {
 		slog.Error("failed to update app status", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -293,20 +288,26 @@ func (h *ApplicationsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) Deploy(w http.ResponseWriter, r *http.Request) {
+// Deploy memicu pembuatan deployment dan memasukkannya ke antrean worker.
+func (h *Handler) Deploy(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	deployment, err := h.deployRepo.Create(models.CreateDeploymentInput{
+	if h.deployRepo == nil {
+		http.Error(w, "Deployment creator not configured", http.StatusInternalServerError)
+		return
+	}
+
+	deployment, err := h.deployRepo.CreateWithContext(r.Context(), models.CreateDeploymentInput{
 		ApplicationID: app.ID,
 	})
 	if err != nil {
@@ -315,16 +316,14 @@ func (h *ApplicationsHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
-	_ = h.appRepo.UpdateStatus(app.ID, models.AppStatusBuilding)
-	_ = h.deployRepo.MarkStarted(deployment.ID)
-	_ = h.deployRepo.UpdateStatus(deployment.ID, models.DeployStatusQueued)
+	_ = h.appRepo.UpdateStatusWithContext(r.Context(), app.ID, models.AppStatusBuilding)
 
 	if h.deployWorker != nil {
 		var envVars []*models.AppEnvVar
 		if h.envVarRepo != nil {
-			envVars, _ = h.envVarRepo.GetByApplicationID(app.ID)
+			envVars, _ = h.envVarRepo.GetByApplicationIDWithContext(r.Context(), app.ID)
 		}
-		job := worker.BuildDeploymentJob(app, deployment.ID, envVars)
+		job := BuildDeploymentJob(app, deployment.ID, envVars)
 		job.LogPath = logPath
 		if err := h.deployWorker.Enqueue(job); err != nil {
 			slog.Error("failed to enqueue deployment job", "error", err, "deployment_id", deployment.ID)
@@ -335,7 +334,8 @@ func (h *ApplicationsHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) CreateEnvVar(w http.ResponseWriter, r *http.Request) {
+// CreateEnvVar menambahkan variabel lingkungan ke aplikasi.
+func (h *Handler) CreateEnvVar(w http.ResponseWriter, r *http.Request) {
 	appID := chi.URLParam(r, "id")
 	if appID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -351,7 +351,7 @@ func (h *ApplicationsHandler) CreateEnvVar(w http.ResponseWriter, r *http.Reques
 	value := r.FormValue("value")
 	isSecret := r.FormValue("is_secret") == "on"
 
-	_, err := h.envVarRepo.Create(models.CreateAppEnvVarInput{
+	_, err := h.envVarRepo.CreateWithContext(r.Context(), models.CreateAppEnvVarInput{
 		ApplicationID: appID,
 		Key:           key,
 		Value:         value,
@@ -366,7 +366,8 @@ func (h *ApplicationsHandler) CreateEnvVar(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) DeleteEnvVar(w http.ResponseWriter, r *http.Request) {
+// DeleteEnvVar menghapus variabel lingkungan aplikasi.
+func (h *Handler) DeleteEnvVar(w http.ResponseWriter, r *http.Request) {
 	appID := chi.URLParam(r, "id")
 	varID := chi.URLParam(r, "var_id")
 	if appID == "" || varID == "" {
@@ -374,12 +375,13 @@ func (h *ApplicationsHandler) DeleteEnvVar(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_ = h.envVarRepo.Delete(varID)
+	_ = h.envVarRepo.DeleteWithContext(r.Context(), varID)
 	w.Header().Set("HX-Redirect", "/applications/"+appID)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) Move(w http.ResponseWriter, r *http.Request) {
+// Move memindahkan aplikasi ke environment target.
+func (h *Handler) Move(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -397,7 +399,7 @@ func (h *ApplicationsHandler) Move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.appRepo.Move(id, targetEnvID); err != nil {
+	if err := h.appRepo.MoveWithContext(r.Context(), id, targetEnvID); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -406,14 +408,15 @@ func (h *ApplicationsHandler) Move(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) Clone(w http.ResponseWriter, r *http.Request) {
+// Clone mengkloning aplikasi dan variabel lingkungannya ke environment lain.
+func (h *Handler) Clone(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -431,15 +434,15 @@ func (h *ApplicationsHandler) Clone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clonedApp, err := h.appRepo.Clone(app, targetEnvID, newName)
+	clonedApp, err := h.appRepo.CloneWithContext(r.Context(), app, targetEnvID, newName)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	envVars, _ := h.envVarRepo.GetByApplicationID(id)
+	envVars, _ := h.envVarRepo.GetByApplicationIDWithContext(r.Context(), id)
 	for _, envVar := range envVars {
-		_, err := h.envVarRepo.Create(models.CreateAppEnvVarInput{
+		_, err := h.envVarRepo.CreateWithContext(r.Context(), models.CreateAppEnvVarInput{
 			ApplicationID: clonedApp.ID,
 			Key:           envVar.Key,
 			Value:         envVar.Value,
@@ -455,7 +458,8 @@ func (h *ApplicationsHandler) Clone(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) SetDomain(w http.ResponseWriter, r *http.Request) {
+// SetDomain mengatur custom domain untuk aplikasi.
+func (h *Handler) SetDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -473,85 +477,71 @@ func (h *ApplicationsHandler) SetDomain(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	_, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
 	domainPtr := &domain
-	if err := h.appRepo.UpdateCustomDomain(id, domainPtr); err != nil {
+	if err := h.appRepo.UpdateCustomDomainWithContext(r.Context(), id, domainPtr); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
-	}
-
-	if h.caddyClient != nil {
-		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
-		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
-		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
-
-		_ = app
-		_ = client
 	}
 
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
+// RemoveDomain menghapus custom domain dari aplikasi.
+func (h *Handler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	_, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	if err := h.appRepo.UpdateCustomDomain(id, nil); err != nil {
+	if err := h.appRepo.UpdateCustomDomainWithContext(r.Context(), id, nil); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
-	}
-
-	if h.caddyClient != nil && app.CustomDomain != nil && *app.CustomDomain != "" {
-		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
-		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
-		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
-
-		_ = client
 	}
 
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) RegenerateWebhookSecret(w http.ResponseWriter, r *http.Request) {
+// RegenerateWebhookSecret membuat secret baru untuk webhook aplikasi.
+func (h *Handler) RegenerateWebhookSecret(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	secret, err := repo.GenerateRandomSecret(32)
+	secret, err := GenerateRandomSecret(32)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	if err := h.appRepo.UpdateWebhookSecret(id, &secret); err != nil {
+	if err := h.appRepo.UpdateWebhookSecretWithContext(r.Context(), id, &secret); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	SetToast(w, "Webhook secret berhasil diperbarui", ToastSuccess)
+	setToast(w, "Webhook secret berhasil diperbarui", "success")
 	w.Header().Set("HX-Redirect", "/applications/"+id)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ApplicationsHandler) UpdateResourceLimits(w http.ResponseWriter, r *http.Request) {
+// UpdateResourceLimits memperbarui batas CPU dan memori aplikasi.
+func (h *Handler) UpdateResourceLimits(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -563,7 +553,7 @@ func (h *ApplicationsHandler) UpdateResourceLimits(w http.ResponseWriter, r *htt
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -590,7 +580,7 @@ func (h *ApplicationsHandler) UpdateResourceLimits(w http.ResponseWriter, r *htt
 		}
 	}
 
-	if err := h.appRepo.UpdateResourceLimits(id, cpuLimit, memoryLimit, memoryReservation); err != nil {
+	if err := h.appRepo.UpdateResourceLimitsWithContext(r.Context(), id, cpuLimit, memoryLimit, memoryReservation); err != nil {
 		http.Error(w, "Failed to update resource limits: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -613,20 +603,20 @@ func (h *ApplicationsHandler) UpdateResourceLimits(w http.ResponseWriter, r *htt
 	http.Redirect(w, r, "/applications/"+id, http.StatusFound)
 }
 
-func (h *ApplicationsHandler) Status(w http.ResponseWriter, r *http.Request) {
+// Status mengecek dan memperbarui status polling aplikasi.
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	// Sinkronisasi status dari Docker container jika ada
 	if h.dockerClient != nil && app.ContainerID != nil && *app.ContainerID != "" {
 		running, err := h.dockerClient.IsContainerRunning(r.Context(), *app.ContainerID)
 		if err == nil {
@@ -635,11 +625,37 @@ func (h *ApplicationsHandler) Status(w http.ResponseWriter, r *http.Request) {
 				newStatus = models.AppStatusRunning
 			}
 			if app.Status != newStatus && app.Status != models.AppStatusIdle {
-				_ = h.appRepo.UpdateStatus(app.ID, newStatus)
+				_ = h.appRepo.UpdateStatusWithContext(r.Context(), app.ID, newStatus)
 				app.Status = newStatus
 			}
 		}
 	}
 
 	templ.Handler(components.PollingStatusBadge(string(app.Status), "/applications/"+id+"/status")).ServeHTTP(w, r)
+}
+
+func parseInt(s string, defaultValue int) int {
+	if s == "" {
+		return defaultValue
+	}
+	val, err := strconv.Atoi(s)
+	if err != nil || val <= 0 {
+		return defaultValue
+	}
+	return val
+}
+
+func setToast(w http.ResponseWriter, message string, toastType string) {
+	if toastType == "" {
+		toastType = "info"
+	}
+	payload := map[string]any{
+		"showToast": map[string]string{
+			"message": message,
+			"type":    toastType,
+		},
+	}
+	if data, err := json.Marshal(payload); err == nil {
+		w.Header().Set("HX-Trigger", string(data))
+	}
 }

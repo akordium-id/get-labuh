@@ -1,4 +1,4 @@
-package handler
+package applications
 
 import (
 	"crypto/hmac"
@@ -12,31 +12,29 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
+// WebhooksHandler menangani request webhook dari GitHub, GitLab, atau Git generic.
 type WebhooksHandler struct {
-	appRepo      *repo.ApplicationRepo
-	deployRepo   *repo.DeploymentRepo
-	envVarRepo   *repo.EnvVarRepo
-	deployWorker *worker.DeployWorker
+	appRepo      *Repo
+	deployRepo   DeploymentCreator
+	envVarRepo   *EnvVarRepo
+	deployWorker DeployEnqueuer
 }
 
-func NewWebhooksHandler(appRepo *repo.ApplicationRepo, deployRepo *repo.DeploymentRepo) *WebhooksHandler {
+// NewWebhooksHandler membuat instance baru WebhooksHandler.
+func NewWebhooksHandler(appRepo *Repo, deployRepo DeploymentCreator, envVarRepo *EnvVarRepo) *WebhooksHandler {
 	return &WebhooksHandler{
 		appRepo:    appRepo,
 		deployRepo: deployRepo,
+		envVarRepo: envVarRepo,
 	}
 }
 
-func (h *WebhooksHandler) SetDeployWorker(w *worker.DeployWorker) {
+// SetDeployWorker menyetel worker antrean deployment.
+func (h *WebhooksHandler) SetDeployWorker(w DeployEnqueuer) {
 	h.deployWorker = w
-}
-
-func (h *WebhooksHandler) SetEnvVarRepo(r *repo.EnvVarRepo) {
-	h.envVarRepo = r
 }
 
 type githubWebhookPayload struct {
@@ -77,7 +75,7 @@ type genericWebhookPayload struct {
 	CommitMessage string `json:"commit_message"`
 }
 
-// Deploy adalah handler universal yang otomatis mendeteksi webhook GitHub, GitLab, atau Generic
+// Deploy menangani webhook universal dengan auto deteksi provider.
 func (h *WebhooksHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	appID := chi.URLParam(r, "application_id")
 	if appID == "" {
@@ -85,7 +83,7 @@ func (h *WebhooksHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := h.appRepo.GetByID(appID)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), appID)
 	if err != nil {
 		http.Error(w, `{"error":"application not found"}`, http.StatusNotFound)
 		return
@@ -97,7 +95,6 @@ func (h *WebhooksHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deteksi provider berdasarkan request headers
 	ghEvent := r.Header.Get("X-GitHub-Event")
 	glEvent := r.Header.Get("X-Gitlab-Event")
 
@@ -111,11 +108,10 @@ func (h *WebhooksHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fallback ke Generic Webhook
 	h.handleGeneric(w, r, app, bodyBytes)
 }
 
-// GitHub dedicated handler
+// GitHub menangani webhook spesifik endpoint GitHub.
 func (h *WebhooksHandler) GitHub(w http.ResponseWriter, r *http.Request) {
 	appID := chi.URLParam(r, "application_id")
 	if appID == "" {
@@ -123,7 +119,7 @@ func (h *WebhooksHandler) GitHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := h.appRepo.GetByID(appID)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), appID)
 	if err != nil {
 		http.Error(w, `{"error":"application not found"}`, http.StatusNotFound)
 		return
@@ -143,7 +139,7 @@ func (h *WebhooksHandler) GitHub(w http.ResponseWriter, r *http.Request) {
 	h.handleGitHub(w, r, app, ghEvent, bodyBytes)
 }
 
-// GitLab dedicated handler
+// GitLab menangani webhook spesifik endpoint GitLab.
 func (h *WebhooksHandler) GitLab(w http.ResponseWriter, r *http.Request) {
 	appID := chi.URLParam(r, "application_id")
 	if appID == "" {
@@ -151,7 +147,7 @@ func (h *WebhooksHandler) GitLab(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := h.appRepo.GetByID(appID)
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), appID)
 	if err != nil {
 		http.Error(w, `{"error":"application not found"}`, http.StatusNotFound)
 		return
@@ -172,7 +168,6 @@ func (h *WebhooksHandler) GitLab(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebhooksHandler) handleGitHub(w http.ResponseWriter, r *http.Request, app *models.Application, event string, bodyBytes []byte) {
-	// Ping event dari GitHub untuk verifikasi webhook endpoint
 	if event == "ping" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -183,7 +178,6 @@ func (h *WebhooksHandler) handleGitHub(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 
-	// Validasi HMAC Signature
 	if app.WebhookSecret != nil && *app.WebhookSecret != "" {
 		signature := r.Header.Get("X-Hub-Signature-256")
 		if signature == "" {
@@ -205,7 +199,6 @@ func (h *WebhooksHandler) handleGitHub(w http.ResponseWriter, r *http.Request, a
 		_ = json.Unmarshal(bodyBytes, &payload)
 	}
 
-	// Branch verification
 	targetBranch := "main"
 	if app.Branch != nil && *app.Branch != "" {
 		targetBranch = *app.Branch
@@ -244,7 +237,6 @@ func (h *WebhooksHandler) handleGitHub(w http.ResponseWriter, r *http.Request, a
 }
 
 func (h *WebhooksHandler) handleGitLab(w http.ResponseWriter, r *http.Request, app *models.Application, event string, bodyBytes []byte) {
-	// Validasi Token GitLab
 	if app.WebhookSecret != nil && *app.WebhookSecret != "" {
 		token := r.Header.Get("X-Gitlab-Token")
 		if subtle.ConstantTimeCompare([]byte(token), []byte(*app.WebhookSecret)) != 1 {
@@ -350,6 +342,11 @@ func (h *WebhooksHandler) dispatchDeployment(w http.ResponseWriter, app *models.
 		msgPtr = &commitMsg
 	}
 
+	if h.deployRepo == nil {
+		http.Error(w, `{"error":"deploy repository not configured"}`, http.StatusInternalServerError)
+		return
+	}
+
 	deployment, err := h.deployRepo.Create(models.CreateDeploymentInput{
 		ApplicationID: app.ID,
 		CommitHash:    hashPtr,
@@ -362,15 +359,13 @@ func (h *WebhooksHandler) dispatchDeployment(w http.ResponseWriter, app *models.
 
 	logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
 	_ = h.appRepo.UpdateStatus(app.ID, models.AppStatusBuilding)
-	_ = h.deployRepo.MarkStarted(deployment.ID)
-	_ = h.deployRepo.UpdateStatus(deployment.ID, models.DeployStatusQueued)
 
 	if h.deployWorker != nil {
 		var envVars []*models.AppEnvVar
 		if h.envVarRepo != nil {
 			envVars, _ = h.envVarRepo.GetByApplicationID(app.ID)
 		}
-		job := worker.BuildDeploymentJob(app, deployment.ID, envVars)
+		job := BuildDeploymentJob(app, deployment.ID, envVars)
 		job.LogPath = logPath
 		if branch != "" {
 			job.Branch = branch

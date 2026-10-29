@@ -14,6 +14,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
 	"github.com/akordium-id/get-labuh/internal/models"
+	applicationsmod "github.com/akordium-id/get-labuh/internal/modules/applications"
 	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
 	composemod "github.com/akordium-id/get-labuh/internal/modules/compose"
 	databasesmod "github.com/akordium-id/get-labuh/internal/modules/databases"
@@ -29,18 +30,16 @@ type Container struct {
 	AuthMod              *authmod.Module
 	AuthMiddleware       func(http.Handler) http.Handler
 	APIKeyAuthMiddleware *api.APIKeyAuthMiddleware
-	ApplicationsHandler  *handler.ApplicationsHandler
+	ApplicationsMod      *applicationsmod.Module
 	DeploymentsMod       *deploymentsmod.Module
 	ComposeMod           *composemod.Module
 	DatabasesMod         *databasesmod.Module
-	WebhooksHandler      *handler.WebhooksHandler
 	MonitoringHandler    *handler.MonitoringHandler
 	TemplatesHandler     *handler.TemplatesHandler
 	TerminalHandler      *handler.TerminalHandler
 	ProjectsMod          *projectsmod.Module
 	NotificationsMod     *notifications.Module
 	SettingsMod          *settingsmod.Module
-	DropzoneHandler      *handler.DropzoneHandler
 
 	APIAppHandler         *api.ApplicationsHandler
 	APIProjectsHandler    *api.ProjectsHandler
@@ -93,7 +92,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 
 	projectsMod := projectsmod.New(db, userRepo)
 	composeMod := composemod.New(db, caddyClient, settingsMod.SettingRepo)
-	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo, dockerClient)
+	applicationsMod := applicationsmod.New(db, projectRepo, projectRepo, deployRepo, settingsMod.SettingRepo, caddyClient, dockerClient)
 	deploymentsMod := deploymentsmod.New(db, appRepo)
 	deploymentsMod.SetDockerClient(dockerClient)
 	databasesMod := databasesmod.New(db, projectRepo)
@@ -108,7 +107,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
 	backupScheduler.Start()
 
-	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
@@ -119,11 +117,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	deployWorker.SetNotifier(notificationsMod.Notifier, projectRepo)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 
-	dropzoneHandler := handler.NewDropzoneHandler(appRepo, projectRepo, deployRepo, envVarRepo)
-	dropzoneHandler.SetDeployWorker(deployWorker)
-	applicationsHandler.SetDeployWorker(deployWorker)
-	webhooksHandler.SetDeployWorker(deployWorker)
-	webhooksHandler.SetEnvVarRepo(envVarRepo)
+	applicationsMod.SetDeployWorker(deployWorker)
 
 	apiAppHandler := api.NewApplicationsHandler(appRepo, projectRepo, deployRepo)
 	apiAppHandler.SetDeployWorker(deployWorker)
@@ -133,18 +127,16 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		AuthMod:               authMod,
 		AuthMiddleware:        authMiddleware,
 		APIKeyAuthMiddleware:  apiKeyAuthMiddleware,
-		ApplicationsHandler:   applicationsHandler,
+		ApplicationsMod:       applicationsMod,
 		DeploymentsMod:        deploymentsMod,
 		ComposeMod:            composeMod,
 		DatabasesMod:          databasesMod,
-		WebhooksHandler:       webhooksHandler,
 		MonitoringHandler:     monitoringHandler,
 		TemplatesHandler:      templatesHandler,
 		TerminalHandler:       terminalHandler,
 		ProjectsMod:           projectsMod,
 		NotificationsMod:      notificationsMod,
 		SettingsMod:           settingsMod,
-		DropzoneHandler:       dropzoneHandler,
 		APIAppHandler:         apiAppHandler,
 		APIProjectsHandler:    api.NewProjectsHandler(projectRepo),
 		APIDeploymentsHandler: api.NewDeploymentsHandler(deployRepo, appRepo),

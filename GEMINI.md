@@ -47,7 +47,7 @@ migrations/                ← SQL migration files
 
 | Domain | Handler | Repo | Model |
 |--------|---------|------|-------|
-| Applications | `handler/applications.go` | `repo/application.go` | `models/application.go` |
+| Applications | `modules/applications/handler.go` | `modules/applications/repo.go` | `models/application.go` |
 | Deployments | `modules/deployments/handler.go` | `modules/deployments/repo.go` | `models/application.go` (Deployment) |
 | Databases | `modules/databases/handler.go` | `modules/databases/repo.go` | `models/database.go` |
 | Compose | `modules/compose/handler.go` | `modules/compose/repo.go` | `models/compose.go` |
