@@ -154,6 +154,8 @@ func main() {
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 	defer deployWorker.Stop()
 
+	dropzoneHandler := handler.NewDropzoneHandler(appRepo, projectRepo, deployRepo, envVarRepo)
+	dropzoneHandler.SetDeployWorker(deployWorker)
 	applicationsHandler.SetDeployWorker(deployWorker)
 	webhooksHandler.SetDeployWorker(deployWorker)
 	webhooksHandler.SetEnvVarRepo(envVarRepo)
@@ -197,6 +199,7 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware)
 		r.Post("/settings/mode", settingsHandler.SwitchMode)
+		r.Post("/lite/deploy/upload", dropzoneHandler.UploadDropzone)
 
 		r.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
 			user, _ := auth.UserFromContext(r.Context())

@@ -10,6 +10,7 @@ const (
 	SourceTypeDockerfile    SourceType = "dockerfile"
 	SourceTypeNixpacks      SourceType = "nixpacks"
 	SourceTypeDockerCompose SourceType = "docker_compose"
+	SourceTypeDropzone      SourceType = "dropzone"
 )
 
 type AppStatus string

@@ -248,6 +248,62 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		writeLog(activeLogWriter, "Docker build completed: "+builtImage)
 		imageName = builtImage
 
+	case string(models.SourceTypeDropzone):
+		writeLog(activeLogWriter, "Processing dropped source code...")
+		updateStep("build", models.DeployStatusBuilding, "")
+
+		buildDir := filepath.Join("/tmp/labuh-sources", job.ApplicationID)
+		if fi, err := os.Stat(buildDir); err != nil || !fi.IsDir() {
+			errMsg := fmt.Sprintf("source directory not found: %s", buildDir)
+			writeLog(activeLogWriter, errMsg)
+			updateStep("build", models.DeployStatusFailed, errMsg)
+			return &DeployError{Step: "build", Output: errMsg}
+		}
+
+		dockerfilePath := "Dockerfile"
+		if job.DockerfilePath != "" {
+			dockerfilePath = job.DockerfilePath
+		}
+		fullDockerfilePath := filepath.Join(buildDir, dockerfilePath)
+		hasDockerfile := false
+		if fi, err := os.Stat(fullDockerfilePath); err == nil && !fi.IsDir() {
+			hasDockerfile = true
+		}
+
+		buildCtx, cancelBuild := context.WithTimeout(ctx, 20*time.Minute)
+		defer cancelBuild()
+
+		if hasDockerfile {
+			writeLog(activeLogWriter, fmt.Sprintf("Found %s in uploaded source. Building docker image...", dockerfilePath))
+			cacheRef := docker.GenerateCacheRef(job.ApplicationID, "dropzone")
+			builtImage, err := p.dockerClient.BuildFromDockerfileWithCache(buildCtx, job.ApplicationID, buildDir, dockerfilePath, cacheRef)
+			if err != nil {
+				errMsg := fmt.Sprintf("docker build failed: %v", err)
+				writeLog(activeLogWriter, errMsg)
+				p.cleanupFailedContainer(ctx, job)
+				updateStep("build", models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "build", Cause: err, Output: errMsg}
+			}
+			writeLog(activeLogWriter, "Docker build completed: "+builtImage)
+			imageName = builtImage
+		} else {
+			writeLog(activeLogWriter, "No Dockerfile found. Using Nixpacks to auto-detect and build runtime...")
+			envs := make(map[string]string)
+			for _, ev := range job.EnvVars {
+				envs[ev.Key] = ev.Value
+			}
+			builtImage, err := p.dockerClient.BuildWithNixpacks(buildCtx, job.ApplicationID, buildDir, envs, activeLogWriter)
+			if err != nil {
+				errMsg := fmt.Sprintf("nixpacks build failed: %v", err)
+				writeLog(activeLogWriter, errMsg)
+				p.cleanupFailedContainer(ctx, job)
+				updateStep("build", models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "build", Cause: err, Output: errMsg}
+			}
+			writeLog(activeLogWriter, "Nixpacks build completed: "+builtImage)
+			imageName = builtImage
+		}
+
 	case string(models.SourceTypeDockerImage):
 		writeLog(activeLogWriter, fmt.Sprintf("Pulling image %s...", job.DockerImage))
 		updateStep("push", models.DeployStatusDeploying, "")
