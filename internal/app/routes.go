@@ -162,10 +162,7 @@ func SetupRoutes(c *Container) http.Handler {
 		r.Get("/settings/backup/download", c.BackupHandler.DownloadBackup)
 		r.Post("/settings/restore", c.BackupHandler.RestoreBackup)
 
-		r.Get("/settings/notifications", c.NotificationsHandler.List)
-		r.Post("/settings/notifications", c.NotificationsHandler.Create)
-		r.Post("/settings/notifications/{id}/delete", c.NotificationsHandler.Delete)
-		r.Post("/settings/notifications/{id}/test", c.NotificationsHandler.Test)
+		c.NotificationsMod.RegisterRoutes(r)
 
 		r.Get("/settings/audit-logs", c.AuditHandler.AuditLogsPage)
 	})

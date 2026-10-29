@@ -13,7 +13,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
-	"github.com/akordium-id/get-labuh/internal/notification"
+	"github.com/akordium-id/get-labuh/internal/modules/notifications"
 	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
@@ -34,7 +34,7 @@ type Container struct {
 	MonitoringHandler          *handler.MonitoringHandler
 	TemplatesHandler           *handler.TemplatesHandler
 	TerminalHandler            *handler.TerminalHandler
-	NotificationsHandler       *handler.NotificationsHandler
+	NotificationsMod           *notifications.Module
 	DropzoneHandler            *handler.DropzoneHandler
 	APIKeysHandler             *handler.APIKeysHandler
 	SettingsHandler            *handler.SettingsHandler
@@ -70,8 +70,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	auditRepo := repo.NewAuditLogRepo(db)
 	storageRepo := repo.NewStorageDestinationRepo(db)
 	databaseBackupRepo := repo.NewDatabaseBackupRepo(db)
-	notifRepo := repo.NewNotificationRepo(db)
-	notifier := notification.NewNotifier(notifRepo)
+	notificationsMod := notifications.New(db, projectRepo)
 
 	_ = settingRepo.InitializeDefaults()
 	_ = encryption.Init(cfg.MasterKeyEnv)
@@ -107,7 +106,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	storageDestinationsHandler := handler.NewStorageDestinationsHandler(storageRepo)
 
 	databaseBackupRunner := backup.NewDatabaseBackupRunner(dockerClient, databaseBackupRepo, storageRepo, databaseRepo, cfg.BackupDir+"/databases")
-	databaseBackupRunner.SetNotifier(notifier, projectRepo)
+	databaseBackupRunner.SetNotifier(notificationsMod.Notifier, projectRepo)
 	databasesHandler.SetBackupDependencies(databaseBackupRepo, storageRepo, databaseBackupRunner)
 
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
@@ -118,12 +117,11 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
-	notificationsHandler := handler.NewNotificationsHandler(notifRepo, projectRepo, notifier)
 
 	deployWorker := worker.NewDeployWorker(10)
 	deployWorker.SetMaxConcurrent(3)
 	deployWorker.SetWorkerCount(1)
-	deployWorker.SetNotifier(notifier, projectRepo)
+	deployWorker.SetNotifier(notificationsMod.Notifier, projectRepo)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 
 	dropzoneHandler := handler.NewDropzoneHandler(appRepo, projectRepo, deployRepo, envVarRepo)
@@ -152,7 +150,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		MonitoringHandler:          monitoringHandler,
 		TemplatesHandler:           templatesHandler,
 		TerminalHandler:            terminalHandler,
-		NotificationsHandler:       notificationsHandler,
+		NotificationsMod:           notificationsMod,
 		DropzoneHandler:            dropzoneHandler,
 		APIKeysHandler:             apiKeysHandler,
 		SettingsHandler:            settingsHandler,

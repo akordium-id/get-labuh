@@ -1,4 +1,4 @@
-package handler
+package notifications_test
 
 import (
 	"net/http"
@@ -14,27 +14,23 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/akordium-id/get-labuh/internal/notification"
+	"github.com/akordium-id/get-labuh/internal/modules/notifications"
 )
 
-func TestNotificationsHandler_CRUD_And_Filtering(t *stdtesting.T) {
+func TestNotificationsModule_CRUD_And_Filtering(t *stdtesting.T) {
 	db, err := database.Connect("file::memory:?cache=shared")
 	require.NoError(t, err)
 	require.NoError(t, database.RunAllMigrations(db))
 	t.Cleanup(func() { _ = db.Close() })
 
 	projectRepo := repo.NewProjectRepo(db)
-	notifRepo := repo.NewNotificationRepo(db)
-	notifier := notification.NewNotifier(notifRepo)
-	h := NewNotificationsHandler(notifRepo, projectRepo, notifier)
+	mod := notifications.New(db, projectRepo)
 
 	proj, err := projectRepo.Create(models.CreateProjectInput{Name: "Client A Project", Slug: "client-a"})
 	require.NoError(t, err)
 
 	r := chi.NewRouter()
-	r.Get("/settings/notifications", h.List)
-	r.Post("/settings/notifications", h.Create)
-	r.Post("/settings/notifications/{id}/delete", h.Delete)
+	mod.RegisterRoutes(r)
 
 	// 1. Create Global Discord Channel
 	form := url.Values{}
@@ -68,21 +64,18 @@ func TestNotificationsHandler_CRUD_And_Filtering(t *stdtesting.T) {
 	r.ServeHTTP(w2, req2)
 	assert.Equal(t, http.StatusFound, w2.Code)
 
-	// 3. Test Filtering (Opsi B: Global + Project Override)
-	// Event Deploy Success untuk Project A: Harus dapat 2 channel (Global Discord + Project A Telegram)
-	channelsForProjectA, err := notifRepo.ListActiveForEvent("deploy_success", &proj.ID)
+	// 3. Test Filtering (Global + Project Override)
+	channelsForProjectA, err := mod.Repo.ListActiveForEvent("deploy_success", &proj.ID)
 	require.NoError(t, err)
 	assert.Len(t, channelsForProjectA, 2)
 
-	// Event Deploy Success untuk Project Lain (atau nil): Hanya dapat 1 channel (Global Discord)
 	otherProjID := "some-other-project-id"
-	channelsForOther, err := notifRepo.ListActiveForEvent("deploy_success", &otherProjID)
+	channelsForOther, err := mod.Repo.ListActiveForEvent("deploy_success", &otherProjID)
 	require.NoError(t, err)
 	assert.Len(t, channelsForOther, 1)
 	assert.Equal(t, "Global DevOps Discord", channelsForOther[0].Name)
 
-	// Event Backup Success: Global Discord disetel false, maka harus kosong
-	backupSuccessChannels, err := notifRepo.ListActiveForEvent("backup_success", &proj.ID)
+	backupSuccessChannels, err := mod.Repo.ListActiveForEvent("backup_success", &proj.ID)
 	require.NoError(t, err)
 	assert.Empty(t, backupSuccessChannels)
 

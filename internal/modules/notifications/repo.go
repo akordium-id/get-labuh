@@ -1,4 +1,4 @@
-package repo
+package notifications
 
 import (
 	"database/sql"
@@ -8,15 +8,15 @@ import (
 	"github.com/google/uuid"
 )
 
-type NotificationRepo struct {
+type Repo struct {
 	db *sql.DB
 }
 
-func NewNotificationRepo(db *sql.DB) *NotificationRepo {
-	return &NotificationRepo{db: db}
+func NewRepo(db *sql.DB) *Repo {
+	return &Repo{db: db}
 }
 
-func (r *NotificationRepo) Create(input models.CreateNotificationChannelInput) (*models.NotificationChannel, error) {
+func (r *Repo) Create(input models.CreateNotificationChannelInput) (*models.NotificationChannel, error) {
 	id := uuid.New().String()
 	now := time.Now()
 
@@ -39,7 +39,7 @@ func (r *NotificationRepo) Create(input models.CreateNotificationChannelInput) (
 	return r.GetByID(id)
 }
 
-func (r *NotificationRepo) GetByID(id string) (*models.NotificationChannel, error) {
+func (r *Repo) GetByID(id string) (*models.NotificationChannel, error) {
 	c := &models.NotificationChannel{}
 	err := r.db.QueryRow(
 		`SELECT id, project_id, type, name, enabled,
@@ -60,20 +60,20 @@ func (r *NotificationRepo) GetByID(id string) (*models.NotificationChannel, erro
 	return c, nil
 }
 
-func (r *NotificationRepo) ListGlobal() ([]*models.NotificationChannel, error) {
+func (r *Repo) ListGlobal() ([]*models.NotificationChannel, error) {
 	rows, err := r.db.Query(
 		`SELECT id, project_id, type, name, enabled,
 				discord_webhook_url, telegram_bot_token, telegram_chat_id,
 				on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
 				created_at, updated_at
-		 FROM notification_channels WHERE project_id IS NULL ORDER BY created_at ASC`,
+		 FROM notification_channels WHERE project_id IS NULL ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var list []*models.NotificationChannel
+	var channels []*models.NotificationChannel
 	for rows.Next() {
 		c := &models.NotificationChannel{}
 		if err := rows.Scan(
@@ -84,22 +84,18 @@ func (r *NotificationRepo) ListGlobal() ([]*models.NotificationChannel, error) {
 		); err != nil {
 			return nil, err
 		}
-		list = append(list, c)
+		channels = append(channels, c)
 	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return list, nil
+	return channels, nil
 }
 
-func (r *NotificationRepo) ListByProjectID(projectID string) ([]*models.NotificationChannel, error) {
+func (r *Repo) ListByProjectID(projectID string) ([]*models.NotificationChannel, error) {
 	rows, err := r.db.Query(
 		`SELECT id, project_id, type, name, enabled,
 				discord_webhook_url, telegram_bot_token, telegram_chat_id,
 				on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
 				created_at, updated_at
-		 FROM notification_channels WHERE project_id = ? ORDER BY created_at ASC`,
+		 FROM notification_channels WHERE project_id = ? ORDER BY created_at DESC`,
 		projectID,
 	)
 	if err != nil {
@@ -107,7 +103,7 @@ func (r *NotificationRepo) ListByProjectID(projectID string) ([]*models.Notifica
 	}
 	defer rows.Close()
 
-	var list []*models.NotificationChannel
+	var channels []*models.NotificationChannel
 	for rows.Next() {
 		c := &models.NotificationChannel{}
 		if err := rows.Scan(
@@ -118,43 +114,40 @@ func (r *NotificationRepo) ListByProjectID(projectID string) ([]*models.Notifica
 		); err != nil {
 			return nil, err
 		}
-		list = append(list, c)
+		channels = append(channels, c)
 	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return list, nil
+	return channels, nil
 }
 
-// ListActiveForEvent mengambil semua channel yang aktif untuk event tertentu:
-// Termasuk channel Global (project_id IS NULL) dan channel project spesifik (jika projectID disediakan).
-func (r *NotificationRepo) ListActiveForEvent(eventType string, projectID *string) ([]*models.NotificationChannel, error) {
-	column := "on_deploy_success"
+func (r *Repo) ListActiveForEvent(eventType string, projectID *string) ([]*models.NotificationChannel, error) {
+	var eventCol string
 	switch eventType {
 	case "deploy_success":
-		column = "on_deploy_success"
+		eventCol = "on_deploy_success = 1"
 	case "deploy_failure":
-		column = "on_deploy_failure"
+		eventCol = "on_deploy_failure = 1"
 	case "backup_success":
-		column = "on_backup_success"
+		eventCol = "on_backup_success = 1"
 	case "backup_failure":
-		column = "on_backup_failure"
+		eventCol = "on_backup_failure = 1"
+	default:
+		return nil, nil
 	}
 
 	query := `SELECT id, project_id, type, name, enabled,
-					 discord_webhook_url, telegram_bot_token, telegram_chat_id,
-					 on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
-					 created_at, updated_at
-			  FROM notification_channels
-			  WHERE enabled = 1 AND ` + column + ` = 1 AND (project_id IS NULL`
+			discord_webhook_url, telegram_bot_token, telegram_chat_id,
+			on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
+			created_at, updated_at
+		FROM notification_channels
+		WHERE enabled = 1 AND ` + eventCol
 
 	var args []any
-	if projectID != nil && *projectID != "" {
-		query += ` OR project_id = ?`
+	if projectID != nil {
+		query += ` AND (project_id IS NULL OR project_id = ?)`
 		args = append(args, *projectID)
+	} else {
+		query += ` AND project_id IS NULL`
 	}
-	query += `)`
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -162,7 +155,7 @@ func (r *NotificationRepo) ListActiveForEvent(eventType string, projectID *strin
 	}
 	defer rows.Close()
 
-	var list []*models.NotificationChannel
+	var channels []*models.NotificationChannel
 	for rows.Next() {
 		c := &models.NotificationChannel{}
 		if err := rows.Scan(
@@ -173,16 +166,12 @@ func (r *NotificationRepo) ListActiveForEvent(eventType string, projectID *strin
 		); err != nil {
 			return nil, err
 		}
-		list = append(list, c)
+		channels = append(channels, c)
 	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return list, nil
+	return channels, nil
 }
 
-func (r *NotificationRepo) Delete(id string) error {
-	_, err := r.db.Exec("DELETE FROM notification_channels WHERE id = ?", id)
+func (r *Repo) Delete(id string) error {
+	_, err := r.db.Exec(`DELETE FROM notification_channels WHERE id = ?`, id)
 	return err
 }

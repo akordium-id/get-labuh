@@ -1,4 +1,4 @@
-package notification
+package notifications
 
 import (
 	"bytes"
@@ -10,16 +10,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
 type Notifier struct {
-	repo       *repo.NotificationRepo
+	repo       *Repo
 	httpClient *http.Client
 }
 
-func NewNotifier(repo *repo.NotificationRepo) *Notifier {
+func NewNotifier(repo *Repo) *Notifier {
 	return &Notifier{
 		repo:       repo,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
@@ -61,61 +60,50 @@ func (n *Notifier) SendToChannel(ctx context.Context, ch *models.NotificationCha
 		return n.sendTelegram(ctx, *ch.TelegramBotToken, *ch.TelegramChatID, event)
 
 	default:
-		return fmt.Errorf("unsupported channel type: %s", ch.Type)
+		return fmt.Errorf("unsupported notification channel type: %s", ch.Type)
 	}
-}
-
-// Discord Webhook Payload
-type discordEmbedField struct {
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-	Inline bool   `json:"inline"`
-}
-
-type discordEmbed struct {
-	Title       string              `json:"title"`
-	Description string              `json:"description"`
-	Color       int                 `json:"color"`
-	Fields      []discordEmbedField `json:"fields,omitempty"`
-	Timestamp   string              `json:"timestamp"`
-	Footer      struct {
-		Text string `json:"text"`
-	} `json:"footer"`
-}
-
-type discordPayload struct {
-	Username  string         `json:"username"`
-	AvatarURL string         `json:"avatar_url,omitempty"`
-	Embeds    []discordEmbed `json:"embeds"`
 }
 
 func (n *Notifier) sendDiscord(ctx context.Context, webhookURL string, event models.NotificationEvent) error {
-	color := 0x22c55e // green
-	if event.Status == "failure" {
-		color = 0xef4444 // red
+	var color int
+	switch event.Status {
+	case "success":
+		color = 0x22c55e // Green
+	case "failed", "error":
+		color = 0xef4444 // Red
+	default:
+		color = 0x3b82f6 // Blue
 	}
 
-	var fields []discordEmbedField
+	type discordField struct {
+		Name   string `json:"name"`
+		Value  string `json:"value"`
+		Inline bool   `json:"inline"`
+	}
+
+	fields := make([]discordField, 0, len(event.Fields))
 	for k, v := range event.Fields {
-		fields = append(fields, discordEmbedField{
+		fields = append(fields, discordField{
 			Name:   k,
 			Value:  v,
 			Inline: true,
 		})
 	}
 
-	embed := discordEmbed{
-		Title:       event.Title,
-		Description: event.Description,
-		Color:       color,
-		Fields:      fields,
-		Timestamp:   time.Now().UTC().Format(time.RFC3339),
-	}
-	embed.Footer.Text = "Labuh PaaS Notification"
-
-	payload := discordPayload{
-		Username: "Labuh",
-		Embeds:   []discordEmbed{embed},
+	payload := map[string]any{
+		"username": "Labuh PaaS",
+		"embeds": []map[string]any{
+			{
+				"title":       event.Title,
+				"description": event.Description,
+				"color":       color,
+				"fields":      fields,
+				"timestamp":   time.Now().UTC().Format(time.RFC3339),
+				"footer": map[string]string{
+					"text": "Labuh Deployment Engine",
+				},
+			},
+		},
 	}
 
 	body, err := json.Marshal(payload)
@@ -123,7 +111,7 @@ func (n *Notifier) sendDiscord(ctx context.Context, webhookURL string, event mod
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -136,42 +124,37 @@ func (n *Notifier) sendDiscord(ctx context.Context, webhookURL string, event mod
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("discord returned status %d", resp.StatusCode)
+		return fmt.Errorf("discord returned non-2xx status: %d", resp.StatusCode)
 	}
+
 	return nil
 }
 
-// Telegram Bot API Payload
-type telegramPayload struct {
-	ChatID    string `json:"chat_id"`
-	Text      string `json:"text"`
-	ParseMode string `json:"parse_mode"`
-}
-
 func (n *Notifier) sendTelegram(ctx context.Context, botToken, chatID string, event models.NotificationEvent) error {
-	statusEmoji := "✅"
-	if event.Status == "failure" {
-		statusEmoji = "❌"
+	var statusIcon string
+	switch event.Status {
+	case "success":
+		statusIcon = "✅"
+	case "failed", "error":
+		statusIcon = "❌"
+	default:
+		statusIcon = "ℹ️"
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "%s <b>%s</b>\n\n", statusEmoji, event.Title)
-	if event.Description != "" {
-		fmt.Fprintf(&sb, "%s\n\n", event.Description)
-	}
+	fmt.Fprintf(&sb, "%s <b>%s</b>\n\n", statusIcon, event.Title)
+	fmt.Fprintf(&sb, "%s\n\n", event.Description)
 
-	if len(event.Fields) > 0 {
-		for k, v := range event.Fields {
-			fmt.Fprintf(&sb, "• <b>%s:</b> <code>%s</code>\n", k, v)
-		}
-		sb.WriteString("\n")
+	for k, v := range event.Fields {
+		fmt.Fprintf(&sb, "<b>%s:</b> <code>%s</code>\n", k, v)
 	}
-	sb.WriteString("<i>Labuh Platform Notification</i>")
+	fmt.Fprintf(&sb, "\n<i>Labuh Deployment Engine • %s</i>", time.Now().Format("2006-01-02 15:04:05"))
 
-	payload := telegramPayload{
-		ChatID:    chatID,
-		Text:      sb.String(),
-		ParseMode: "HTML",
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	payload := map[string]string{
+		"chat_id":    chatID,
+		"text":       sb.String(),
+		"parse_mode": "HTML",
 	}
 
 	body, err := json.Marshal(payload)
@@ -179,8 +162,7 @@ func (n *Notifier) sendTelegram(ctx context.Context, botToken, chatID string, ev
 		return err
 	}
 
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -193,7 +175,8 @@ func (n *Notifier) sendTelegram(ctx context.Context, botToken, chatID string, ev
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("telegram returned status %d", resp.StatusCode)
+		return fmt.Errorf("telegram returned non-2xx status: %d", resp.StatusCode)
 	}
+
 	return nil
 }

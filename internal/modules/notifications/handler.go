@@ -1,4 +1,4 @@
-package handler
+package notifications
 
 import (
 	"context"
@@ -8,42 +8,43 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/akordium-id/get-labuh/internal/notification"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/settings"
 )
 
-type NotificationsHandler struct {
-	notifRepo   *repo.NotificationRepo
-	projectRepo *repo.ProjectRepo
-	notifier    *notification.Notifier
+type ProjectProvider interface {
+	GetAll() ([]*models.Project, error)
 }
 
-func NewNotificationsHandler(
-	notifRepo *repo.NotificationRepo,
-	projectRepo *repo.ProjectRepo,
-	notifier *notification.Notifier,
-) *NotificationsHandler {
-	return &NotificationsHandler{
-		notifRepo:   notifRepo,
-		projectRepo: projectRepo,
-		notifier:    notifier,
+type Handler struct {
+	repo            *Repo
+	projectProvider ProjectProvider
+	notifier        *Notifier
+}
+
+func NewHandler(
+	repo *Repo,
+	projectProvider ProjectProvider,
+	notifier *Notifier,
+) *Handler {
+	return &Handler{
+		repo:            repo,
+		projectProvider: projectProvider,
+		notifier:        notifier,
 	}
 }
 
-func (h *NotificationsHandler) List(w http.ResponseWriter, r *http.Request) {
-	channels, err := h.notifRepo.ListGlobal()
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	channels, err := h.repo.ListGlobal()
 	if err != nil {
 		http.Error(w, "Failed to load notification channels", http.StatusInternalServerError)
 		return
 	}
 
-	projects, _ := h.projectRepo.GetAll()
-	// Muat juga channels project-level jika ada
+	projects, _ := h.projectProvider.GetAll()
 	for _, p := range projects {
-		if pChannels, err := h.notifRepo.ListByProjectID(p.ID); err == nil {
+		if pChannels, err := h.repo.ListByProjectID(p.ID); err == nil {
 			channels = append(channels, pChannels...)
 		}
 	}
@@ -51,7 +52,7 @@ func (h *NotificationsHandler) List(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(layouts.AppLayout(settings.NotificationsPage(channels, projects))).ServeHTTP(w, r)
 }
 
-func (h *NotificationsHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
@@ -95,7 +96,7 @@ func (h *NotificationsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		OnBackupFailure:   r.FormValue("on_backup_failure") == "true",
 	}
 
-	if _, err := h.notifRepo.Create(input); err != nil {
+	if _, err := h.repo.Create(input); err != nil {
 		http.Error(w, "Failed to create channel: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -103,14 +104,14 @@ func (h *NotificationsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings/notifications", http.StatusFound)
 }
 
-func (h *NotificationsHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.notifRepo.Delete(id); err != nil {
+	if err := h.repo.Delete(id); err != nil {
 		http.Error(w, "Failed to delete channel", http.StatusInternalServerError)
 		return
 	}
@@ -118,14 +119,14 @@ func (h *NotificationsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings/notifications", http.StatusFound)
 }
 
-func (h *NotificationsHandler) Test(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Test(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	ch, err := h.notifRepo.GetByID(id)
+	ch, err := h.repo.GetByID(id)
 	if err != nil {
 		http.Error(w, "Channel not found", http.StatusNotFound)
 		return
