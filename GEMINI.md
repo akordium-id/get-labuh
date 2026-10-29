@@ -50,11 +50,10 @@ migrations/                ← SQL migration files
 | Applications | `handler/applications.go` | `repo/application.go` | `models/application.go` |
 | Deployments | `handler/deployments.go` | `repo/deployment.go` | `models/application.go` (Deployment) |
 | Databases | `handler/databases.go` | `repo/database.go` | `models/database.go` |
-| Projects | `handler/projects.go` | `repo/project.go` | `models/project.go` |
-| Notifications | `handler/notifications.go` | `repo/notification.go` | `models/notification.go` |
-| Backup | `handler/backup.go` | `repo/backup.go` | `models/backup.go` |
-| Auth | `handler/auth.go` | `repo/user.go`, `repo/session.go` | `models/user.go` |
-| Settings | `handler/settings.go` | `repo/setting.go` | `models/setting.go` |
+| Projects | `modules/projects/handler.go` | `modules/projects/repo.go` | `models/project.go` |
+| Notifications | `modules/notifications/handler.go` | `modules/notifications/repo.go` | `models/notification.go` |
+| Auth | `modules/auth/handler.go` | `modules/auth/repo.go` | `models/user.go` |
+| Settings & Backup | `modules/settings/handler.go` | `modules/settings/repo.go` | `models/setting.go` |
 
 ## Konvensi Kode
 

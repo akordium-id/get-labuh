@@ -10,9 +10,9 @@ import (
 
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
-	"github.com/akordium-id/get-labuh/internal/handler"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/modules/auth"
+	"github.com/akordium-id/get-labuh/internal/modules/projects"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -75,7 +75,7 @@ func TestIntegration_ProjectCreationFlow(t *stdtesting.T) {
 
 	projectRepo := repo.NewProjectRepo(db)
 	appRepo := repo.NewApplicationRepo(db)
-	projectsHandler := handler.NewProjectsHandler(projectRepo)
+	projectsMod := projects.New(db, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/projects", nil)
 	req.PostForm = map[string][]string{
@@ -84,7 +84,7 @@ func TestIntegration_ProjectCreationFlow(t *stdtesting.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
-	projectsHandler.Create(w, req)
+	projectsMod.Handler.ProjectsCreate(w, req)
 
 	resp := w.Result()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

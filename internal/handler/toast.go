@@ -41,3 +41,20 @@ func SetToast(w http.ResponseWriter, message string, toastType ToastType) {
 		w.Header().Set("HX-Trigger", string(data))
 	}
 }
+
+func parseInt(s string, defaultValue int) int {
+	if s == "" {
+		return defaultValue
+	}
+	var val int
+	for _, ch := range s {
+		if ch < '0' || ch > '9' {
+			return defaultValue
+		}
+		val = val*10 + int(ch-'0')
+	}
+	if val < 1 {
+		return defaultValue
+	}
+	return val
+}

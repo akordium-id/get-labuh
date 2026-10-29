@@ -14,7 +14,6 @@ import (
 	"github.com/akordium-id/get-labuh/internal/web/pages/compose"
 	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 	"github.com/akordium-id/get-labuh/internal/web/pages/lite"
-	"github.com/akordium-id/get-labuh/internal/web/pages/projects"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -69,16 +68,7 @@ func SetupRoutes(c *Container) http.Handler {
 
 			templ.Handler(layouts.AppLayout(pages.DashboardPage(user.Name), userMode)).ServeHTTP(w, r)
 		})
-		r.Get("/projects", c.ProjectsHandler.List)
-		r.Post("/projects", c.ProjectsHandler.Create)
-		r.Get("/projects/{id}", c.ProjectsHandler.Get)
-		r.Post("/projects/{id}/delete", c.ProjectsHandler.Delete)
-		r.Get("/projects/create", func(w http.ResponseWriter, r *http.Request) {
-			templ.Handler(layouts.AppLayout(projects.ProjectCreatePage())).ServeHTTP(w, r)
-		})
-		r.Get("/projects/{id}/deploy-keys", c.DeployKeysHandler.List)
-		r.Post("/projects/{id}/deploy-keys", c.DeployKeysHandler.Create)
-		r.Post("/deploy-keys/{id}/delete", c.DeployKeysHandler.Delete)
+		c.ProjectsMod.RegisterRoutes(r)
 
 		r.Get("/templates", c.TemplatesHandler.List)
 		r.Get("/templates/{id}", c.TemplatesHandler.Get)

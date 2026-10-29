@@ -15,6 +15,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/handler"
 	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
 	"github.com/akordium-id/get-labuh/internal/modules/notifications"
+	projectsmod "github.com/akordium-id/get-labuh/internal/modules/projects"
 	settingsmod "github.com/akordium-id/get-labuh/internal/modules/settings"
 	"github.com/akordium-id/get-labuh/internal/worker"
 )
@@ -24,17 +25,16 @@ type Container struct {
 	AuthMod              *authmod.Module
 	AuthMiddleware       func(http.Handler) http.Handler
 	APIKeyAuthMiddleware *api.APIKeyAuthMiddleware
-	ProjectsHandler      *handler.ProjectsHandler
 	ApplicationsHandler  *handler.ApplicationsHandler
 	DeploymentsHandler   *handler.DeploymentsHandler
 	LogsHandler          *handler.LogsHandler
 	ComposeHandler       *handler.ComposeHandler
 	DatabasesHandler     *handler.DatabasesHandler
-	DeployKeysHandler    *handler.DeployKeysHandler
 	WebhooksHandler      *handler.WebhooksHandler
 	MonitoringHandler    *handler.MonitoringHandler
 	TemplatesHandler     *handler.TemplatesHandler
 	TerminalHandler      *handler.TerminalHandler
+	ProjectsMod          *projectsmod.Module
 	NotificationsMod     *notifications.Module
 	SettingsMod          *settingsmod.Module
 	DropzoneHandler      *handler.DropzoneHandler
@@ -62,7 +62,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	envVarRepo := repo.NewEnvVarRepo(db)
 	composeRepo := repo.NewComposeRepo(db)
 	databaseRepo := repo.NewDatabaseRepo(db)
-	deployKeyRepo := repo.NewDeployKeyRepo(db)
 	templateRepo := repo.NewTemplateRepo(db)
 	apiKeyRepo := repo.NewApiKeyRepo(db)
 	settingRepo := repo.NewSettingRepo(db)
@@ -89,7 +88,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
 	}
 
-	projectsHandler := handler.NewProjectsHandler(projectRepo)
+	projectsMod := projectsmod.New(db, userRepo)
 	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo, dockerClient)
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
 	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
@@ -105,7 +104,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
 	backupScheduler.Start()
 
-	deployKeysHandler := handler.NewDeployKeysHandler(deployKeyRepo, projectRepo)
 	webhooksHandler := handler.NewWebhooksHandler(appRepo, deployRepo)
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
@@ -131,17 +129,16 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		AuthMod:               authMod,
 		AuthMiddleware:        authMiddleware,
 		APIKeyAuthMiddleware:  apiKeyAuthMiddleware,
-		ProjectsHandler:       projectsHandler,
 		ApplicationsHandler:   applicationsHandler,
 		DeploymentsHandler:    deploymentsHandler,
 		LogsHandler:           logsHandler,
 		ComposeHandler:        composeHandler,
 		DatabasesHandler:      databasesHandler,
-		DeployKeysHandler:     deployKeysHandler,
 		WebhooksHandler:       webhooksHandler,
 		MonitoringHandler:     monitoringHandler,
 		TemplatesHandler:      templatesHandler,
 		TerminalHandler:       terminalHandler,
+		ProjectsMod:           projectsMod,
 		NotificationsMod:      notificationsMod,
 		SettingsMod:           settingsMod,
 		DropzoneHandler:       dropzoneHandler,
