@@ -151,6 +151,33 @@ func (r *ApplicationRepo) GetByEnvironmentID(envID string) ([]*models.Applicatio
 	return apps, nil
 }
 
+func (r *ApplicationRepo) GetAll() ([]*models.Application, error) {
+	rows, err := r.db.Query(
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
+		 FROM applications ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var apps []*models.Application
+	for rows.Next() {
+		app := &models.Application{}
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.CreatedAt, &app.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		apps = append(apps, app)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return apps, nil
+}
+
 func (r *ApplicationRepo) GetByEnvironmentIDPaginated(envID string, limit, offset int) ([]*models.Application, int, error) {
 	var total int
 	err := r.db.QueryRow("SELECT COUNT(*) FROM applications WHERE environment_id = ?", envID).Scan(&total)

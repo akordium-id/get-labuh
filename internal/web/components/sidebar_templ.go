@@ -9,7 +9,7 @@ package components
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Sidebar() templ.Component {
+func Sidebar(currentMode ...string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -26,7 +26,41 @@ func Sidebar() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<aside x-data=\"{ open: false }\" @toggle-sidebar.window=\"open = !open\" class=\"fixed inset-y-0 left-0 z-40 w-64 bg-gray-900 text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto\" :class=\"open ? 'translate-x-0' : '-translate-x-full'\"><div class=\"p-4 border-b border-gray-800 flex items-center justify-between\"><h1 class=\"text-xl font-bold\">Labuh</h1><button @click=\"open = false\" class=\"lg:hidden text-gray-400 hover:text-white\"><svg class=\"h-6 w-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><nav class=\"flex-1 p-4 space-y-2\"><a href=\"/dashboard\" class=\"block px-4 py-2 rounded\" :class=\"window.location.pathname === '/dashboard' ? 'bg-gray-800' : 'hover:bg-gray-800'\">Dashboard</a> <a href=\"/projects\" class=\"block px-4 py-2 rounded\" :class=\"window.location.pathname.startsWith('/projects') || window.location.pathname.startsWith('/templates') ? 'bg-gray-800' : 'hover:bg-gray-800'\">Projects</a> <a href=\"/templates\" class=\"block px-4 py-2 rounded\" :class=\"window.location.pathname === '/templates' ? 'bg-gray-800' : 'hover:bg-gray-800'\">Templates</a> <a href=\"#\" class=\"block px-4 py-2 rounded\" :class=\"window.location.pathname.startsWith('/applications') ? 'bg-gray-800' : 'hover:bg-gray-800'\">Applications</a> <a href=\"#\" class=\"block px-4 py-2 rounded\" :class=\"window.location.pathname.startsWith('/servers') ? 'bg-gray-800' : 'hover:bg-gray-800'\">Servers</a> <a href=\"/settings/api-keys\" class=\"block px-4 py-2 rounded\" :class=\"window.location.pathname.startsWith('/settings') ? 'bg-gray-800' : 'hover:bg-gray-800'\">Settings</a></nav><div class=\"p-4 border-t border-gray-800\"><form action=\"/auth/logout\" method=\"get\"><button type=\"submit\" class=\"w-full text-left px-4 py-2 rounded hover:bg-gray-800\">Logout</button></form></div></aside>")
+		mode := "lite"
+		if len(currentMode) > 0 && currentMode[0] != "" {
+			mode = currentMode[0]
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<aside x-data=\"{ open: false }\" @toggle-sidebar.window=\"open = !open\" class=\"fixed inset-y-0 left-0 z-40 w-64 bg-gray-900 text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto\" :class=\"open ? 'translate-x-0' : '-translate-x-full'\"><div class=\"p-4 border-b border-gray-800 flex items-center justify-between\"><div class=\"flex items-center gap-2\"><h1 class=\"text-xl font-bold tracking-tight\">Labuh</h1>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if mode == "lite" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<span class=\"text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30\">LITE</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<span class=\"text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30\">PRO</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><button @click=\"open = false\" class=\"lg:hidden text-gray-400 hover:text-white\"><svg class=\"h-6 w-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><nav class=\"flex-1 p-4 space-y-1.5\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if mode == "lite" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<!-- Lite Menu: Disederhanakan untuk Vibecoder --> <a href=\"/dashboard\" class=\"block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors\" :class=\"window.location.pathname === '/dashboard' || window.location.pathname === '/' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'\">⚡ Beranda Aplikasi</a> <a href=\"/templates\" class=\"block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors\" :class=\"window.location.pathname.startsWith('/templates') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'\">📦 1-Click Catalog</a>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<!-- Pro Menu: Lengkap untuk Developer / DevOps --> <a href=\"/dashboard\" class=\"block px-4 py-2 rounded text-sm transition-colors\" :class=\"window.location.pathname === '/dashboard' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'\">Dashboard</a> <a href=\"/projects\" class=\"block px-4 py-2 rounded text-sm transition-colors\" :class=\"window.location.pathname.startsWith('/projects') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'\">Projects & Envs</a> <a href=\"/templates\" class=\"block px-4 py-2 rounded text-sm transition-colors\" :class=\"window.location.pathname === '/templates' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'\">Templates</a> <a href=\"/settings/api-keys\" class=\"block px-4 py-2 rounded text-sm transition-colors\" :class=\"window.location.pathname.startsWith('/settings') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'\">Settings</a>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</nav><div class=\"p-4 border-t border-gray-800\"><form action=\"/auth/logout\" method=\"get\"><button type=\"submit\" class=\"w-full text-left px-4 py-2 rounded hover:bg-gray-800\">Logout</button></form></div></aside>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

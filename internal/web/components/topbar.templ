@@ -1,6 +1,12 @@
 package components
 
-templ Topbar() {
+templ Topbar(currentMode ...string) {
+	{{
+		mode := "lite"
+		if len(currentMode) > 0 && currentMode[0] != "" {
+			mode = currentMode[0]
+		}
+	}}
 	<header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6">
 		<div class="flex items-center gap-4">
 			<button @click="$dispatch('toggle-sidebar')" class="lg:hidden text-gray-600 hover:text-gray-900">
@@ -8,10 +14,44 @@ templ Topbar() {
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
 				</svg>
 			</button>
-			<h2 class="text-lg font-semibold text-gray-800">Labuh</h2>
+			<div class="flex items-center gap-3">
+				<h2 class="text-lg font-bold tracking-tight text-gray-900">Labuh</h2>
+				<!-- Mode Pill Switcher (Binance Style) -->
+				<div class="inline-flex items-center p-0.5 bg-gray-100 rounded-full border border-gray-200 text-xs font-semibold">
+					<form action="/settings/mode" method="post" class="inline m-0 p-0" hx-post="/settings/mode">
+						<input type="hidden" name="mode" value="lite">
+						<button type="submit"
+						        class={ "px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5",
+						          templ.KV("bg-blue-600 text-white shadow-xs font-bold", mode == "lite"),
+						          templ.KV("text-gray-500 hover:text-gray-900", mode != "lite") }>
+							<span>⚡</span>
+							<span>Lite</span>
+						</button>
+					</form>
+					<form action="/settings/mode" method="post" class="inline m-0 p-0" hx-post="/settings/mode">
+						<input type="hidden" name="mode" value="pro">
+						<button type="submit"
+						        class={ "px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5",
+						          templ.KV("bg-gray-900 text-white shadow-xs font-bold", mode == "pro"),
+						          templ.KV("text-gray-500 hover:text-gray-900", mode != "pro") }>
+							<span>🛠️</span>
+							<span>Pro</span>
+						</button>
+					</form>
+				</div>
+			</div>
 		</div>
 		<div class="flex items-center space-x-4">
-			<span class="text-sm text-gray-600">User</span>
+			if mode == "lite" {
+				<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+					Vibecoder Mode
+				</span>
+			} else {
+				<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+					DevOps Mode
+				</span>
+			}
+			<span class="text-sm font-medium text-gray-700">User</span>
 		</div>
 	</header>
 }

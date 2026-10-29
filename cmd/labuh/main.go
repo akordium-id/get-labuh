@@ -31,6 +31,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/web/pages"
 	"github.com/akordium-id/get-labuh/internal/web/pages/compose"
 	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
+	"github.com/akordium-id/get-labuh/internal/web/pages/lite"
 	"github.com/akordium-id/get-labuh/internal/web/pages/projects"
 	"github.com/akordium-id/get-labuh/internal/worker"
 	"github.com/go-chi/chi/v5"
@@ -166,6 +167,7 @@ func main() {
 	r.Use(middleware.CSRFProtectionMiddleware)
 	r.Use(middleware.AuditLoggingMiddleware(auditRepo))
 	r.Use(middleware.CacheMiddleware)
+	r.Use(middleware.ModeMiddleware)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -194,13 +196,25 @@ func main() {
 
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware)
+		r.Post("/settings/mode", settingsHandler.SwitchMode)
+
 		r.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
 			user, _ := auth.UserFromContext(r.Context())
 			if user == nil {
 				http.Redirect(w, r, "/auth/login", http.StatusFound)
 				return
 			}
-			templ.Handler(layouts.AppLayout(pages.DashboardPage(user.Name))).ServeHTTP(w, r)
+
+			userMode := middleware.GetUserMode(r.Context())
+			if userMode == middleware.ModeLite {
+				// Lite Experience: Ambil semua aplikasi untuk ditampilkan dalam bentuk card
+				apps, _ := appRepo.GetAll()
+				templ.Handler(layouts.AppLayout(lite.LiteDashboardPage(user.Name, apps), userMode)).ServeHTTP(w, r)
+				return
+			}
+
+			// Pro Experience: Tampilan dashboard developer
+			templ.Handler(layouts.AppLayout(pages.DashboardPage(user.Name), userMode)).ServeHTTP(w, r)
 		})
 		r.Get("/projects", projectsHandler.List)
 		r.Post("/projects", projectsHandler.Create)

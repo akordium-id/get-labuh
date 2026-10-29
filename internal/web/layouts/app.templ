@@ -2,7 +2,13 @@ package layouts
 
 import "github.com/akordium-id/get-labuh/internal/web/components"
 
-templ AppLayout(content templ.Component) {
+templ AppLayout(content templ.Component, currentMode ...string) {
+	{{
+		mode := "lite"
+		if len(currentMode) > 0 && currentMode[0] != "" {
+			mode = currentMode[0]
+		}
+	}}
 	<!DOCTYPE html>
 	<html lang="en">
 	<head>
@@ -115,9 +121,9 @@ templ AppLayout(content templ.Component) {
 		</div>
 
 		<div class="flex h-screen">
-			@components.Sidebar()
+			@components.Sidebar(mode)
 			<div class="flex-1 flex flex-col min-w-0">
-				@components.Topbar()
+				@components.Topbar(mode)
 				<main id="main-content" class="flex-1 overflow-auto p-6">
 					@content
 				</main>

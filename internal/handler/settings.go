@@ -60,3 +60,37 @@ func (h *SettingsHandler) TestCaddy(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok","caddy_url":"` + caddyAPIURL + `"}`))
 	_ = caddyAPIKey
 }
+
+func (h *SettingsHandler) SwitchMode(w http.ResponseWriter, r *http.Request) {
+	mode := r.FormValue("mode")
+	if mode != "pro" {
+		mode = "lite"
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "labuh_mode",
+		Value:    mode,
+		Path:     "/",
+		MaxAge:   365 * 24 * 3600, // 1 tahun
+		HttpOnly: false,           // bisa dibaca/dideteksi client-side jika perlu
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	label := "Mode Lite diaktifkan (Vibecoder Friendly)"
+	if mode == "pro" {
+		label = "Mode Pro diaktifkan (Advanced DevOps)"
+	}
+	SetToast(w, label, ToastInfo)
+
+	// Kembalikan refresh atau redirect ke halaman sebelumnya/dashboard
+	redirectURL := r.Header.Get("HX-Current-URL")
+	if redirectURL == "" {
+		redirectURL = r.Referer()
+	}
+	if redirectURL == "" {
+		redirectURL = "/dashboard"
+	}
+
+	w.Header().Set("HX-Redirect", redirectURL)
+	w.WriteHeader(http.StatusOK)
+}
