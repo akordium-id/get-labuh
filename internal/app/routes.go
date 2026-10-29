@@ -11,7 +11,6 @@ import (
 	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages"
-	"github.com/akordium-id/get-labuh/internal/web/pages/compose"
 	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 	"github.com/akordium-id/get-labuh/internal/web/pages/lite"
 	"github.com/go-chi/chi/v5"
@@ -90,17 +89,7 @@ func SetupRoutes(c *Container) http.Handler {
 		r.Get("/applications/{id}/status", c.ApplicationsHandler.Status)
 		r.Get("/applications/{id}/stats", c.MonitoringHandler.ApplicationStats)
 
-		r.Get("/projects/{project_id}/environments/{env_id}/compose-apps", c.ComposeHandler.List)
-		r.Get("/projects/{project_id}/environments/{env_id}/compose-apps/new", func(w http.ResponseWriter, r *http.Request) {
-			templ.Handler(layouts.AppLayout(compose.ComposeCreatePage())).ServeHTTP(w, r)
-		})
-		r.Post("/projects/{project_id}/environments/{env_id}/compose-apps", c.ComposeHandler.Create)
-		r.Get("/compose-apps/{id}", c.ComposeHandler.Get)
-		r.Post("/compose-apps/{id}/deploy", c.ComposeHandler.Deploy)
-		r.Post("/compose-apps/{id}/stop", c.ComposeHandler.Stop)
-		r.Post("/compose-apps/{id}/start", c.ComposeHandler.Start)
-		r.Post("/compose-apps/{id}/domain", c.ComposeHandler.SetDomain)
-		r.Post("/compose-apps/{id}/domain/remove", c.ComposeHandler.RemoveDomain)
+		c.ComposeMod.RegisterRoutes(r)
 
 		r.Get("/projects/{project_id}/environments/{env_id}/databases", c.DatabasesHandler.List)
 		r.Get("/projects/{project_id}/environments/{env_id}/databases/new", func(w http.ResponseWriter, r *http.Request) {

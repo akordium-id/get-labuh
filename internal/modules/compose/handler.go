@@ -1,42 +1,47 @@
-package handler
+package compose
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/akordium-id/get-labuh/internal/caddy"
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/modules/projects"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/compose"
 )
 
-type ComposeHandler struct {
-	composeRepo *repo.ComposeRepo
-	envRepo     *repo.ProjectRepo
-	caddyClient *caddy.Client
-	settingRepo *repo.SettingRepo
+// SettingProvider interface untuk mengambil setting Caddy
+type SettingProvider interface {
+	Get(ctx context.Context, key string) (string, error)
 }
 
-func NewComposeHandler(composeRepo *repo.ComposeRepo, envRepo *repo.ProjectRepo, caddyClient *caddy.Client, settingRepo *repo.SettingRepo) *ComposeHandler {
-	return &ComposeHandler{
-		composeRepo: composeRepo,
-		envRepo:     envRepo,
-		caddyClient: caddyClient,
-		settingRepo: settingRepo,
+// Handler mengelola HTTP request untuk aplikasi Docker Compose.
+type Handler struct {
+	composeRepo     *Repo
+	caddyClient     *caddy.Client
+	settingProvider SettingProvider
+}
+
+func NewHandler(composeRepo *Repo, caddyClient *caddy.Client, settingProvider SettingProvider) *Handler {
+	return &Handler{
+		composeRepo:     composeRepo,
+		caddyClient:     caddyClient,
+		settingProvider: settingProvider,
 	}
 }
 
-func (h *ComposeHandler) List(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	envID := chi.URLParam(r, "env_id")
 	if envID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	composes, err := h.composeRepo.GetByEnvironmentID(envID)
+	composes, err := h.composeRepo.GetByEnvironmentIDWithContext(r.Context(), envID)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -45,7 +50,7 @@ func (h *ComposeHandler) List(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(layouts.AppLayout(compose.ComposeListPage(composes))).ServeHTTP(w, r)
 }
 
-func (h *ComposeHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	envID := chi.URLParam(r, "env_id")
 	if envID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -64,7 +69,7 @@ func (h *ComposeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	customDomain := r.FormValue("custom_domain")
 
 	if slug == "" {
-		slug = repo.GenerateSlug(name)
+		slug = projects.GenerateSlug(name)
 	}
 	if composeFilePath == "" {
 		composeFilePath = "docker-compose.yml"
@@ -79,7 +84,7 @@ func (h *ComposeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		customDomainPtr = &customDomain
 	}
 
-	_, err := h.composeRepo.Create(models.CreateComposeApplicationInput{
+	_, err := h.composeRepo.CreateWithContext(r.Context(), models.CreateComposeApplicationInput{
 		EnvironmentID:      envID,
 		Name:               name,
 		Slug:               slug,
@@ -96,14 +101,18 @@ func (h *ComposeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ComposeHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {
+	templ.Handler(layouts.AppLayout(compose.ComposeCreatePage())).ServeHTTP(w, r)
+}
+
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	composeApp, err := h.composeRepo.GetByID(id)
+	composeApp, err := h.composeRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -112,20 +121,20 @@ func (h *ComposeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(layouts.AppLayout(compose.ComposeDetailPage(composeApp))).ServeHTTP(w, r)
 }
 
-func (h *ComposeHandler) Deploy(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Deploy(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	composeApp, err := h.composeRepo.GetByID(id)
+	composeApp, err := h.composeRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	_ = h.composeRepo.UpdateStatus(id, models.ComposeStatusBuilding)
+	_ = h.composeRepo.UpdateStatusWithContext(r.Context(), id, models.ComposeStatusBuilding)
 
 	logPath := "/tmp/labuh-logs/" + id + ".log"
 
@@ -136,31 +145,31 @@ func (h *ComposeHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ComposeHandler) Stop(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	_ = h.composeRepo.UpdateStatus(id, models.ComposeStatusStopped)
+	_ = h.composeRepo.UpdateStatusWithContext(r.Context(), id, models.ComposeStatusStopped)
 	w.Header().Set("HX-Redirect", "/compose-apps/"+id)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ComposeHandler) Start(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	_ = h.composeRepo.UpdateStatus(id, models.ComposeStatusRunning)
+	_ = h.composeRepo.UpdateStatusWithContext(r.Context(), id, models.ComposeStatusRunning)
 	w.Header().Set("HX-Redirect", "/compose-apps/"+id)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ComposeHandler) SetDomain(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SetDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -178,21 +187,21 @@ func (h *ComposeHandler) SetDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	composeApp, err := h.composeRepo.GetByID(id)
+	composeApp, err := h.composeRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
 	domainPtr := &domain
-	if err := h.composeRepo.UpdateCustomDomain(id, domainPtr); err != nil {
+	if err := h.composeRepo.UpdateCustomDomainWithContext(r.Context(), id, domainPtr); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	if h.caddyClient != nil {
-		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
-		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
+	if h.caddyClient != nil && h.settingProvider != nil {
+		caddyAPIURL, _ := h.settingProvider.Get(r.Context(), "caddy_api_url")
+		caddyAPIKey, _ := h.settingProvider.Get(r.Context(), "caddy_api_key")
 		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
 
 		_ = composeApp
@@ -203,27 +212,27 @@ func (h *ComposeHandler) SetDomain(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ComposeHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	composeApp, err := h.composeRepo.GetByID(id)
+	composeApp, err := h.composeRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	if err := h.composeRepo.UpdateCustomDomain(id, nil); err != nil {
+	if err := h.composeRepo.UpdateCustomDomainWithContext(r.Context(), id, nil); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	if h.caddyClient != nil && composeApp.CustomDomain != nil && *composeApp.CustomDomain != "" {
-		caddyAPIURL, _ := h.settingRepo.Get("caddy_api_url")
-		caddyAPIKey, _ := h.settingRepo.Get("caddy_api_key")
+	if h.caddyClient != nil && composeApp.CustomDomain != nil && *composeApp.CustomDomain != "" && h.settingProvider != nil {
+		caddyAPIURL, _ := h.settingProvider.Get(r.Context(), "caddy_api_url")
+		caddyAPIKey, _ := h.settingProvider.Get(r.Context(), "caddy_api_key")
 		client := caddy.NewClient(caddyAPIURL, caddyAPIKey)
 
 		_ = client

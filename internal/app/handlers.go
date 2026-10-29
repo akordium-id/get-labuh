@@ -14,6 +14,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
 	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
+	composemod "github.com/akordium-id/get-labuh/internal/modules/compose"
 	"github.com/akordium-id/get-labuh/internal/modules/notifications"
 	projectsmod "github.com/akordium-id/get-labuh/internal/modules/projects"
 	settingsmod "github.com/akordium-id/get-labuh/internal/modules/settings"
@@ -28,7 +29,7 @@ type Container struct {
 	ApplicationsHandler  *handler.ApplicationsHandler
 	DeploymentsHandler   *handler.DeploymentsHandler
 	LogsHandler          *handler.LogsHandler
-	ComposeHandler       *handler.ComposeHandler
+	ComposeMod           *composemod.Module
 	DatabasesHandler     *handler.DatabasesHandler
 	WebhooksHandler      *handler.WebhooksHandler
 	MonitoringHandler    *handler.MonitoringHandler
@@ -89,11 +90,11 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	}
 
 	projectsMod := projectsmod.New(db, userRepo)
+	composeMod := composemod.New(db, caddyClient, settingsMod.SettingRepo)
 	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo, dockerClient)
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
 	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
 	logsHandler.SetDockerClient(dockerClient)
-	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo, caddyClient, settingRepo)
 	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
 	databasesHandler.SetDockerClient(dockerClient)
 
@@ -132,7 +133,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		ApplicationsHandler:   applicationsHandler,
 		DeploymentsHandler:    deploymentsHandler,
 		LogsHandler:           logsHandler,
-		ComposeHandler:        composeHandler,
+		ComposeMod:            composeMod,
 		DatabasesHandler:      databasesHandler,
 		WebhooksHandler:       webhooksHandler,
 		MonitoringHandler:     monitoringHandler,
