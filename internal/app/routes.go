@@ -7,7 +7,6 @@ import (
 	"github.com/akordium-id/get-labuh/internal/api"
 	"github.com/akordium-id/get-labuh/internal/auth"
 	"github.com/akordium-id/get-labuh/internal/middleware"
-	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages"
@@ -96,34 +95,11 @@ func SetupRoutes(c *Container) http.Handler {
 		r.Get("/applications/{id}/terminal", c.TerminalHandler.ApplicationTerminal)
 		r.Get("/containers/{container_id}/terminal/ws", c.TerminalHandler.ContainerTerminalWS)
 
-		r.Get("/deployments/{id}", c.DeploymentsHandler.Get)
-		r.Get("/deployments/{id}/logs", c.DeploymentsHandler.Logs)
-		r.Get("/deployments/{id}/logs/stream", c.LogsHandler.StreamDeploymentLogs)
-		r.Get("/applications/{id}/logs/stream", c.LogsHandler.StreamContainerLogs)
+		c.DeploymentsMod.RegisterRoutes(r)
 
 		c.AuthMod.RegisterProtectedRoutes(r)
 		c.NotificationsMod.RegisterRoutes(r)
 		c.SettingsMod.RegisterRoutes(r)
-	})
-
-	r.Post("/deployments/{id}/start", func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			http.Error(w, "Bad Request", http.StatusBadRequest)
-			return
-		}
-
-		deployment, err := c.DeployRepo.GetByID(id)
-		if err != nil {
-			http.Error(w, "Bad Request", http.StatusBadRequest)
-			return
-		}
-
-		_ = c.DeployRepo.MarkStarted(deployment.ID)
-		_ = c.DeployRepo.UpdateStatus(deployment.ID, models.DeployStatusCloning)
-
-		w.Header().Set("HX-Redirect", "/deployments/"+id)
-		w.WriteHeader(http.StatusOK)
 	})
 
 	r.Post("/webhooks/deploy/{application_id}", c.WebhooksHandler.Deploy)

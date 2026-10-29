@@ -1,4 +1,4 @@
-package handler
+package deployments
 
 import (
 	"bufio"
@@ -10,39 +10,163 @@ import (
 	"strings"
 	"time"
 
+	"github.com/a-h/templ"
+	"github.com/docker/docker/api/types/container"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
-	"github.com/docker/docker/api/types/container"
+	"github.com/akordium-id/get-labuh/internal/web/layouts"
+	webdeploy "github.com/akordium-id/get-labuh/internal/web/pages/deployments"
 )
 
-type LogsHandler struct {
-	deployRepo   *repo.DeploymentRepo
-	appRepo      *repo.ApplicationRepo
+// ApplicationProvider mengabstraksi akses aplikasi yang dibutuhkan oleh Handler deployments.
+type ApplicationProvider interface {
+	GetByID(id string) (*models.Application, error)
+	UpdateStatus(id string, status models.AppStatus) error
+}
+
+// Handler menangani request HTTP dan SSE untuk domain Deployments.
+type Handler struct {
+	repo         *Repo
+	appProvider  ApplicationProvider
 	dockerClient *docker.Client
 }
 
-func NewLogsHandler(deployRepo *repo.DeploymentRepo, appRepo *repo.ApplicationRepo) *LogsHandler {
-	return &LogsHandler{
-		deployRepo: deployRepo,
-		appRepo:    appRepo,
+// NewHandler membuat instance baru Handler deployments.
+func NewHandler(repo *Repo, appProvider ApplicationProvider) *Handler {
+	return &Handler{
+		repo:        repo,
+		appProvider: appProvider,
 	}
 }
 
-func (h *LogsHandler) SetDockerClient(client *docker.Client) {
+// SetDockerClient mengatur docker client untuk streaming container logs.
+func (h *Handler) SetDockerClient(client *docker.Client) {
 	h.dockerClient = client
 }
 
-func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Request) {
+// Get merender halaman detail deployment.
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	deployment, err := h.deployRepo.GetByID(id)
+	deployment, err := h.repo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	var app *models.Application
+	if h.appProvider != nil {
+		app, _ = h.appProvider.GetByID(deployment.ApplicationID)
+	}
+
+	templ.Handler(layouts.AppLayout(webdeploy.DeploymentDetailPage(deployment, app))).ServeHTTP(w, r)
+}
+
+// Logs merender halaman log deployment.
+func (h *Handler) Logs(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	deployment, err := h.repo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	logPath := "/tmp/labuh-logs/" + deployment.ID + ".log"
+	if deployment.LogPath != nil && *deployment.LogPath != "" {
+		logPath = *deployment.LogPath
+	}
+
+	var logs []string
+	content, err := readLogFile(logPath)
+	if err == nil {
+		logs = content
+	}
+
+	templ.Handler(layouts.AppLayout(webdeploy.DeploymentLogsPage(deployment, logs))).ServeHTTP(w, r)
+}
+
+// Rollback memulai deployment baru mengacu pada deployment sukses sebelumnya.
+func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	deployment, err := h.repo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	prevDeployment, err := h.repo.GetPreviousSuccessfulWithContext(r.Context(), deployment.ApplicationID)
+	if err != nil || prevDeployment == nil {
+		http.Error(w, "No previous successful deployment found", http.StatusBadRequest)
+		return
+	}
+
+	rollbackDeployment, err := h.repo.CreateWithContext(r.Context(), models.CreateDeploymentInput{
+		ApplicationID: deployment.ApplicationID,
+		CommitHash:    prevDeployment.CommitHash,
+		CommitMessage: prevDeployment.CommitMessage,
+		LogPath:       prevDeployment.LogPath,
+	})
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	_ = h.repo.MarkStartedWithContext(r.Context(), rollbackDeployment.ID)
+	_ = h.repo.UpdateStatusWithContext(r.Context(), rollbackDeployment.ID, models.DeployStatusDeploying)
+	if h.appProvider != nil {
+		_ = h.appProvider.UpdateStatus(deployment.ApplicationID, models.AppStatusRunning)
+	}
+
+	w.Header().Set("HX-Redirect", "/deployments/"+rollbackDeployment.ID)
+	w.WriteHeader(http.StatusOK)
+}
+
+// Start memulai ulang/menjalankan deployment.
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	deployment, err := h.repo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_ = h.repo.MarkStartedWithContext(r.Context(), deployment.ID)
+	_ = h.repo.UpdateStatusWithContext(r.Context(), deployment.ID, models.DeployStatusCloning)
+
+	w.Header().Set("HX-Redirect", "/deployments/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
+// StreamDeploymentLogs streaming log deployment realtime via SSE.
+func (h *Handler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	deployment, err := h.repo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -101,7 +225,7 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 				_ = file.Close()
 			}
 
-			latestDeploy, dErr := h.deployRepo.GetByID(id)
+			latestDeploy, dErr := h.repo.GetByIDWithContext(r.Context(), id)
 			if dErr == nil && latestDeploy != nil {
 				currentStep := ""
 				if latestDeploy.Step != nil {
@@ -143,14 +267,20 @@ func (h *LogsHandler) StreamDeploymentLogs(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (h *LogsHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Request) {
+// StreamContainerLogs streaming container log realtime via SSE.
+func (h *Handler) StreamContainerLogs(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	app, err := h.appRepo.GetByID(id)
+	if h.appProvider == nil {
+		http.Error(w, "Application provider not configured", http.StatusInternalServerError)
+		return
+	}
+
+	app, err := h.appProvider.GetByID(id)
 	if err != nil || app.ContainerID == nil || *app.ContainerID == "" {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -223,6 +353,24 @@ func (h *LogsHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Request
 	}
 
 	sendEvent("done", "{}")
+}
+
+func readLogFile(path string) ([]string, error) {
+	if path == "" {
+		return nil, nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	rawLines := strings.Split(string(content), "\n")
+	var lines []string
+	for _, l := range rawLines {
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, l)
+		}
+	}
+	return lines, nil
 }
 
 func escapeJSON(s string) string {

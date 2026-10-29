@@ -17,6 +17,7 @@ import (
 	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
 	composemod "github.com/akordium-id/get-labuh/internal/modules/compose"
 	databasesmod "github.com/akordium-id/get-labuh/internal/modules/databases"
+	deploymentsmod "github.com/akordium-id/get-labuh/internal/modules/deployments"
 	"github.com/akordium-id/get-labuh/internal/modules/notifications"
 	projectsmod "github.com/akordium-id/get-labuh/internal/modules/projects"
 	settingsmod "github.com/akordium-id/get-labuh/internal/modules/settings"
@@ -29,8 +30,7 @@ type Container struct {
 	AuthMiddleware       func(http.Handler) http.Handler
 	APIKeyAuthMiddleware *api.APIKeyAuthMiddleware
 	ApplicationsHandler  *handler.ApplicationsHandler
-	DeploymentsHandler   *handler.DeploymentsHandler
-	LogsHandler          *handler.LogsHandler
+	DeploymentsMod       *deploymentsmod.Module
 	ComposeMod           *composemod.Module
 	DatabasesMod         *databasesmod.Module
 	WebhooksHandler      *handler.WebhooksHandler
@@ -94,9 +94,8 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	projectsMod := projectsmod.New(db, userRepo)
 	composeMod := composemod.New(db, caddyClient, settingsMod.SettingRepo)
 	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo, dockerClient)
-	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
-	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
-	logsHandler.SetDockerClient(dockerClient)
+	deploymentsMod := deploymentsmod.New(db, appRepo)
+	deploymentsMod.SetDockerClient(dockerClient)
 	databasesMod := databasesmod.New(db, projectRepo)
 	databasesMod.SetDockerClient(dockerClient)
 
@@ -135,8 +134,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		AuthMiddleware:        authMiddleware,
 		APIKeyAuthMiddleware:  apiKeyAuthMiddleware,
 		ApplicationsHandler:   applicationsHandler,
-		DeploymentsHandler:    deploymentsHandler,
-		LogsHandler:           logsHandler,
+		DeploymentsMod:        deploymentsMod,
 		ComposeMod:            composeMod,
 		DatabasesMod:          databasesMod,
 		WebhooksHandler:       webhooksHandler,
