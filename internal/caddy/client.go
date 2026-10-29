@@ -3,12 +3,15 @@ package caddy
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const defaultTimeout = 5 * time.Second
@@ -34,6 +37,10 @@ func routeIDForDomain(domain string) string {
 }
 
 func (c *Client) AddRoute(domain, upstreamAddr string, port int) error {
+	return c.AddRouteWithOptions(domain, upstreamAddr, port, RouteOptions{})
+}
+
+func (c *Client) AddRouteWithOptions(domain, upstreamAddr string, port int, opts RouteOptions) error {
 	if domain == "" {
 		return fmt.Errorf("domain cannot be empty")
 	}
@@ -41,19 +48,44 @@ func (c *Client) AddRoute(domain, upstreamAddr string, port int) error {
 	// Remove existing route if any to prevent duplicates
 	_ = c.RemoveRoute(domain)
 
+	var handles []Handle
+
+	// Jika basic auth disetel, tambahkan handler authentication sebelum reverse_proxy
+	if opts.BasicAuthUser != "" && opts.BasicAuthPassword != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(opts.BasicAuthPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("failed to hash basic auth password: %w", err)
+		}
+		encodedHash := base64.StdEncoding.EncodeToString(hash)
+
+		handles = append(handles, Handle{
+			Handler: "authentication",
+			Providers: &Providers{
+				HTTPBasic: &HTTPBasicProvider{
+					Accounts: []BasicAuthAccount{
+						{
+							Username: opts.BasicAuthUser,
+							Password: encodedHash,
+						},
+					},
+				},
+			},
+		})
+	}
+
+	handles = append(handles, Handle{
+		Handler: "reverse_proxy",
+		Upstreams: []Upstream{
+			{Dial: fmt.Sprintf("%s:%d", upstreamAddr, port)},
+		},
+	})
+
 	route := Route{
 		ID: routeIDForDomain(domain),
 		Match: []Match{
 			{Host: []string{domain}},
 		},
-		Handle: []Handle{
-			{
-				Handler: "reverse_proxy",
-				Upstreams: []Upstream{
-					{Dial: fmt.Sprintf("%s:%d", upstreamAddr, port)},
-				},
-			},
-		},
+		Handle: handles,
 	}
 
 	body, err := json.Marshal(route)

@@ -253,3 +253,75 @@ func TestDetectAppStack(t *stdtesting.T) {
 	assert.Equal(t, StackGeneric, stack)
 	assert.Equal(t, 8080, port)
 }
+
+func TestApplicationsHandler_UpdateHealthcheck(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Healthcheck App",
+		Slug:          "healthcheck-app",
+		SourceType:    models.SourceTypeDockerImage,
+	})
+	require.NoError(t, err)
+
+	form := url.Values{}
+	form.Set("healthcheck_path", "/api/v1/healthz")
+	form.Set("healthcheck_timeout", "45")
+
+	req := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/healthcheck", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", app.ID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	mod.Handler.UpdateHealthcheck(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/applications/"+app.ID, rec.Header().Get("Location"))
+
+	updated, err := mod.Repo.GetByIDWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated.HealthcheckPath)
+	assert.Equal(t, "/api/v1/healthz", *updated.HealthcheckPath)
+	require.NotNil(t, updated.HealthcheckTimeout)
+	assert.Equal(t, 45, *updated.HealthcheckTimeout)
+}
+
+func TestApplicationsHandler_UpdateBasicAuth(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Secure App",
+		Slug:          "secure-app",
+		SourceType:    models.SourceTypeDockerImage,
+	})
+	require.NoError(t, err)
+
+	form := url.Values{}
+	form.Set("basic_auth_user", "superadmin")
+	form.Set("basic_auth_password", "strongpassword123")
+
+	req := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/basic-auth", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", app.ID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	mod.Handler.UpdateBasicAuth(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/applications/"+app.ID, rec.Header().Get("Location"))
+
+	updated, err := mod.Repo.GetByIDWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated.BasicAuthUser)
+	assert.Equal(t, "superadmin", *updated.BasicAuthUser)
+	require.NotNil(t, updated.BasicAuthPassword)
+	assert.Equal(t, "strongpassword123", *updated.BasicAuthPassword)
+}

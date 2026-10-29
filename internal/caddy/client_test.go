@@ -20,6 +20,34 @@ func TestClient_AddRoute(t *stdtesting.T) {
 	assert.NoError(t, err)
 }
 
+func TestClient_AddRouteWithOptions_BasicAuth(t *stdtesting.T) {
+	var capturedRoute Route
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			json.NewDecoder(r.Body).Decode(&capturedRoute)
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "")
+	err := client.AddRouteWithOptions("protected.example.com", "127.0.0.1", 8080, RouteOptions{
+		BasicAuthUser:     "admin",
+		BasicAuthPassword: "secretpassword",
+	})
+	assert.NoError(t, err)
+	assert.Len(t, capturedRoute.Handle, 2)
+	assert.Equal(t, "authentication", capturedRoute.Handle[0].Handler)
+	assert.NotNil(t, capturedRoute.Handle[0].Providers)
+	assert.NotNil(t, capturedRoute.Handle[0].Providers.HTTPBasic)
+	assert.Len(t, capturedRoute.Handle[0].Providers.HTTPBasic.Accounts, 1)
+	assert.Equal(t, "admin", capturedRoute.Handle[0].Providers.HTTPBasic.Accounts[0].Username)
+	assert.NotEmpty(t, capturedRoute.Handle[0].Providers.HTTPBasic.Accounts[0].Password)
+	assert.Equal(t, "reverse_proxy", capturedRoute.Handle[1].Handler)
+}
+
 func TestClient_AddRoute_EmptyDomain(t *stdtesting.T) {
 	client := NewClient("http://localhost:2019", "")
 	err := client.AddRoute("", "127.0.0.1", 8080)

@@ -126,6 +126,20 @@ func formatMemLimit(val *int64) string {
 	return strconv.FormatInt(*val, 10)
 }
 
+func formatHealthcheckTimeout(val *int) string {
+	if val == nil || *val <= 0 {
+		return "30"
+	}
+	return strconv.Itoa(*val)
+}
+
+func getStrVal(val *string, defaultVal string) string {
+	if val == nil || *val == "" {
+		return defaultVal
+	}
+	return *val
+}
+
 templ ApplicationDetailPage(app *models.Application, deployments []*models.Deployment, envVars []*models.AppEnvVar) {
 	<div>
 		<div class="flex justify-between items-center mb-6">
@@ -249,6 +263,65 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 					</div>
 					<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md">
 						Save & Apply Limits
+					</button>
+				</form>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<div class="flex items-center gap-2 mb-1">
+					<svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+					<h2 class="text-xl font-bold text-gray-900">Custom Healthcheck</h2>
+				</div>
+				<p class="text-xs text-gray-500 mb-4">Ubah path endpoint dan batas waktu evaluasi kesiapan container sebelum traffic dialihkan (Zero-Downtime gate).</p>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/healthcheck") } method="post" class="space-y-3">
+					<div>
+						<label class="block text-xs font-semibold text-gray-700">Healthcheck HTTP Path</label>
+						<input type="text" name="healthcheck_path"
+							value={ getStrVal(app.HealthcheckPath, "/") }
+							placeholder="/"
+							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+						<span class="text-[11px] text-gray-400 mt-0.5 block">Contoh: /, /healthz, /api/health</span>
+					</div>
+					<div>
+						<label class="block text-xs font-semibold text-gray-700">Healthcheck Timeout (Detik)</label>
+						<input type="number" min="5" max="300" name="healthcheck_timeout"
+							value={ formatHealthcheckTimeout(app.HealthcheckTimeout) }
+							placeholder="30"
+							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+						<span class="text-[11px] text-gray-400 mt-0.5 block">Waktu maksimal menunggu container menjawab HTTP status &lt; 500 (Default: 30s)</span>
+					</div>
+					<button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 rounded-md transition-colors">
+						Simpan Konfigurasi Healthcheck
+					</button>
+				</form>
+			</div>
+
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<div class="flex items-center gap-2 mb-1">
+					<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+					<h2 class="text-xl font-bold text-gray-900">HTTP Basic Auth (Caddy)</h2>
+				</div>
+				<p class="text-xs text-gray-500 mb-4">Lindungi endpoint aplikasi dengan otentikasi login browser HTTP Basic via Caddy proxy.</p>
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/basic-auth") } method="post" class="space-y-3">
+					<div>
+						<label class="block text-xs font-semibold text-gray-700">Username</label>
+						<input type="text" name="basic_auth_user"
+							value={ getStrVal(app.BasicAuthUser, "") }
+							placeholder="Kosongkan jika dinonaktifkan"
+							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+					</div>
+					<div>
+						<label class="block text-xs font-semibold text-gray-700">Password</label>
+						<input type="password" name="basic_auth_password"
+							value={ getStrVal(app.BasicAuthPassword, "") }
+							placeholder="Kosongkan jika dinonaktifkan"
+							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+						<span class="text-[11px] text-gray-400 mt-0.5 block">Di-hash secara aman dengan bcrypt sebelum dikirim ke Caddy Admin API. Kosongkan username &amp; password untuk menonaktifkan.</span>
+					</div>
+					<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md transition-colors">
+						Simpan &amp; Terapkan Basic Auth
 					</button>
 				</form>
 			</div>

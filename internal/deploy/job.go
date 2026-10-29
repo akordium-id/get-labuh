@@ -338,6 +338,10 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	var oldContainerID string
 
 	var resLimits docker.ContainerResourceLimits
+	var healthcheckPath = "/"
+	var healthcheckTimeout = 30 * time.Second
+	var routeOpts caddy.RouteOptions
+
 	if p.appRepo != nil {
 		app, err := p.appRepo.GetByID(job.ApplicationID)
 		if err == nil && app != nil {
@@ -350,6 +354,16 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			}
 			if app.ContainerID != nil {
 				oldContainerID = *app.ContainerID
+			}
+			if app.HealthcheckPath != nil && *app.HealthcheckPath != "" {
+				healthcheckPath = *app.HealthcheckPath
+			}
+			if app.HealthcheckTimeout != nil && *app.HealthcheckTimeout > 0 {
+				healthcheckTimeout = time.Duration(*app.HealthcheckTimeout) * time.Second
+			}
+			if app.BasicAuthUser != nil && *app.BasicAuthUser != "" && app.BasicAuthPassword != nil && *app.BasicAuthPassword != "" {
+				routeOpts.BasicAuthUser = *app.BasicAuthUser
+				routeOpts.BasicAuthPassword = *app.BasicAuthPassword
 			}
 			resLimits = docker.ContainerResourceLimits{
 				CPULimit:          app.CPULimit,
@@ -383,11 +397,11 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		return &DeployError{Step: "deploy", Cause: err, Output: errMsg}
 	}
 
-	writeLog(activeLogWriter, fmt.Sprintf("Candidate container started (ID: %s). Running healthcheck gate...", candidateContainerID))
+	writeLog(activeLogWriter, fmt.Sprintf("Candidate container started (ID: %s). Running healthcheck gate (%s, timeout %v)...", candidateContainerID, healthcheckPath, healthcheckTimeout))
 	updateStep("healthcheck", models.DeployStatusDeploying, "")
 
-	// Healthcheck gate: wait up to 30 seconds for container to answer or stay running
-	if err := p.dockerClient.WaitForHealth(ctx, candidateContainerID, appPort, 30*time.Second); err != nil {
+	// Healthcheck gate: wait for container to answer on healthcheckPath or stay running
+	if err := p.dockerClient.WaitForHealthCustom(ctx, candidateContainerID, appPort, healthcheckPath, healthcheckTimeout); err != nil {
 		errMsg := fmt.Sprintf("Healthcheck failed for candidate container: %v. Rolling back...", err)
 		writeLog(activeLogWriter, errMsg)
 		_ = p.dockerClient.StopContainer(ctx, candidateContainerID, 5)
@@ -401,7 +415,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	// Atomic Caddy Route Update to the new healthy candidate container
 	if p.caddyClient != nil && customDomain != nil && *customDomain != "" {
 		writeLog(activeLogWriter, fmt.Sprintf("Switching Caddy route for %s -> %s:%d", *customDomain, candidateName, appPort))
-		if err := p.caddyClient.AddRoute(*customDomain, candidateName, appPort); err != nil {
+		if err := p.caddyClient.AddRouteWithOptions(*customDomain, candidateName, appPort, routeOpts); err != nil {
 			writeLog(activeLogWriter, fmt.Sprintf("Warning: failed to update Caddy route: %v", err))
 		} else {
 			writeLog(activeLogWriter, "Caddy route switched successfully without downtime")

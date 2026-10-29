@@ -81,6 +81,8 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/applications/{id}/domain", m.Handler.SetDomain)
 	r.Post("/applications/{id}/domain/remove", m.Handler.RemoveDomain)
 	r.Post("/applications/{id}/resources", m.Handler.UpdateResourceLimits)
+	r.Post("/applications/{id}/healthcheck", m.Handler.UpdateHealthcheck)
+	r.Post("/applications/{id}/basic-auth", m.Handler.UpdateBasicAuth)
 	r.Post("/applications/{id}/webhook/regenerate", m.Handler.RegenerateWebhookSecret)
 	r.Get("/applications/{id}/status", m.Handler.Status)
 	r.Get("/applications/{id}/stats", m.Monitoring.Stats)

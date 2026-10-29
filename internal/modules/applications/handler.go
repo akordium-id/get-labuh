@@ -603,6 +603,97 @@ func (h *Handler) UpdateResourceLimits(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/applications/"+id, http.StatusFound)
 }
 
+// UpdateHealthcheck memperbarui path dan batas waktu healthcheck aplikasi.
+func (h *Handler) UpdateHealthcheck(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.appRepo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	path := strings.TrimSpace(r.FormValue("healthcheck_path"))
+	if path == "" {
+		path = "/"
+	}
+
+	var timeoutVal = 30
+	if timeoutStr := strings.TrimSpace(r.FormValue("healthcheck_timeout")); timeoutStr != "" {
+		if val, err := strconv.Atoi(timeoutStr); err == nil && val > 0 {
+			timeoutVal = val
+		}
+	}
+
+	if err := h.appRepo.UpdateHealthcheckWithContext(r.Context(), id, &path, &timeoutVal); err != nil {
+		http.Error(w, "Failed to update healthcheck: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Konfigurasi healthcheck berhasil disimpan", "success")
+	http.Redirect(w, r, "/applications/"+id, http.StatusFound)
+}
+
+// UpdateBasicAuth memperbarui HTTP basic auth untuk proteksi reverse proxy aplikasi.
+func (h *Handler) UpdateBasicAuth(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appRepo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	user := strings.TrimSpace(r.FormValue("basic_auth_user"))
+	password := strings.TrimSpace(r.FormValue("basic_auth_password"))
+
+	var userPtr *string
+	var passPtr *string
+
+	if user != "" && password != "" {
+		userPtr = &user
+		passPtr = &password
+	}
+
+	if err := h.appRepo.UpdateBasicAuthWithContext(r.Context(), id, userPtr, passPtr); err != nil {
+		http.Error(w, "Failed to update basic auth: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Live update ke Caddy jika aplikasi sedang running dan memiliki domain kustom
+	if h.caddyClient != nil && app.CustomDomain != nil && *app.CustomDomain != "" && app.ContainerName != nil {
+		opts := caddy.RouteOptions{}
+		if userPtr != nil && passPtr != nil {
+			opts.BasicAuthUser = *userPtr
+			opts.BasicAuthPassword = *passPtr
+		}
+		if err := h.caddyClient.AddRouteWithOptions(*app.CustomDomain, *app.ContainerName, app.AppPort, opts); err != nil {
+			slog.Warn("failed to live update caddy basic auth", "error", err, "domain", *app.CustomDomain)
+		}
+	}
+
+	setToast(w, "Konfigurasi HTTP Basic Auth berhasil disimpan", "success")
+	http.Redirect(w, r, "/applications/"+id, http.StatusFound)
+}
+
 // Status mengecek dan memperbarui status polling aplikasi.
 func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

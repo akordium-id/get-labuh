@@ -279,8 +279,18 @@ func (c *Client) GetContainerIP(ctx context.Context, containerID, networkName st
 }
 
 func (c *Client) WaitForHealth(ctx context.Context, containerID string, appPort int, maxDuration time.Duration) error {
+	return c.WaitForHealthCustom(ctx, containerID, appPort, "/", maxDuration)
+}
+
+func (c *Client) WaitForHealthCustom(ctx context.Context, containerID string, appPort int, path string, maxDuration time.Duration) error {
 	if maxDuration <= 0 {
 		maxDuration = 30 * time.Second
+	}
+	if path == "" {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
 	}
 
 	deadline := time.Now().Add(maxDuration)
@@ -321,8 +331,8 @@ func (c *Client) WaitForHealth(ctx context.Context, containerID string, appPort 
 					}
 
 					for _, checkPort := range portsToTry {
-						// 1. Try HTTP request
-						url := fmt.Sprintf("http://%s:%d/", ip, checkPort)
+						// 1. Try HTTP request with custom path
+						url := fmt.Sprintf("http://%s:%d%s", ip, checkPort, path)
 						req, reqErr := http.NewRequestWithContext(ctx, "GET", url, nil)
 						if reqErr == nil {
 							resp, httpErr := httpClient.Do(req)
