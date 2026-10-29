@@ -1,4 +1,4 @@
-package handler
+package databases
 
 import (
 	"context"
@@ -16,46 +16,73 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/akordium-id/get-labuh/internal/backup"
-	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/modules/projects"
 	"github.com/akordium-id/get-labuh/internal/web/components"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 )
 
-type DatabasesHandler struct {
-	dbRepo       *repo.DatabaseRepo
-	envRepo      *repo.ProjectRepo
-	dockerClient *docker.Client
-	backupRepo   *repo.DatabaseBackupRepo
-	storageRepo  *repo.StorageDestinationRepo
-	backupRunner *backup.DatabaseBackupRunner
+// EnvironmentProvider interface untuk mengambil info Environment
+type EnvironmentProvider interface {
+	GetEnvironmentByID(id string) (*models.Environment, error)
 }
 
-func NewDatabasesHandler(dbRepo *repo.DatabaseRepo, envRepo *repo.ProjectRepo) *DatabasesHandler {
-	return &DatabasesHandler{
+// StorageProvider interface untuk berinteraksi dengan S3 Storage Destinations
+type StorageProvider interface {
+	List(ctx context.Context) ([]*models.StorageDestination, error)
+	GetByID(ctx context.Context, id string) (*models.StorageDestination, error)
+}
+
+// S3Deleter interface untuk menghapus remote backup di S3 storage
+type S3Deleter interface {
+	DeleteObject(ctx context.Context, key string) error
+}
+
+// S3ClientFactory func type untuk membuat S3 client dari StorageDestination
+type S3ClientFactory func(dest *models.StorageDestination) (S3Deleter, error)
+
+// BackupRunner interface untuk menjalankan database backup job
+type BackupRunner interface {
+	RunBackup(ctx context.Context, databaseID string) (*models.DatabaseBackup, error)
+}
+
+// Handler menangani request HTTP untuk managed databases dan backup scheduling.
+type Handler struct {
+	dbRepo          *ServiceRepo
+	envRepo         EnvironmentProvider
+	dockerClient    *docker.Client
+	backupRepo      *BackupRepo
+	storageRepo     StorageProvider
+	backupRunner    BackupRunner
+	s3ClientFactory S3ClientFactory
+}
+
+func NewHandler(dbRepo *ServiceRepo, envRepo EnvironmentProvider) *Handler {
+	return &Handler{
 		dbRepo:  dbRepo,
 		envRepo: envRepo,
 	}
 }
 
-func (h *DatabasesHandler) SetDockerClient(client *docker.Client) {
+func (h *Handler) SetDockerClient(client *docker.Client) {
 	h.dockerClient = client
 }
 
-func (h *DatabasesHandler) SetBackupDependencies(
-	backupRepo *repo.DatabaseBackupRepo,
-	storageRepo *repo.StorageDestinationRepo,
-	runner *backup.DatabaseBackupRunner,
+func (h *Handler) SetBackupDependencies(
+	backupRepo *BackupRepo,
+	storageRepo StorageProvider,
+	runner BackupRunner,
+	s3Factory S3ClientFactory,
 ) {
 	h.backupRepo = backupRepo
 	h.storageRepo = storageRepo
 	h.backupRunner = runner
+	h.s3ClientFactory = s3Factory
 }
 
-func (h *DatabasesHandler) List(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	envID := chi.URLParam(r, "env_id")
 	if envID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -72,9 +99,9 @@ func (h *DatabasesHandler) List(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if search != "" {
-		dbServices, total, err = h.dbRepo.SearchPaginated(envID, search, limit, offset)
+		dbServices, total, err = h.dbRepo.SearchPaginatedWithContext(r.Context(), envID, search, limit, offset)
 	} else {
-		dbServices, total, err = h.dbRepo.GetByEnvironmentIDPaginated(envID, limit, offset)
+		dbServices, total, err = h.dbRepo.GetByEnvironmentIDPaginatedWithContext(r.Context(), envID, limit, offset)
 	}
 
 	if err != nil {
@@ -101,7 +128,11 @@ func (h *DatabasesHandler) List(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(layouts.AppLayout(databases.DatabaseListPage(dbServices, page, totalPages, search, baseURL))).ServeHTTP(w, r)
 }
 
-func (h *DatabasesHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {
+	templ.Handler(layouts.AppLayout(databases.DatabaseCreatePage())).ServeHTTP(w, r)
+}
+
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	envID := chi.URLParam(r, "env_id")
 	if envID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -123,7 +154,7 @@ func (h *DatabasesHandler) Create(w http.ResponseWriter, r *http.Request) {
 	port, _ := strconv.Atoi(r.FormValue("port"))
 
 	if slug == "" {
-		slug = repo.GenerateSlug(name)
+		slug = projects.GenerateSlug(name)
 	}
 	if version == "" {
 		version = "latest"
@@ -162,7 +193,7 @@ func (h *DatabasesHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	dbService, err := h.dbRepo.Create(models.CreateDatabaseServiceInput{
+	dbService, err := h.dbRepo.CreateWithContext(r.Context(), models.CreateDatabaseServiceInput{
 		EnvironmentID: envID,
 		Name:          name,
 		Slug:          slug,
@@ -222,14 +253,14 @@ func (h *DatabasesHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *DatabasesHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	dbService, err := h.dbRepo.GetByID(id)
+	dbService, err := h.dbRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -239,17 +270,17 @@ func (h *DatabasesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var destinations []*models.StorageDestination
 	var backups []*models.DatabaseBackup
 	if h.backupRepo != nil {
-		backupConfig, _ = h.backupRepo.GetConfig(id)
-		backups, _ = h.backupRepo.ListByDatabaseID(id)
+		backupConfig, _ = h.backupRepo.GetConfigWithContext(r.Context(), id)
+		backups, _ = h.backupRepo.ListByDatabaseIDWithContext(r.Context(), id)
 	}
 	if h.storageRepo != nil {
-		destinations, _ = h.storageRepo.List()
+		destinations, _ = h.storageRepo.List(r.Context())
 	}
 
 	templ.Handler(layouts.AppLayout(databases.DatabaseDetailPage(dbService, backupConfig, destinations, backups))).ServeHTTP(w, r)
 }
 
-func (h *DatabasesHandler) UpdateBackupConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateBackupConfig(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -294,7 +325,7 @@ func (h *DatabasesHandler) UpdateBackupConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	if h.backupRepo != nil {
-		if err := h.backupRepo.UpsertConfig(cfg); err != nil {
+		if err := h.backupRepo.UpsertConfigWithContext(r.Context(), cfg); err != nil {
 			http.Error(w, "Failed to update backup config: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -304,7 +335,7 @@ func (h *DatabasesHandler) UpdateBackupConfig(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *DatabasesHandler) CreateBackup(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateBackup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -329,7 +360,7 @@ func (h *DatabasesHandler) CreateBackup(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *DatabasesHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	backupID := chi.URLParam(r, "backup_id")
 	if id == "" || backupID == "" {
@@ -342,7 +373,7 @@ func (h *DatabasesHandler) DownloadBackup(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	backupRecord, err := h.backupRepo.GetByID(backupID)
+	backupRecord, err := h.backupRepo.GetByIDWithContext(r.Context(), backupID)
 	if err != nil {
 		http.Error(w, "Backup record not found", http.StatusNotFound)
 		return
@@ -351,7 +382,6 @@ func (h *DatabasesHandler) DownloadBackup(w http.ResponseWriter, r *http.Request
 	baseDir := "/var/lib/labuh/backups/databases"
 	localPath := filepath.Join(baseDir, id, backupRecord.Filename)
 	if _, err := os.Stat(localPath); os.IsNotExist(err) {
-		// Fallback ke ./backups/databases jika testing
 		localPath = filepath.Join("./backups/databases", id, backupRecord.Filename)
 	}
 
@@ -367,7 +397,7 @@ func (h *DatabasesHandler) DownloadBackup(w http.ResponseWriter, r *http.Request
 	http.ServeContent(w, r, backupRecord.Filename, backupRecord.CreatedAt, f)
 }
 
-func (h *DatabasesHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	backupID := chi.URLParam(r, "backup_id")
 	if id == "" || backupID == "" {
@@ -376,22 +406,22 @@ func (h *DatabasesHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if h.backupRepo != nil {
-		backupRecord, err := h.backupRepo.GetByID(backupID)
+		backupRecord, err := h.backupRepo.GetByIDWithContext(r.Context(), backupID)
 		if err == nil {
 			localPath := filepath.Join("/var/lib/labuh/backups/databases", id, backupRecord.Filename)
 			_ = os.Remove(localPath)
 			_ = os.Remove(filepath.Join("./backups/databases", id, backupRecord.Filename))
 
 			// Remote S3 deletion if configured
-			if backupRecord.S3Key != nil && h.storageRepo != nil && backupRecord.StorageDestinationID != nil {
-				if dest, err := h.storageRepo.GetByID(*backupRecord.StorageDestinationID); err == nil {
-					if client, err := backup.NewS3ClientFromDestination(dest); err == nil {
+			if backupRecord.S3Key != nil && h.storageRepo != nil && backupRecord.StorageDestinationID != nil && h.s3ClientFactory != nil {
+				if dest, err := h.storageRepo.GetByID(r.Context(), *backupRecord.StorageDestinationID); err == nil {
+					if client, err := h.s3ClientFactory(dest); err == nil {
 						_ = client.DeleteObject(r.Context(), *backupRecord.S3Key)
 					}
 				}
 			}
 
-			_ = h.backupRepo.Delete(backupID)
+			_ = h.backupRepo.DeleteWithContext(r.Context(), backupID)
 		}
 	}
 
@@ -399,14 +429,14 @@ func (h *DatabasesHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *DatabasesHandler) Start(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	dbService, err := h.dbRepo.GetByID(id)
+	dbService, err := h.dbRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -420,19 +450,19 @@ func (h *DatabasesHandler) Start(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = h.dbRepo.UpdateStatus(id, models.DatabaseStatusRunning)
+	_ = h.dbRepo.UpdateStatusWithContext(r.Context(), id, models.DatabaseStatusRunning)
 	w.Header().Set("HX-Redirect", "/databases/"+id)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *DatabasesHandler) Stop(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	dbService, err := h.dbRepo.GetByID(id)
+	dbService, err := h.dbRepo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -444,19 +474,19 @@ func (h *DatabasesHandler) Stop(w http.ResponseWriter, r *http.Request) {
 		_ = h.dockerClient.StopContainer(ctx, *dbService.ContainerID, 10)
 	}
 
-	_ = h.dbRepo.UpdateStatus(id, models.DatabaseStatusStopped)
+	_ = h.dbRepo.UpdateStatusWithContext(r.Context(), id, models.DatabaseStatusStopped)
 	w.Header().Set("HX-Redirect", "/databases/"+id)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *DatabasesHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	dbService, err := h.dbRepo.GetByID(id)
+	dbService, err := h.dbRepo.GetByIDWithContext(r.Context(), id)
 	if err == nil && dbService != nil && h.dockerClient != nil && dbService.ContainerID != nil && *dbService.ContainerID != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -464,13 +494,106 @@ func (h *DatabasesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		_ = h.dockerClient.RemoveContainer(ctx, *dbService.ContainerID)
 	}
 
-	if err := h.dbRepo.Delete(id); err != nil {
+	if err := h.dbRepo.DeleteWithContext(r.Context(), id); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("HX-Redirect", "/projects/"+chi.URLParam(r, "project_id")+"/environments/"+chi.URLParam(r, "env_id")+"/databases")
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) UpdateResourceLimits(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	db, err := h.dbRepo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	var cpuLimit *float64
+	if cpuStr := strings.TrimSpace(r.FormValue("cpu_limit")); cpuStr != "" {
+		if val, err := strconv.ParseFloat(cpuStr, 64); err == nil && val > 0 {
+			cpuLimit = &val
+		}
+	}
+
+	var memoryLimit *int64
+	if memStr := strings.TrimSpace(r.FormValue("memory_limit")); memStr != "" {
+		if val, err := strconv.ParseInt(memStr, 10, 64); err == nil && val > 0 {
+			memoryLimit = &val
+		}
+	}
+
+	var memoryReservation *int64
+	if resStr := strings.TrimSpace(r.FormValue("memory_reservation")); resStr != "" {
+		if val, err := strconv.ParseInt(resStr, 10, 64); err == nil && val > 0 {
+			memoryReservation = &val
+		}
+	}
+
+	if err := h.dbRepo.UpdateResourceLimitsWithContext(r.Context(), id, cpuLimit, memoryLimit, memoryReservation); err != nil {
+		http.Error(w, "Failed to update database resource limits: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Live update ke Docker database container jika sedang running
+	if h.dockerClient != nil && db.ContainerID != nil && *db.ContainerID != "" {
+		running, _ := h.dockerClient.IsContainerRunning(r.Context(), *db.ContainerID)
+		if running {
+			limits := docker.ContainerResourceLimits{
+				CPULimit:          cpuLimit,
+				MemoryLimit:       memoryLimit,
+				MemoryReservation: memoryReservation,
+			}
+			if err := h.dockerClient.UpdateContainerResources(r.Context(), *db.ContainerID, limits); err != nil {
+				slog.Warn("live update database container resources failed", "error", err, "container_id", *db.ContainerID)
+			}
+		}
+	}
+
+	http.Redirect(w, r, "/databases/"+id, http.StatusFound)
+}
+
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	dbService, err := h.dbRepo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	// Sinkronisasi status dari Docker container jika ada
+	if h.dockerClient != nil && dbService.ContainerID != nil && *dbService.ContainerID != "" {
+		running, err := h.dockerClient.IsContainerRunning(r.Context(), *dbService.ContainerID)
+		if err == nil {
+			newStatus := models.DatabaseStatusStopped
+			if running {
+				newStatus = models.DatabaseStatusRunning
+			}
+			if dbService.Status != newStatus {
+				_ = h.dbRepo.UpdateStatusWithContext(r.Context(), dbService.ID, newStatus)
+				dbService.Status = newStatus
+			}
+		}
+	}
+
+	templ.Handler(components.PollingStatusBadge(string(dbService.Status), "/databases/"+id+"/status")).ServeHTTP(w, r)
 }
 
 func GetDatabaseImage(engine models.DatabaseEngine, version string) string {
@@ -527,97 +650,15 @@ func GenerateConnectionString(engine models.DatabaseEngine, username, password, 
 	}
 }
 
-func (h *DatabasesHandler) UpdateResourceLimits(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if id == "" {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
+func parseInt(s string, defaultValue int) int {
+	if s == "" {
+		return defaultValue
 	}
-
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
+	val, err := strconv.Atoi(s)
+	if err != nil || val < 1 {
+		return defaultValue
 	}
-
-	db, err := h.dbRepo.GetByID(id)
-	if err != nil {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	var cpuLimit *float64
-	if cpuStr := strings.TrimSpace(r.FormValue("cpu_limit")); cpuStr != "" {
-		if val, err := strconv.ParseFloat(cpuStr, 64); err == nil && val > 0 {
-			cpuLimit = &val
-		}
-	}
-
-	var memoryLimit *int64
-	if memStr := strings.TrimSpace(r.FormValue("memory_limit")); memStr != "" {
-		if val, err := strconv.ParseInt(memStr, 10, 64); err == nil && val > 0 {
-			memoryLimit = &val
-		}
-	}
-
-	var memoryReservation *int64
-	if resStr := strings.TrimSpace(r.FormValue("memory_reservation")); resStr != "" {
-		if val, err := strconv.ParseInt(resStr, 10, 64); err == nil && val > 0 {
-			memoryReservation = &val
-		}
-	}
-
-	if err := h.dbRepo.UpdateResourceLimits(id, cpuLimit, memoryLimit, memoryReservation); err != nil {
-		http.Error(w, "Failed to update database resource limits: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Live update ke Docker database container jika sedang running
-	if h.dockerClient != nil && db.ContainerID != nil && *db.ContainerID != "" {
-		running, _ := h.dockerClient.IsContainerRunning(r.Context(), *db.ContainerID)
-		if running {
-			limits := docker.ContainerResourceLimits{
-				CPULimit:          cpuLimit,
-				MemoryLimit:       memoryLimit,
-				MemoryReservation: memoryReservation,
-			}
-			if err := h.dockerClient.UpdateContainerResources(r.Context(), *db.ContainerID, limits); err != nil {
-				slog.Warn("live update database container resources failed", "error", err, "container_id", *db.ContainerID)
-			}
-		}
-	}
-
-	http.Redirect(w, r, "/databases/"+id, http.StatusFound)
-}
-
-func (h *DatabasesHandler) Status(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if id == "" {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-
-	dbService, err := h.dbRepo.GetByID(id)
-	if err != nil {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	// Sinkronisasi status dari Docker container jika ada
-	if h.dockerClient != nil && dbService.ContainerID != nil && *dbService.ContainerID != "" {
-		running, err := h.dockerClient.IsContainerRunning(r.Context(), *dbService.ContainerID)
-		if err == nil {
-			newStatus := models.DatabaseStatusStopped
-			if running {
-				newStatus = models.DatabaseStatusRunning
-			}
-			if dbService.Status != newStatus {
-				_ = h.dbRepo.UpdateStatus(dbService.ID, newStatus)
-				dbService.Status = newStatus
-			}
-		}
-	}
-
-	templ.Handler(components.PollingStatusBadge(string(dbService.Status), "/databases/"+id+"/status")).ServeHTTP(w, r)
+	return val
 }
 
 func generateSecurePassword(length int) string {

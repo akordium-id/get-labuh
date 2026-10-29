@@ -49,7 +49,7 @@ migrations/                ← SQL migration files
 |--------|---------|------|-------|
 | Applications | `handler/applications.go` | `repo/application.go` | `models/application.go` |
 | Deployments | `handler/deployments.go` | `repo/deployment.go` | `models/application.go` (Deployment) |
-| Databases | `handler/databases.go` | `repo/database.go` | `models/database.go` |
+| Databases | `modules/databases/handler.go` | `modules/databases/repo.go` | `models/database.go` |
 | Compose | `modules/compose/handler.go` | `modules/compose/repo.go` | `models/compose.go` |
 | Projects | `modules/projects/handler.go` | `modules/projects/repo.go` | `models/project.go` |
 | Notifications | `modules/notifications/handler.go` | `modules/notifications/repo.go` | `models/notification.go` |

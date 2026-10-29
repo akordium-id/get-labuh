@@ -11,7 +11,6 @@ import (
 	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	"github.com/akordium-id/get-labuh/internal/web/pages"
-	"github.com/akordium-id/get-labuh/internal/web/pages/databases"
 	"github.com/akordium-id/get-labuh/internal/web/pages/lite"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -90,24 +89,9 @@ func SetupRoutes(c *Container) http.Handler {
 		r.Get("/applications/{id}/stats", c.MonitoringHandler.ApplicationStats)
 
 		c.ComposeMod.RegisterRoutes(r)
-
-		r.Get("/projects/{project_id}/environments/{env_id}/databases", c.DatabasesHandler.List)
-		r.Get("/projects/{project_id}/environments/{env_id}/databases/new", func(w http.ResponseWriter, r *http.Request) {
-			templ.Handler(layouts.AppLayout(databases.DatabaseCreatePage())).ServeHTTP(w, r)
-		})
-		r.Post("/projects/{project_id}/environments/{env_id}/databases", c.DatabasesHandler.Create)
-		r.Get("/databases/{id}", c.DatabasesHandler.Get)
-		r.Post("/databases/{id}/start", c.DatabasesHandler.Start)
-		r.Post("/databases/{id}/stop", c.DatabasesHandler.Stop)
-		r.Post("/databases/{id}/delete", c.DatabasesHandler.Delete)
-		r.Post("/databases/{id}/resources", c.DatabasesHandler.UpdateResourceLimits)
-		r.Get("/databases/{id}/status", c.DatabasesHandler.Status)
+		c.DatabasesMod.RegisterRoutes(r)
 		r.Get("/databases/{id}/stats", c.MonitoringHandler.DatabaseStats)
 		r.Get("/databases/{id}/terminal", c.TerminalHandler.DatabaseTerminal)
-		r.Post("/databases/{id}/backups/config", c.DatabasesHandler.UpdateBackupConfig)
-		r.Post("/databases/{id}/backups/create", c.DatabasesHandler.CreateBackup)
-		r.Get("/databases/{id}/backups/{backup_id}/download", c.DatabasesHandler.DownloadBackup)
-		r.Post("/databases/{id}/backups/{backup_id}/delete", c.DatabasesHandler.DeleteBackup)
 
 		r.Get("/applications/{id}/terminal", c.TerminalHandler.ApplicationTerminal)
 		r.Get("/containers/{container_id}/terminal/ws", c.TerminalHandler.ContainerTerminalWS)

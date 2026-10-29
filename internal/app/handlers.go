@@ -13,8 +13,10 @@ import (
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
+	"github.com/akordium-id/get-labuh/internal/models"
 	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
 	composemod "github.com/akordium-id/get-labuh/internal/modules/compose"
+	databasesmod "github.com/akordium-id/get-labuh/internal/modules/databases"
 	"github.com/akordium-id/get-labuh/internal/modules/notifications"
 	projectsmod "github.com/akordium-id/get-labuh/internal/modules/projects"
 	settingsmod "github.com/akordium-id/get-labuh/internal/modules/settings"
@@ -30,7 +32,7 @@ type Container struct {
 	DeploymentsHandler   *handler.DeploymentsHandler
 	LogsHandler          *handler.LogsHandler
 	ComposeMod           *composemod.Module
-	DatabasesHandler     *handler.DatabasesHandler
+	DatabasesMod         *databasesmod.Module
 	WebhooksHandler      *handler.WebhooksHandler
 	MonitoringHandler    *handler.MonitoringHandler
 	TemplatesHandler     *handler.TemplatesHandler
@@ -95,12 +97,14 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
 	logsHandler := handler.NewLogsHandler(deployRepo, appRepo)
 	logsHandler.SetDockerClient(dockerClient)
-	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
-	databasesHandler.SetDockerClient(dockerClient)
+	databasesMod := databasesmod.New(db, projectRepo)
+	databasesMod.SetDockerClient(dockerClient)
 
 	databaseBackupRunner := backup.NewDatabaseBackupRunner(dockerClient, databaseBackupRepo, storageRepo, databaseRepo, cfg.BackupDir+"/databases")
 	databaseBackupRunner.SetNotifier(notificationsMod.Notifier, projectRepo)
-	databasesHandler.SetBackupDependencies(databaseBackupRepo, storageRepo, databaseBackupRunner)
+	databasesMod.SetBackupDependencies(settingsMod.StorageRepo, databaseBackupRunner, func(dest *models.StorageDestination) (databasesmod.S3Deleter, error) {
+		return backup.NewS3ClientFromDestination(dest)
+	})
 
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
 	backupScheduler.Start()
@@ -134,7 +138,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		DeploymentsHandler:    deploymentsHandler,
 		LogsHandler:           logsHandler,
 		ComposeMod:            composeMod,
-		DatabasesHandler:      databasesHandler,
+		DatabasesMod:          databasesMod,
 		WebhooksHandler:       webhooksHandler,
 		MonitoringHandler:     monitoringHandler,
 		TemplatesHandler:      templatesHandler,
