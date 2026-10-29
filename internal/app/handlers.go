@@ -15,31 +15,29 @@ import (
 	"github.com/akordium-id/get-labuh/internal/handler"
 	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
 	"github.com/akordium-id/get-labuh/internal/modules/notifications"
+	settingsmod "github.com/akordium-id/get-labuh/internal/modules/settings"
 	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
 // Container menyimpan semua instans handler, repo, dan worker aplikasi.
 type Container struct {
-	AuthMod                    *authmod.Module
-	AuthMiddleware             func(http.Handler) http.Handler
-	APIKeyAuthMiddleware       *api.APIKeyAuthMiddleware
-	ProjectsHandler            *handler.ProjectsHandler
-	ApplicationsHandler        *handler.ApplicationsHandler
-	DeploymentsHandler         *handler.DeploymentsHandler
-	LogsHandler                *handler.LogsHandler
-	ComposeHandler             *handler.ComposeHandler
-	DatabasesHandler           *handler.DatabasesHandler
-	StorageDestinationsHandler *handler.StorageDestinationsHandler
-	DeployKeysHandler          *handler.DeployKeysHandler
-	WebhooksHandler            *handler.WebhooksHandler
-	MonitoringHandler          *handler.MonitoringHandler
-	TemplatesHandler           *handler.TemplatesHandler
-	TerminalHandler            *handler.TerminalHandler
-	NotificationsMod           *notifications.Module
-	DropzoneHandler            *handler.DropzoneHandler
-	SettingsHandler            *handler.SettingsHandler
-	BackupHandler              *handler.BackupHandler
-	AuditHandler               *handler.AuditHandler
+	AuthMod              *authmod.Module
+	AuthMiddleware       func(http.Handler) http.Handler
+	APIKeyAuthMiddleware *api.APIKeyAuthMiddleware
+	ProjectsHandler      *handler.ProjectsHandler
+	ApplicationsHandler  *handler.ApplicationsHandler
+	DeploymentsHandler   *handler.DeploymentsHandler
+	LogsHandler          *handler.LogsHandler
+	ComposeHandler       *handler.ComposeHandler
+	DatabasesHandler     *handler.DatabasesHandler
+	DeployKeysHandler    *handler.DeployKeysHandler
+	WebhooksHandler      *handler.WebhooksHandler
+	MonitoringHandler    *handler.MonitoringHandler
+	TemplatesHandler     *handler.TemplatesHandler
+	TerminalHandler      *handler.TerminalHandler
+	NotificationsMod     *notifications.Module
+	SettingsMod          *settingsmod.Module
+	DropzoneHandler      *handler.DropzoneHandler
 
 	APIAppHandler         *api.ApplicationsHandler
 	APIProjectsHandler    *api.ProjectsHandler
@@ -68,6 +66,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	templateRepo := repo.NewTemplateRepo(db)
 	apiKeyRepo := repo.NewApiKeyRepo(db)
 	settingRepo := repo.NewSettingRepo(db)
+	settingsMod := settingsmod.New(db, cfg.BackupDir)
 	auditRepo := repo.NewAuditLogRepo(db)
 	storageRepo := repo.NewStorageDestinationRepo(db)
 	databaseBackupRepo := repo.NewDatabaseBackupRepo(db)
@@ -81,10 +80,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	caddyClient := caddy.NewClient(caddyAPIURL, caddyAPIKey)
 
 	SeedTemplates(templateRepo)
-
-	settingsHandler := handler.NewSettingsHandler(settingRepo)
-	backupHandler := handler.NewBackupHandler(settingRepo, cfg.BackupDir)
-	auditHandler := handler.NewAuditHandler(auditRepo, userRepo)
 
 	authMiddleware := auth.RequireAuth(sessionRepo, userRepo, false)
 	apiKeyAuthMiddleware := api.NewAPIKeyAuthMiddleware(apiKeyRepo, userRepo)
@@ -102,7 +97,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	composeHandler := handler.NewComposeHandler(composeRepo, projectRepo, caddyClient, settingRepo)
 	databasesHandler := handler.NewDatabasesHandler(databaseRepo, projectRepo)
 	databasesHandler.SetDockerClient(dockerClient)
-	storageDestinationsHandler := handler.NewStorageDestinationsHandler(storageRepo)
 
 	databaseBackupRunner := backup.NewDatabaseBackupRunner(dockerClient, databaseBackupRepo, storageRepo, databaseRepo, cfg.BackupDir+"/databases")
 	databaseBackupRunner.SetNotifier(notificationsMod.Notifier, projectRepo)
@@ -134,33 +128,30 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	apiAppHandler.SetEnvVarRepo(envVarRepo)
 
 	return &Container{
-		AuthMod:                    authMod,
-		AuthMiddleware:             authMiddleware,
-		APIKeyAuthMiddleware:       apiKeyAuthMiddleware,
-		ProjectsHandler:            projectsHandler,
-		ApplicationsHandler:        applicationsHandler,
-		DeploymentsHandler:         deploymentsHandler,
-		LogsHandler:                logsHandler,
-		ComposeHandler:             composeHandler,
-		DatabasesHandler:           databasesHandler,
-		StorageDestinationsHandler: storageDestinationsHandler,
-		DeployKeysHandler:          deployKeysHandler,
-		WebhooksHandler:            webhooksHandler,
-		MonitoringHandler:          monitoringHandler,
-		TemplatesHandler:           templatesHandler,
-		TerminalHandler:            terminalHandler,
-		NotificationsMod:           notificationsMod,
-		DropzoneHandler:            dropzoneHandler,
-		SettingsHandler:            settingsHandler,
-		BackupHandler:              backupHandler,
-		AuditHandler:               auditHandler,
-		APIAppHandler:              apiAppHandler,
-		APIProjectsHandler:         api.NewProjectsHandler(projectRepo),
-		APIDeploymentsHandler:      api.NewDeploymentsHandler(deployRepo, appRepo),
-		AppRepo:                    appRepo,
-		DeployRepo:                 deployRepo,
-		AuditRepo:                  auditRepo,
-		DeployWorker:               deployWorker,
-		BackupScheduler:            backupScheduler,
+		AuthMod:               authMod,
+		AuthMiddleware:        authMiddleware,
+		APIKeyAuthMiddleware:  apiKeyAuthMiddleware,
+		ProjectsHandler:       projectsHandler,
+		ApplicationsHandler:   applicationsHandler,
+		DeploymentsHandler:    deploymentsHandler,
+		LogsHandler:           logsHandler,
+		ComposeHandler:        composeHandler,
+		DatabasesHandler:      databasesHandler,
+		DeployKeysHandler:     deployKeysHandler,
+		WebhooksHandler:       webhooksHandler,
+		MonitoringHandler:     monitoringHandler,
+		TemplatesHandler:      templatesHandler,
+		TerminalHandler:       terminalHandler,
+		NotificationsMod:      notificationsMod,
+		SettingsMod:           settingsMod,
+		DropzoneHandler:       dropzoneHandler,
+		APIAppHandler:         apiAppHandler,
+		APIProjectsHandler:    api.NewProjectsHandler(projectRepo),
+		APIDeploymentsHandler: api.NewDeploymentsHandler(deployRepo, appRepo),
+		AppRepo:               appRepo,
+		DeployRepo:            deployRepo,
+		AuditRepo:             auditRepo,
+		DeployWorker:          deployWorker,
+		BackupScheduler:       backupScheduler,
 	}, nil
 }

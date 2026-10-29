@@ -51,7 +51,6 @@ func SetupRoutes(c *Container) http.Handler {
 
 	r.Group(func(r chi.Router) {
 		r.Use(c.AuthMiddleware)
-		r.Post("/settings/mode", c.SettingsHandler.SwitchMode)
 		r.Post("/lite/deploy/upload", c.DropzoneHandler.UploadDropzone)
 
 		r.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
@@ -140,25 +139,8 @@ func SetupRoutes(c *Container) http.Handler {
 		r.Get("/applications/{id}/logs/stream", c.LogsHandler.StreamContainerLogs)
 
 		c.AuthMod.RegisterProtectedRoutes(r)
-
-		r.Get("/settings/caddy", c.SettingsHandler.Caddy)
-		r.Post("/settings/caddy", c.SettingsHandler.UpdateCaddy)
-		r.Post("/settings/caddy/test", c.SettingsHandler.TestCaddy)
-
-		r.Get("/settings/storage-destinations", c.StorageDestinationsHandler.List)
-		r.Post("/settings/storage-destinations", c.StorageDestinationsHandler.Create)
-		r.Post("/settings/storage-destinations/{id}/default", c.StorageDestinationsHandler.SetDefault)
-		r.Post("/settings/storage-destinations/{id}/delete", c.StorageDestinationsHandler.Delete)
-		r.Post("/settings/storage-destinations/{id}/test", c.StorageDestinationsHandler.TestConnection)
-
-		r.Get("/settings/backup", c.BackupHandler.BackupPage)
-		r.Post("/settings/backup/create", c.BackupHandler.CreateBackup)
-		r.Get("/settings/backup/download", c.BackupHandler.DownloadBackup)
-		r.Post("/settings/restore", c.BackupHandler.RestoreBackup)
-
 		c.NotificationsMod.RegisterRoutes(r)
-
-		r.Get("/settings/audit-logs", c.AuditHandler.AuditLogsPage)
+		c.SettingsMod.RegisterRoutes(r)
 	})
 
 	r.Post("/deployments/{id}/start", func(w http.ResponseWriter, r *http.Request) {
