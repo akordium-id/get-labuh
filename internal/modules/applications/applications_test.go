@@ -335,3 +335,81 @@ func TestApplicationsHandler_UpdateBasicAuth(t *stdtesting.T) {
 	require.NotNil(t, updated.BasicAuthPassword)
 	assert.Equal(t, "strongpassword123", *updated.BasicAuthPassword)
 }
+
+func TestApplications_CronJobs(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Cron App",
+		Slug:          "cron-app",
+		SourceType:    models.SourceTypeDockerImage,
+	})
+	require.NoError(t, err)
+
+	// Test 1: Create Cron Job via Repo
+	job, err := mod.CronRepo.CreateWithContext(context.Background(), models.CreateCronJobInput{
+		ApplicationID:  app.ID,
+		Name:           "Laravel Schedule",
+		Command:        "php artisan schedule:run",
+		CronExpression: "* * * * *",
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, job.ID)
+	assert.Equal(t, "Laravel Schedule", job.Name)
+	assert.True(t, job.IsEnabled)
+
+	// Test 2: List by App ID
+	jobs, err := mod.CronRepo.GetByApplicationIDWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+
+	// Test 3: Toggle Enabled
+	newStatus, err := mod.CronRepo.ToggleEnabledWithContext(context.Background(), job.ID)
+	require.NoError(t, err)
+	assert.False(t, newStatus)
+
+	activeJobs, err := mod.CronRepo.ListActiveJobsWithContext(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, activeJobs)
+
+	// Test 4: Update Execution
+	err = mod.CronRepo.UpdateExecutionWithContext(context.Background(), job.ID, models.CronJobStatusSuccess, "Schedule run successfully")
+	require.NoError(t, err)
+
+	updatedJob, err := mod.CronRepo.GetByIDWithContext(context.Background(), job.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedJob.LastStatus)
+	assert.Equal(t, models.CronJobStatusSuccess, *updatedJob.LastStatus)
+	require.NotNil(t, updatedJob.LastOutput)
+	assert.Equal(t, "Schedule run successfully", *updatedJob.LastOutput)
+
+	// Test 5: HTTP CreateCronJob Handler
+	form := url.Values{}
+	form.Set("name", "Cleanup Logs")
+	form.Set("command", "rm -rf /tmp/logs/*")
+	form.Set("cron_expression", "0 2 * * *")
+
+	req := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/cron-jobs", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", app.ID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	mod.Handler.CreateCronJob(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "/applications/"+app.ID, rec.Header().Get("HX-Redirect"))
+
+	jobsAfterHTTP, err := mod.CronRepo.GetByApplicationIDWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	assert.Len(t, jobsAfterHTTP, 2)
+
+	// Test 6: Delete Cron Job
+	err = mod.CronRepo.DeleteWithContext(context.Background(), job.ID)
+	require.NoError(t, err)
+
+	jobsAfterDelete, err := mod.CronRepo.GetByApplicationIDWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	assert.Len(t, jobsAfterDelete, 1)
+}

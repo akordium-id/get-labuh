@@ -107,6 +107,10 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
 	backupScheduler.Start()
 
+	if applicationsMod.CronScheduler != nil {
+		applicationsMod.CronScheduler.Start()
+	}
+
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)

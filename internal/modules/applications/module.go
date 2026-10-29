@@ -11,12 +11,14 @@ import (
 
 // Module mengelompokkan repository dan HTTP handler domain Applications.
 type Module struct {
-	Repo       *Repo
-	EnvVarRepo *EnvVarRepo
-	Handler    *Handler
-	Webhooks   *WebhooksHandler
-	Dropzone   *DropzoneHandler
-	Monitoring *MonitoringHandler
+	Repo          *Repo
+	EnvVarRepo    *EnvVarRepo
+	CronRepo      *CronJobRepo
+	CronScheduler *CronScheduler
+	Handler       *Handler
+	Webhooks      *WebhooksHandler
+	Dropzone      *DropzoneHandler
+	Monitoring    *MonitoringHandler
 }
 
 // New menginisialisasi modul Applications.
@@ -31,19 +33,25 @@ func New(
 ) *Module {
 	repo := NewRepo(db)
 	envVarRepo := NewEnvVarRepo(db)
+	cronRepo := NewCronJobRepo(db)
+	cronScheduler := NewCronScheduler(cronRepo, repo, envVarRepo, dockerClient)
 
 	handler := NewHandler(repo, envVarRepo, envRepo, deployRepo, settingRepo, caddyClient, dockerClient)
+	handler.SetCronDependencies(cronRepo, cronScheduler)
+
 	webhooks := NewWebhooksHandler(repo, deployRepo, envVarRepo)
 	dropzone := NewDropzoneHandler(repo, projectRepo, deployRepo, envVarRepo)
 	monitoring := NewMonitoringHandler(repo, dockerClient)
 
 	return &Module{
-		Repo:       repo,
-		EnvVarRepo: envVarRepo,
-		Handler:    handler,
-		Webhooks:   webhooks,
-		Dropzone:   dropzone,
-		Monitoring: monitoring,
+		Repo:          repo,
+		EnvVarRepo:    envVarRepo,
+		CronRepo:      cronRepo,
+		CronScheduler: cronScheduler,
+		Handler:       handler,
+		Webhooks:      webhooks,
+		Dropzone:      dropzone,
+		Monitoring:    monitoring,
 	}
 }
 
@@ -58,6 +66,9 @@ func (m *Module) SetDeployWorker(w DeployEnqueuer) {
 func (m *Module) SetDockerClient(c *docker.Client) {
 	m.Handler.SetDockerClient(c)
 	m.Monitoring.SetDockerClient(c)
+	if m.CronScheduler != nil {
+		m.CronScheduler.dockerClient = c
+	}
 }
 
 // SetCaddyClient menyetel caddy client.
@@ -86,6 +97,12 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/applications/{id}/webhook/regenerate", m.Handler.RegenerateWebhookSecret)
 	r.Get("/applications/{id}/status", m.Handler.Status)
 	r.Get("/applications/{id}/stats", m.Monitoring.Stats)
+
+	// Application Cron Jobs
+	r.Post("/applications/{id}/cron-jobs", m.Handler.CreateCronJob)
+	r.Post("/applications/{id}/cron-jobs/{job_id}/toggle", m.Handler.ToggleCronJob)
+	r.Post("/applications/{id}/cron-jobs/{job_id}/run", m.Handler.RunCronJobNow)
+	r.Post("/applications/{id}/cron-jobs/{job_id}/delete", m.Handler.DeleteCronJob)
 }
 
 // RegisterPublicRoutes mendaftarkan rute publik webhook.

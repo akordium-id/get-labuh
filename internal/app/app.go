@@ -58,6 +58,9 @@ func New(cfg Config) (*App, error) {
 // Run menjalankan HTTP/TLS server dan menunggu signal termination untuk graceful shutdown.
 func (a *App) Run(ctx context.Context) error {
 	defer a.container.BackupScheduler.Stop()
+	if a.container.ApplicationsMod != nil && a.container.ApplicationsMod.CronScheduler != nil {
+		defer a.container.ApplicationsMod.CronScheduler.Stop()
+	}
 	defer a.container.DeployWorker.Stop()
 	defer func() {
 		if err := database.Close(); err != nil {

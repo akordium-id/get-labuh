@@ -20,14 +20,16 @@ import (
 
 // Handler menangani operasi HTTP untuk domain Applications.
 type Handler struct {
-	appRepo      *Repo
-	envVarRepo   *EnvVarRepo
-	envRepo      EnvironmentProvider
-	deployRepo   DeploymentCreator
-	settingRepo  SettingProvider
-	caddyClient  *caddy.Client
-	dockerClient *docker.Client
-	deployWorker DeployEnqueuer
+	appRepo       *Repo
+	envVarRepo    *EnvVarRepo
+	envRepo       EnvironmentProvider
+	deployRepo    DeploymentCreator
+	settingRepo   SettingProvider
+	caddyClient   *caddy.Client
+	dockerClient  *docker.Client
+	deployWorker  DeployEnqueuer
+	cronRepo      *CronJobRepo
+	cronScheduler *CronScheduler
 }
 
 // NewHandler membuat instance baru Handler applications.
@@ -49,6 +51,12 @@ func NewHandler(
 		caddyClient:  caddyClient,
 		dockerClient: dockerClient,
 	}
+}
+
+// SetCronDependencies menyetel cron repository dan scheduler ke handler.
+func (h *Handler) SetCronDependencies(repo *CronJobRepo, scheduler *CronScheduler) {
+	h.cronRepo = repo
+	h.cronScheduler = scheduler
 }
 
 // SetDeployWorker menyetel worker antrean deployment.
@@ -192,7 +200,14 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	envVars, _ := h.envVarRepo.GetByApplicationIDWithContext(r.Context(), id)
 
-	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars))).ServeHTTP(w, r)
+	var cronJobs []*models.ApplicationCronJob
+	if h.cronRepo != nil {
+		if jobs, err := h.cronRepo.GetByApplicationIDWithContext(r.Context(), id); err == nil {
+			cronJobs = jobs
+		}
+	}
+
+	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs))).ServeHTTP(w, r)
 }
 
 // Start menjalankan kontainer aplikasi.
@@ -753,4 +768,116 @@ func setToast(w http.ResponseWriter, message string, toastType string) {
 	if data, err := json.Marshal(payload); err == nil {
 		w.Header().Set("HX-Trigger", string(data))
 	}
+}
+
+// CreateCronJob membuat cron job baru untuk aplikasi.
+func (h *Handler) CreateCronJob(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	if appID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	command := strings.TrimSpace(r.FormValue("command"))
+	cronExpr := strings.TrimSpace(r.FormValue("cron_expression"))
+
+	if name == "" || command == "" || cronExpr == "" {
+		http.Error(w, "Name, command, and cron expression are required", http.StatusBadRequest)
+		return
+	}
+
+	if h.cronRepo == nil {
+		http.Error(w, "Cron repository not configured", http.StatusInternalServerError)
+		return
+	}
+
+	_, err := h.cronRepo.CreateWithContext(r.Context(), models.CreateCronJobInput{
+		ApplicationID:  appID,
+		Name:           name,
+		Command:        command,
+		CronExpression: cronExpr,
+	})
+	if err != nil {
+		http.Error(w, "Failed to create cron job: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+appID)
+	w.WriteHeader(http.StatusOK)
+}
+
+// ToggleCronJob mengaktifkan/menonaktifkan cron job.
+func (h *Handler) ToggleCronJob(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	jobID := chi.URLParam(r, "job_id")
+	if appID == "" || jobID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.cronRepo == nil {
+		http.Error(w, "Cron repository not configured", http.StatusInternalServerError)
+		return
+	}
+
+	_, err := h.cronRepo.ToggleEnabledWithContext(r.Context(), jobID)
+	if err != nil {
+		http.Error(w, "Failed to toggle cron job: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+appID)
+	w.WriteHeader(http.StatusOK)
+}
+
+// RunCronJobNow menjalankan cron job secara instan di dalam container aplikasi.
+func (h *Handler) RunCronJobNow(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	jobID := chi.URLParam(r, "job_id")
+	if appID == "" || jobID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.cronScheduler == nil {
+		http.Error(w, "Cron scheduler not configured", http.StatusInternalServerError)
+		return
+	}
+
+	_, err := h.cronScheduler.RunJob(r.Context(), jobID)
+	if err != nil {
+		slog.Warn("manual cron job run encountered error", "job_id", jobID, "error", err)
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+appID)
+	w.WriteHeader(http.StatusOK)
+}
+
+// DeleteCronJob menghapus cron job.
+func (h *Handler) DeleteCronJob(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	jobID := chi.URLParam(r, "job_id")
+	if appID == "" || jobID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.cronRepo == nil {
+		http.Error(w, "Cron repository not configured", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.cronRepo.DeleteWithContext(r.Context(), jobID); err != nil {
+		http.Error(w, "Failed to delete cron job: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/applications/"+appID)
+	w.WriteHeader(http.StatusOK)
 }

@@ -483,6 +483,60 @@ func (c *Client) ExecStream(ctx context.Context, containerID string, cmd []strin
 	return nil
 }
 
+// ExecCommand menjalankan perintah shell di dalam container dan mengembalikan stdout + stderr sebagai string gabungan.
+func (c *Client) ExecCommand(ctx context.Context, containerID, command string, env []string) (string, error) {
+	if c.cli == nil {
+		return "", fmt.Errorf("docker client not initialized")
+	}
+
+	// Bungkus command dalam shell sh -c atau bash -c agar mendukung pipe dan arguments kompleks
+	cmd := []string{"sh", "-c", command}
+	execConfig := container.ExecOptions{
+		Cmd:          cmd,
+		Env:          env,
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execCreateResp, err := c.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec instance: %w", err)
+	}
+
+	attachResp, err := c.cli.ContainerExecAttach(ctx, execCreateResp.ID, container.ExecAttachOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to attach exec instance: %w", err)
+	}
+	defer attachResp.Close()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	_, err = stdcopy.StdCopy(&stdoutBuf, &stderrBuf, attachResp.Reader)
+	if err != nil {
+		return "", fmt.Errorf("failed during exec stream copy: %w", err)
+	}
+
+	output := strings.TrimSpace(stdoutBuf.String())
+	stderrStr := strings.TrimSpace(stderrBuf.String())
+	if stderrStr != "" {
+		if output != "" {
+			output += "\n" + stderrStr
+		} else {
+			output = stderrStr
+		}
+	}
+
+	inspectResp, err := c.cli.ContainerExecInspect(ctx, execCreateResp.ID)
+	if err != nil {
+		return output, fmt.Errorf("failed to inspect exec exit code: %w", err)
+	}
+
+	if inspectResp.ExitCode != 0 {
+		return output, fmt.Errorf("command exited with code %d: %s", inspectResp.ExitCode, output)
+	}
+
+	return output, nil
+}
+
 // ExecTTY membuat sesi exec interaktif dengan PTY untuk terminal web WebSocket
 func (c *Client) ExecTTY(ctx context.Context, containerID string, cmd []string, env []string) (string, types.HijackedResponse, error) {
 	if c.cli == nil {
