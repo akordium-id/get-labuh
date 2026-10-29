@@ -1,0 +1,61 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    # Standar & Deteksi Bug
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - revive
+
+    # Kerapian & Formatting
+    - gci
+    - misspell
+
+    # Keamanan & Keandalan
+    - gosec
+    - noctx
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      # Hanya abaikan penulisan response HTTP (karena error biasanya sudah ditangani network layer)
+      - (*net/http.ResponseWriter).Write
+      - (net/http.ResponseWriter).Write
+      # Rollback pada deferred function umumnya aman diabaikan jika tx sudah commit
+      - (*database/sql.Tx).Rollback
+
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/your-org/your-repo) # Ganti dengan modul internal Anda
+
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+      - name: var-naming
+        disabled: false
+
+issues:
+  exclude-rules:
+    # Abaikan error handling ketat dan unused hanya pada pengujian
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - unused
+
+    # Abaikan deprecation warning hanya jika berasal dari migrasi SDK spesifik
+    - text: "SA1019: .*docker"
+      linters:
+        - staticcheck

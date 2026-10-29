@@ -1,61 +1,65 @@
+version: "2"
 run:
-  timeout: 5m
   tests: true
-
 linters:
-  disable-all: true
+  default: none
   enable:
-    # Standar & Deteksi Bug
     - errcheck
+    - gocritic
+    - gosec
     - govet
     - ineffassign
+    - misspell
+    - noctx
+    - revive
     - staticcheck
     - unused
-    - gocritic
-    - revive
-
-    # Kerapian & Formatting
-    - gci
-    - misspell
-
-    # Keamanan & Keandalan
-    - gosec
-    - noctx
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      # Hanya abaikan penulisan response HTTP (karena error biasanya sudah ditangani network layer)
-      - (*net/http.ResponseWriter).Write
-      - (net/http.ResponseWriter).Write
-      # Rollback pada deferred function umumnya aman diabaikan jika tx sudah commit
-      - (*database/sql.Tx).Rollback
-
-  gci:
-    sections:
-      - standard
-      - default
-      - prefix(github.com/your-org/your-repo) # Ganti dengan modul internal Anda
-
-  revive:
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - (*net/http.ResponseWriter).Write
+        - (net/http.ResponseWriter).Write
+        - (*database/sql.Tx).Rollback
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+        - name: var-naming
+          disabled: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-        disabled: false
-      - name: var-naming
-        disabled: false
-
-issues:
-  exclude-rules:
-    # Abaikan error handling ketat dan unused hanya pada pengujian
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-        - unused
-
-    # Abaikan deprecation warning hanya jika berasal dari migrasi SDK spesifik
-    - text: "SA1019: .*docker"
-      linters:
-        - staticcheck
+      - linters:
+          - errcheck
+          - gosec
+          - unused
+        path: _test\.go
+      - linters:
+          - staticcheck
+        text: 'SA1019: .*docker'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/your-org/your-repo)
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
