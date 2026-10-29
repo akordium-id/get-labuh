@@ -438,10 +438,55 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	writeLog(activeLogWriter, "Zero-downtime deployment completed successfully!")
 	updateStep("done", models.DeployStatusSuccess, "")
 	if p.deployRepo != nil {
+		if imageName != "" {
+			_ = p.deployRepo.UpdateImageName(job.DeploymentID, imageName)
+		}
 		_ = p.deployRepo.MarkFinished(job.DeploymentID)
 	}
 
+	// Retention policy: Cache 5 image sukses terakhir per aplikasi (seperti Coolify)
+	p.pruneOldCachedImages(ctx, job.ApplicationID, imageName, activeLogWriter)
+
 	return nil
+}
+
+// pruneOldCachedImages membersihkan image docker lama milik aplikasi dengan mempertahankan 5 image sukses terbaru.
+func (p *Pipeline) pruneOldCachedImages(ctx context.Context, appID, currentImage string, logWriter logging.LogWriter) {
+	if p.deployRepo == nil || p.dockerClient == nil {
+		return
+	}
+
+	// Whitelist 5 image sukses terakhir dari DB
+	keepImages, err := p.deployRepo.GetRecentSuccessfulImages(appID, 5)
+	if err != nil {
+		writeLog(logWriter, fmt.Sprintf("Warning: failed to fetch recent successful images for retention: %v", err))
+		return
+	}
+
+	keepSet := make(map[string]bool)
+	for _, img := range keepImages {
+		keepSet[img] = true
+	}
+	if currentImage != "" {
+		keepSet[currentImage] = true
+	}
+
+	// Cari semua image lokal yang memiliki prefix labuh-<appID>:
+	prefix := fmt.Sprintf("labuh-%s:", appID)
+	localImages, err := p.dockerClient.ListImagesByPrefix(ctx, prefix)
+	if err != nil {
+		writeLog(logWriter, fmt.Sprintf("Warning: failed to list images for retention prune: %v", err))
+		return
+	}
+
+	for _, localImg := range localImages {
+		if !keepSet[localImg] {
+			writeLog(logWriter, fmt.Sprintf("Pruning older cached image to free space: %s", localImg))
+			if err := p.dockerClient.RemoveImage(ctx, localImg); err != nil {
+				writeLog(logWriter, fmt.Sprintf("Notice: could not remove image %s (might be in use): %v", localImg, err))
+			}
+		}
+	}
 }
 
 func (p *Pipeline) ExecuteCompose(ctx context.Context, job ComposeJob) error {

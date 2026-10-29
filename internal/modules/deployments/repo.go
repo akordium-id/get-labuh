@@ -26,6 +26,7 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateDeploym
 		ApplicationID: input.ApplicationID,
 		CommitHash:    input.CommitHash,
 		CommitMessage: input.CommitMessage,
+		ImageName:     input.ImageName,
 		Status:        models.DeployStatusQueued,
 		Step:          input.Step,
 		Output:        input.Output,
@@ -36,9 +37,9 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateDeploym
 
 	_, err := r.db.ExecContext(
 		ctx,
-		`INSERT INTO deployments (id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		deployment.ID, deployment.ApplicationID, deployment.CommitHash, deployment.CommitMessage, deployment.Status, deployment.Step, deployment.Output, deployment.ErrorMessage, deployment.LogPath, nil, nil, deployment.CreatedAt,
+		`INSERT INTO deployments (id, application_id, commit_hash, commit_message, image_name, status, step, output, error_message, log_path, started_at, finished_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		deployment.ID, deployment.ApplicationID, deployment.CommitHash, deployment.CommitMessage, deployment.ImageName, deployment.Status, deployment.Step, deployment.Output, deployment.ErrorMessage, deployment.LogPath, nil, nil, deployment.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -56,10 +57,10 @@ func (r *Repo) GetByIDWithContext(ctx context.Context, id string) (*models.Deplo
 	deployment := &models.Deployment{}
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, image_name, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments WHERE id = ?`,
 		id,
-	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.ImageName, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +76,7 @@ func (r *Repo) GetByID(id string) (*models.Deployment, error) {
 func (r *Repo) GetByApplicationIDWithContext(ctx context.Context, appID string) ([]*models.Deployment, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, image_name, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments WHERE application_id = ? ORDER BY created_at DESC`,
 		appID,
 	)
@@ -87,7 +88,7 @@ func (r *Repo) GetByApplicationIDWithContext(ctx context.Context, appID string) 
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.ImageName, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +116,7 @@ func (r *Repo) GetByApplicationIDPaginatedWithContext(ctx context.Context, appID
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, image_name, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments WHERE application_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		appID, limit, offset,
 	)
@@ -127,7 +128,7 @@ func (r *Repo) GetByApplicationIDPaginatedWithContext(ctx context.Context, appID
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.ImageName, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -155,7 +156,7 @@ func (r *Repo) GetByStatusPaginatedWithContext(ctx context.Context, status model
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, image_name, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		status, limit, offset,
 	)
@@ -167,7 +168,7 @@ func (r *Repo) GetByStatusPaginatedWithContext(ctx context.Context, status model
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.ImageName, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -279,7 +280,7 @@ func (r *Repo) MarkFinished(id string) error {
 func (r *Repo) GetByProjectIDWithContext(ctx context.Context, projectID string) ([]*models.Deployment, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.status, d.step, d.output, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
+		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.image_name, d.status, d.step, d.output, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
 		 FROM deployments d
 		 JOIN applications a ON d.application_id = a.id
 		 JOIN environments e ON a.environment_id = e.id
@@ -295,7 +296,7 @@ func (r *Repo) GetByProjectIDWithContext(ctx context.Context, projectID string) 
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.ImageName, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -317,7 +318,7 @@ func (r *Repo) GetByProjectID(projectID string) ([]*models.Deployment, error) {
 func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) ([]*models.Deployment, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.status, d.step, d.output, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
+		`SELECT d.id, d.application_id, d.commit_hash, d.commit_message, d.image_name, d.status, d.step, d.output, d.error_message, d.log_path, d.started_at, d.finished_at, d.created_at
 		 FROM deployments d
 		 JOIN applications a ON d.application_id = a.id
 		 WHERE a.environment_id = ?
@@ -332,7 +333,7 @@ func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) 
 	var deployments []*models.Deployment
 	for rows.Next() {
 		deployment := &models.Deployment{}
-		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+		err := rows.Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.ImageName, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -355,13 +356,13 @@ func (r *Repo) GetPreviousSuccessfulWithContext(ctx context.Context, appID strin
 	deployment := &models.Deployment{}
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, application_id, commit_hash, commit_message, status, step, output, error_message, log_path, started_at, finished_at, created_at
+		`SELECT id, application_id, commit_hash, commit_message, image_name, status, step, output, error_message, log_path, started_at, finished_at, created_at
 		 FROM deployments
 		 WHERE application_id = ? AND status = ?
 		 ORDER BY created_at DESC
 		 LIMIT 1`,
 		appID, models.DeployStatusSuccess,
-	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
+	).Scan(&deployment.ID, &deployment.ApplicationID, &deployment.CommitHash, &deployment.CommitMessage, &deployment.ImageName, &deployment.Status, &deployment.Step, &deployment.Output, &deployment.ErrorMessage, &deployment.LogPath, &deployment.StartedAt, &deployment.FinishedAt, &deployment.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -371,4 +372,58 @@ func (r *Repo) GetPreviousSuccessfulWithContext(ctx context.Context, appID strin
 
 func (r *Repo) GetPreviousSuccessful(appID string) (*models.Deployment, error) {
 	return r.GetPreviousSuccessfulWithContext(context.Background(), appID)
+}
+
+// UpdateImageNameWithContext memperbarui nama docker image dari deployment.
+func (r *Repo) UpdateImageNameWithContext(ctx context.Context, id, imageName string) error {
+	now := time.Now()
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE deployments SET image_name = ?, updated_at = ? WHERE id = ?`,
+		imageName, now, id,
+	)
+	return err
+}
+
+func (r *Repo) UpdateImageName(id, imageName string) error {
+	return r.UpdateImageNameWithContext(context.Background(), id, imageName)
+}
+
+// GetRecentSuccessfulImagesWithContext mengambil daftar image_name dari N deployment sukses terakhir untuk retention cache.
+func (r *Repo) GetRecentSuccessfulImagesWithContext(ctx context.Context, appID string, keepCount int) ([]string, error) {
+	if keepCount <= 0 {
+		keepCount = 5
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT DISTINCT image_name
+		 FROM deployments
+		 WHERE application_id = ? AND status = ? AND image_name IS NOT NULL AND image_name != ''
+		 ORDER BY created_at DESC
+		 LIMIT ?`,
+		appID, models.DeployStatusSuccess, keepCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var images []string
+	for rows.Next() {
+		var img string
+		if err := rows.Scan(&img); err != nil {
+			return nil, err
+		}
+		if img != "" {
+			images = append(images, img)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return images, nil
+}
+
+func (r *Repo) GetRecentSuccessfulImages(appID string, keepCount int) ([]string, error) {
+	return r.GetRecentSuccessfulImagesWithContext(context.Background(), appID, keepCount)
 }

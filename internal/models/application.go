@@ -109,6 +109,7 @@ type Deployment struct {
 	ApplicationID string
 	CommitHash    *string
 	CommitMessage *string
+	ImageName     *string
 	Status        DeployStatus
 	Step          *string
 	Output        *string
@@ -124,6 +125,7 @@ type CreateDeploymentInput struct {
 	ApplicationID string
 	CommitHash    *string
 	CommitMessage *string
+	ImageName     *string
 	LogPath       *string
 	Step          *string
 	Output        *string

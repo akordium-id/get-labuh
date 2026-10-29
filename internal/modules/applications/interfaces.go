@@ -20,10 +20,11 @@ type ProjectEnvironmentProvider interface {
 	CreateEnvironment(projectID, name, slug string) (*models.Environment, error)
 }
 
-// DeploymentCreator mengabstraksi pembuatan deployment record.
+// DeploymentCreator mengabstraksi pembuatan dan pembacaan deployment record.
 type DeploymentCreator interface {
 	Create(input models.CreateDeploymentInput) (*models.Deployment, error)
 	CreateWithContext(ctx context.Context, input models.CreateDeploymentInput) (*models.Deployment, error)
+	GetByApplicationIDWithContext(ctx context.Context, appID string) ([]*models.Deployment, error)
 	MarkStarted(id string) error
 	UpdateStatus(id string, status models.DeployStatus) error
 }

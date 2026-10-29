@@ -84,20 +84,39 @@ func TestDeploymentRepo_CRUD(t *stdtesting.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.DeployStatusSuccess, found.Status)
 
-	// Get previous successful
-	prev, err := repo.GetPreviousSuccessfulWithContext(context.Background(), "app-1")
+	// Test ImageName and Retention
+	img := "labuh-app-1:1234567890"
+	require.NoError(t, repo.UpdateImageNameWithContext(context.Background(), deploy.ID, img))
+	updated, err := repo.GetByIDWithContext(context.Background(), deploy.ID)
 	require.NoError(t, err)
-	assert.Equal(t, deploy.ID, prev.ID)
+	require.NotNil(t, updated.ImageName)
+	assert.Equal(t, img, *updated.ImageName)
+
+	recentImgs, err := repo.GetRecentSuccessfulImagesWithContext(context.Background(), "app-1", 5)
+	require.NoError(t, err)
+	assert.Contains(t, recentImgs, img)
+}
+
+type mockDeployEnqueuer struct {
+	enqueued []models.DeploymentJob
+}
+
+func (m *mockDeployEnqueuer) Enqueue(job models.DeploymentJob) error {
+	m.enqueued = append(m.enqueued, job)
+	return nil
 }
 
 func TestDeploymentsHandler_StartAndRollback(t *stdtesting.T) {
 	_, repo, handler := setupTestModule(t)
+	workerMock := &mockDeployEnqueuer{}
+	handler.SetDeployWorker(workerMock)
 
-	// Create initial successful deployment
+	// Create initial successful deployment with cached image
 	deploy1, err := repo.CreateWithContext(context.Background(), models.CreateDeploymentInput{
 		ApplicationID: "app-1",
 		CommitHash:    ptrString("commit-v1"),
 		CommitMessage: ptrString("v1 stable"),
+		ImageName:     ptrString("labuh-app-1:v1-stable"),
 	})
 	require.NoError(t, err)
 	require.NoError(t, repo.UpdateStatusWithContext(context.Background(), deploy1.ID, models.DeployStatusSuccess))
@@ -122,7 +141,7 @@ func TestDeploymentsHandler_StartAndRollback(t *stdtesting.T) {
 	assert.Equal(t, http.StatusOK, w.Result().StatusCode)
 	assert.Equal(t, "/deployments/"+deploy2.ID, w.Header().Get("HX-Redirect"))
 
-	// Test Rollback
+	// Test Instant Rollback
 	reqRollback := httptest.NewRequest(http.MethodPost, "/deployments/"+deploy2.ID+"/rollback", nil)
 	reqRollback = reqRollback.WithContext(context.WithValue(reqRollback.Context(), chi.RouteCtxKey, rctx))
 
@@ -130,4 +149,11 @@ func TestDeploymentsHandler_StartAndRollback(t *stdtesting.T) {
 	handler.Rollback(wRollback, reqRollback)
 	assert.Equal(t, http.StatusOK, wRollback.Result().StatusCode)
 	assert.Contains(t, wRollback.Header().Get("HX-Redirect"), "/deployments/")
+
+	// Pastikan Instant Rollback langsung enqueue Docker image yang ter-cache
+	require.Len(t, workerMock.enqueued, 1)
+	enqueuedJob := workerMock.enqueued[0]
+	assert.Equal(t, string(models.SourceTypeDockerImage), enqueuedJob.SourceType)
+	assert.Equal(t, "labuh-app-1:v1-stable", enqueuedJob.DockerImage)
+	assert.Equal(t, 0, enqueuedJob.Priority)
 }

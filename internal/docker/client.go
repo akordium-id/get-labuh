@@ -131,6 +131,43 @@ func (c *Client) RemoveContainer(ctx context.Context, containerID string) error 
 	})
 }
 
+func (c *Client) RemoveImage(ctx context.Context, imageRef string) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	slog.Info("pruning old docker image", "image", imageRef)
+	_, err := c.cli.ImageRemove(ctx, imageRef, image.RemoveOptions{
+		Force:         false,
+		PruneChildren: true,
+	})
+	return err
+}
+
+func (c *Client) ListImagesByPrefix(ctx context.Context, prefix string) ([]string, error) {
+	if c.cli == nil {
+		return nil, fmt.Errorf("docker client not initialized")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	images, err := c.cli.ImageList(ctx, image.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var matched []string
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if strings.HasPrefix(tag, prefix) {
+				matched = append(matched, tag)
+			}
+		}
+	}
+	return matched, nil
+}
+
 func (c *Client) InspectContainer(ctx context.Context, containerID string) (*types.ContainerJSON, error) {
 	if c.cli == nil {
 		return nil, fmt.Errorf("docker client not initialized")

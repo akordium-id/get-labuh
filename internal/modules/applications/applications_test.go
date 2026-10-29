@@ -79,6 +79,16 @@ func (m *mockDeploymentCreator) UpdateStatus(id string, status models.DeployStat
 	return nil
 }
 
+func (m *mockDeploymentCreator) GetByApplicationIDWithContext(ctx context.Context, appID string) ([]*models.Deployment, error) {
+	var result []*models.Deployment
+	for _, d := range m.created {
+		if d.ApplicationID == appID {
+			result = append(result, d)
+		}
+	}
+	return result, nil
+}
+
 type mockSettingProvider struct{}
 
 func (m *mockSettingProvider) Get(ctx context.Context, key string) (string, error) {

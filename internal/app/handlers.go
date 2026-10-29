@@ -118,6 +118,8 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
 
 	applicationsMod.SetDeployWorker(deployWorker)
+	deploymentsMod.SetDeployWorker(deployWorker)
+	deploymentsMod.SetEnvVarRepo(envVarRepo)
 
 	apiAppHandler := api.NewApplicationsHandler(appRepo, projectRepo, deployRepo)
 	apiAppHandler.SetDeployWorker(deployWorker)

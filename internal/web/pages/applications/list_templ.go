@@ -789,76 +789,258 @@ func ApplicationDetailPage(app *models.Application, deployments []*models.Deploy
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</div><div class=\"text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3\"><strong class=\"text-blue-800\">Petunjuk Konfigurasi:</strong><ul class=\"list-disc list-inside mt-1 space-y-1 text-blue-700\"><li><strong>GitHub:</strong> Buka Repo Settings &rarr; Webhooks &rarr; Add Webhook. Masukkan URL GitHub di atas, pilih Content type: <code class=\"bg-blue-100 px-1 py-0.5 rounded\">application/json</code>, isi Secret, dan pilih event <em>Just the push event</em>.</li><li><strong>GitLab:</strong> Buka Repo Settings &rarr; Webhooks. Masukkan URL GitLab, paste Secret Token, dan centang event <em>Push events</em>.</li><li><strong>Filter Otomatis:</strong> Push ke branch lain akan diabaikan tanpa error demi menghemat resource server.</li></ul></div></div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Environment Variables</h2><form action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</div><div class=\"text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3\"><strong class=\"text-blue-800\">Petunjuk Konfigurasi:</strong><ul class=\"list-disc list-inside mt-1 space-y-1 text-blue-700\"><li><strong>GitHub:</strong> Buka Repo Settings &rarr; Webhooks &rarr; Add Webhook. Masukkan URL GitHub di atas, pilih Content type: <code class=\"bg-blue-100 px-1 py-0.5 rounded\">application/json</code>, isi Secret, dan pilih event <em>Just the push event</em>.</li><li><strong>GitLab:</strong> Buka Repo Settings &rarr; Webhooks. Masukkan URL GitLab, paste Secret Token, dan centang event <em>Push events</em>.</li><li><strong>Filter Otomatis:</strong> Push ke branch lain akan diabaikan tanpa error demi menghemat resource server.</li></ul></div></div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-4\"><div><h2 class=\"text-xl font-bold text-gray-900 flex items-center gap-2\"><svg class=\"w-5 h-5 text-blue-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg> Recent Deployments &amp; Instant Rollback</h2><p class=\"text-xs text-gray-500 mt-1\">Sistem menyimpan cache 5 image sukses terakhir (Coolify-style) untuk rollback instan tanpa git clone/re-build.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var44 string
-		templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars")).ResolveURL(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 392, Col: 72}
+		if len(deployments) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<p class=\"text-sm text-gray-500 italic py-4 text-center\">Belum ada riwayat deployment untuk aplikasi ini.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<div class=\"overflow-x-auto\"><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Deployment ID</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Status</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Cached Image</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Commit / Info</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Date</th><th class=\"px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, dep := range deployments {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900\"><a href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var44 string
+				templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID)).ResolveURL(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 421, Col: 59}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "\" class=\"text-blue-600 hover:text-blue-800 hover:underline\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var45 string
+				templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(dep.ID[:8])
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 422, Col: 23}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</a></td><td class=\"px-4 py-3 whitespace-nowrap text-sm\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = components.StatusBadge(string(dep.Status)).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if dep.ImageName != nil && *dep.ImageName != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<span class=\"inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200\" title=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var46 string
+					templ_7745c5c3_Var46, templ_7745c5c3_Err = templruntime.NewAttributeExpression(*dep.ImageName).Resolve(ctx)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 430, Col: 155}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "\"><svg class=\"w-3 h-3 text-emerald-500\" fill=\"currentColor\" viewBox=\"0 0 20 20\"><path fill-rule=\"evenodd\" d=\"M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z\" clip-rule=\"evenodd\"></path></svg> Cached</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<span class=\"text-gray-400\">-</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "</td><td class=\"px-4 py-3 whitespace-nowrap text-sm text-gray-600\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if dep.CommitMessage != nil && *dep.CommitMessage != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<span class=\"truncate block max-w-xs\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var47 string
+					templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(*dep.CommitMessage)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 440, Col: 69}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else if dep.CommitHash != nil && *dep.CommitHash != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<span class=\"font-mono text-xs\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var48 string
+					templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs((*dep.CommitHash)[:7])
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 442, Col: 66}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<span class=\"text-gray-400 italic text-xs\">Manual trigger</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs text-gray-500\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var49 string
+				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(dep.CreatedAt.Format("2006-01-02 15:04"))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 448, Col: 52}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "</td><td class=\"px-4 py-3 whitespace-nowrap text-right text-sm\"><div class=\"flex items-center justify-end gap-2\"><a href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var50 string
+				templ_7745c5c3_Var50, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID)).ResolveURL(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 452, Col: 60}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "\" class=\"text-xs text-gray-600 hover:text-gray-900 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors\">Logs</a> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if dep.Status == models.DeployStatusSuccess {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<form action=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var51 string
+					templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID + "/rollback")).ResolveURL(ctx)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 456, Col: 80}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "\" method=\"post\" class=\"inline\" hx-on:htmx:config-request=\"this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Rolling back...'\"><button type=\"submit\" class=\"inline-flex items-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded shadow-sm transition-colors\" title=\"Instant rollback to this container image\"><svg class=\"w-3 h-3\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6\"></path></svg> Instant Rollback</button></form>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</div></td></tr>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</tbody></table></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "</div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Environment Variables</h2><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\" method=\"post\" class=\"mb-4 flex gap-2\"><input type=\"text\" name=\"key\" placeholder=\"KEY\" class=\"border border-gray-300 rounded px-2 py-1 text-sm w-32\" required> <input type=\"text\" name=\"value\" placeholder=\"value\" class=\"border border-gray-300 rounded px-2 py-1 text-sm flex-1\" required> <label class=\"flex items-center text-sm\"><input type=\"checkbox\" name=\"is_secret\" class=\"mr-1\"> Secret</label> <button type=\"submit\" class=\"bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700\">Add</button></form><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Key</th><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Value</th><th class=\"px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
+		var templ_7745c5c3_Var52 string
+		templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars")).ResolveURL(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 476, Col: 72}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "\" method=\"post\" class=\"mb-4 flex gap-2\"><input type=\"text\" name=\"key\" placeholder=\"KEY\" class=\"border border-gray-300 rounded px-2 py-1 text-sm w-32\" required> <input type=\"text\" name=\"value\" placeholder=\"value\" class=\"border border-gray-300 rounded px-2 py-1 text-sm flex-1\" required> <label class=\"flex items-center text-sm\"><input type=\"checkbox\" name=\"is_secret\" class=\"mr-1\"> Secret</label> <button type=\"submit\" class=\"bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700\">Add</button></form><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Key</th><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Value</th><th class=\"px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, envVar := range envVars {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<tr><td class=\"px-4 py-2 text-sm text-gray-900\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "<tr><td class=\"px-4 py-2 text-sm text-gray-900\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var45 string
-			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Key)
+			var templ_7745c5c3_Var53 string
+			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Key)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 412, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 496, Col: 63}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</td><td class=\"px-4 py-2 text-sm text-gray-500\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "</td><td class=\"px-4 py-2 text-sm text-gray-500\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if envVar.IsSecret {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "••••••••")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "••••••••")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				var templ_7745c5c3_Var46 string
-				templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Value)
+				var templ_7745c5c3_Var54 string
+				templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Value)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 417, Col: 23}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 501, Col: 23}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</td><td class=\"px-4 py-2 text-right\"><form action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "</td><td class=\"px-4 py-2 text-right\"><form action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var47 string
-			templ_7745c5c3_Var47, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete")).ResolveURL(ctx)
+			var templ_7745c5c3_Var55 string
+			templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 421, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 505, Col: 102}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-red-600 hover:text-red-900 text-sm\">Delete</button></form></td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-red-600 hover:text-red-900 text-sm\">Delete</button></form></td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</tbody></table></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "</tbody></table></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -883,7 +1065,7 @@ func ApplicationCreatePage() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

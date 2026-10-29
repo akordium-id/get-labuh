@@ -2,6 +2,7 @@ package deployments
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,11 +27,23 @@ type ApplicationProvider interface {
 	UpdateStatus(id string, status models.AppStatus) error
 }
 
+// DeployEnqueuer mengabstraksi worker antrean deploy.
+type DeployEnqueuer interface {
+	Enqueue(job models.DeploymentJob) error
+}
+
+// EnvVarProvider mengabstraksi pembacaan env vars untuk aplikasi.
+type EnvVarProvider interface {
+	GetByApplicationIDWithContext(ctx context.Context, appID string) ([]*models.AppEnvVar, error)
+}
+
 // Handler menangani request HTTP dan SSE untuk domain Deployments.
 type Handler struct {
 	repo         *Repo
 	appProvider  ApplicationProvider
 	dockerClient *docker.Client
+	deployWorker DeployEnqueuer
+	envVarRepo   EnvVarProvider
 }
 
 // NewHandler membuat instance baru Handler deployments.
@@ -44,6 +57,16 @@ func NewHandler(repo *Repo, appProvider ApplicationProvider) *Handler {
 // SetDockerClient mengatur docker client untuk streaming container logs.
 func (h *Handler) SetDockerClient(client *docker.Client) {
 	h.dockerClient = client
+}
+
+// SetDeployWorker menyetel worker antrean deployment.
+func (h *Handler) SetDeployWorker(w DeployEnqueuer) {
+	h.deployWorker = w
+}
+
+// SetEnvVarRepo menyetel provider env var untuk deployment.
+func (h *Handler) SetEnvVarRepo(provider EnvVarProvider) {
+	h.envVarRepo = provider
 }
 
 // Get merender halaman detail deployment.
@@ -96,7 +119,7 @@ func (h *Handler) Logs(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(layouts.AppLayout(webdeploy.DeploymentLogsPage(deployment, logs))).ServeHTTP(w, r)
 }
 
-// Rollback memulai deployment baru mengacu pada deployment sukses sebelumnya.
+// Rollback memulai instant rollback mengacu pada deployment yang dipilih atau deployment sukses sebelumnya.
 func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
@@ -104,33 +127,105 @@ func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deployment, err := h.repo.GetByIDWithContext(r.Context(), id)
+	targetDeployment, err := h.repo.GetByIDWithContext(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
-	prevDeployment, err := h.repo.GetPreviousSuccessfulWithContext(r.Context(), deployment.ApplicationID)
-	if err != nil || prevDeployment == nil {
-		http.Error(w, "No previous successful deployment found", http.StatusBadRequest)
+	// Tentukan target rollback: jika deployment ini sukses dan punya image_name, pakai langsung.
+	// Jika tidak, cari deployment sukses terakhir dari aplikasi tersebut.
+	var rollbackSource *models.Deployment = targetDeployment
+	if rollbackSource.Status != models.DeployStatusSuccess || rollbackSource.ImageName == nil || *rollbackSource.ImageName == "" {
+		prevDeployment, err := h.repo.GetPreviousSuccessfulWithContext(r.Context(), targetDeployment.ApplicationID)
+		if err != nil || prevDeployment == nil {
+			http.Error(w, "No previous successful deployment found", http.StatusBadRequest)
+			return
+		}
+		rollbackSource = prevDeployment
+	}
+
+	var app *models.Application
+	if h.appProvider != nil {
+		app, _ = h.appProvider.GetByID(targetDeployment.ApplicationID)
+	}
+	if app == nil {
+		http.Error(w, "Application not found", http.StatusNotFound)
 		return
 	}
 
+	commitMsg := "Rollback to " + rollbackSource.ID[:8]
+	if rollbackSource.CommitMessage != nil && *rollbackSource.CommitMessage != "" {
+		commitMsg = fmt.Sprintf("Rollback to: %s", *rollbackSource.CommitMessage)
+	}
+
 	rollbackDeployment, err := h.repo.CreateWithContext(r.Context(), models.CreateDeploymentInput{
-		ApplicationID: deployment.ApplicationID,
-		CommitHash:    prevDeployment.CommitHash,
-		CommitMessage: prevDeployment.CommitMessage,
-		LogPath:       prevDeployment.LogPath,
+		ApplicationID: targetDeployment.ApplicationID,
+		CommitHash:    rollbackSource.CommitHash,
+		CommitMessage: &commitMsg,
+		ImageName:     rollbackSource.ImageName,
 	})
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
+	logPath := "/tmp/labuh-logs/" + rollbackDeployment.ID + ".log"
 	_ = h.repo.MarkStartedWithContext(r.Context(), rollbackDeployment.ID)
 	_ = h.repo.UpdateStatusWithContext(r.Context(), rollbackDeployment.ID, models.DeployStatusDeploying)
 	if h.appProvider != nil {
-		_ = h.appProvider.UpdateStatus(deployment.ApplicationID, models.AppStatusRunning)
+		_ = h.appProvider.UpdateStatus(app.ID, models.AppStatusBuilding)
+	}
+
+	// Enqueue Instant Rollback ke DeployWorker via cached Docker Image
+	if h.deployWorker != nil {
+		var envList []models.AppEnvVar
+		if h.envVarRepo != nil {
+			if envs, err := h.envVarRepo.GetByApplicationIDWithContext(r.Context(), app.ID); err == nil {
+				for _, ev := range envs {
+					if ev != nil {
+						envList = append(envList, *ev)
+					}
+				}
+			}
+		}
+
+		job := models.DeploymentJob{
+			DeploymentID:  rollbackDeployment.ID,
+			ApplicationID: app.ID,
+			AppPort:       app.AppPort,
+			EnvVars:       envList,
+			LogPath:       logPath,
+			Priority:      0, // High priority untuk instant rollback
+		}
+
+		// Jika image tersedia di cache, deploy langsung via docker_image tanpa re-build
+		if rollbackSource.ImageName != nil && *rollbackSource.ImageName != "" {
+			job.SourceType = string(models.SourceTypeDockerImage)
+			job.DockerImage = *rollbackSource.ImageName
+		} else {
+			// Fallback ke source type bawaan aplikasi bila image belum ter-cache
+			job.SourceType = string(app.SourceType)
+			if app.RepositoryURL != nil {
+				job.RepositoryURL = *app.RepositoryURL
+			}
+			if app.Branch != nil {
+				job.Branch = *app.Branch
+			}
+			if app.DockerfilePath != nil {
+				job.DockerfilePath = *app.DockerfilePath
+			}
+			if app.BuildPath != nil {
+				job.BuildPath = *app.BuildPath
+			}
+			if app.DockerImage != nil {
+				job.DockerImage = *app.DockerImage
+			}
+		}
+
+		if err := h.deployWorker.Enqueue(job); err != nil {
+			slog.Error("failed to enqueue instant rollback job", "error", err, "deployment_id", rollbackDeployment.ID)
+		}
 	}
 
 	w.Header().Set("HX-Redirect", "/deployments/"+rollbackDeployment.ID)

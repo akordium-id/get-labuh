@@ -185,7 +185,11 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var deployments []*models.Deployment
-	// Deployments bisa kosong bila belum pernah deploy
+	if h.deployRepo != nil {
+		if deps, err := h.deployRepo.GetByApplicationIDWithContext(r.Context(), id); err == nil {
+			deployments = deps
+		}
+	}
 	envVars, _ := h.envVarRepo.GetByApplicationIDWithContext(r.Context(), id)
 
 	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars))).ServeHTTP(w, r)
