@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	stdtesting "testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/handler"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/modules/auth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,12 +26,10 @@ func TestIntegration_AuthFlow(t *stdtesting.T) {
 	}
 	defer db.Close()
 
-	userRepo := repo.NewUserRepo(db)
-	sessionRepo := repo.NewSessionRepo(db)
-	authHandler := handler.NewAuthHandler(userRepo, sessionRepo, false)
+	authMod := auth.New(db, false)
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
-	userRepo.Create(models.CreateUserInput{
+	_, _ = authMod.UserRepo.Create(context.Background(), models.CreateUserInput{
 		Email:        "test@example.com",
 		PasswordHash: string(hash),
 		Name:         "Test User",
@@ -43,7 +43,7 @@ func TestIntegration_AuthFlow(t *stdtesting.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
-	authHandler.Login(w, req)
+	authMod.Handler.Login(w, req)
 
 	resp := w.Result()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -56,7 +56,7 @@ func TestIntegration_AuthFlow(t *stdtesting.T) {
 	req.AddCookie(&http.Cookie{Name: "session", Value: cookies[0].Value})
 	w = httptest.NewRecorder()
 
-	authHandler.Logout(w, req)
+	authMod.Handler.Logout(w, req)
 
 	resp = w.Result()
 	assert.Equal(t, http.StatusFound, resp.StatusCode)

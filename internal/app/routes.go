@@ -47,11 +47,7 @@ func SetupRoutes(c *Container) http.Handler {
 	)
 	r.Mount("/api/v1", apiRouter)
 
-	r.Group(func(r chi.Router) {
-		r.Get("/auth/login", c.AuthHandler.LoginPage)
-		r.Post("/auth/login", c.AuthHandler.Login)
-		r.Get("/auth/logout", c.AuthHandler.Logout)
-	})
+	c.AuthMod.RegisterPublicRoutes(r)
 
 	r.Group(func(r chi.Router) {
 		r.Use(c.AuthMiddleware)
@@ -143,9 +139,7 @@ func SetupRoutes(c *Container) http.Handler {
 		r.Get("/deployments/{id}/logs/stream", c.LogsHandler.StreamDeploymentLogs)
 		r.Get("/applications/{id}/logs/stream", c.LogsHandler.StreamContainerLogs)
 
-		r.Get("/settings/api-keys", c.APIKeysHandler.List)
-		r.Post("/settings/api-keys/create", c.APIKeysHandler.Create)
-		r.Post("/settings/api-keys/{id}/delete", c.APIKeysHandler.Delete)
+		c.AuthMod.RegisterProtectedRoutes(r)
 
 		r.Get("/settings/caddy", c.SettingsHandler.Caddy)
 		r.Post("/settings/caddy", c.SettingsHandler.UpdateCaddy)

@@ -13,13 +13,14 @@ import (
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
+	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
 	"github.com/akordium-id/get-labuh/internal/modules/notifications"
 	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
 // Container menyimpan semua instans handler, repo, dan worker aplikasi.
 type Container struct {
-	AuthHandler                *handler.AuthHandler
+	AuthMod                    *authmod.Module
 	AuthMiddleware             func(http.Handler) http.Handler
 	APIKeyAuthMiddleware       *api.APIKeyAuthMiddleware
 	ProjectsHandler            *handler.ProjectsHandler
@@ -36,7 +37,6 @@ type Container struct {
 	TerminalHandler            *handler.TerminalHandler
 	NotificationsMod           *notifications.Module
 	DropzoneHandler            *handler.DropzoneHandler
-	APIKeysHandler             *handler.APIKeysHandler
 	SettingsHandler            *handler.SettingsHandler
 	BackupHandler              *handler.BackupHandler
 	AuditHandler               *handler.AuditHandler
@@ -55,6 +55,7 @@ type Container struct {
 
 // BuildContainer melakukan wiring dependency injection untuk seluruh repository, service, worker, dan handler.
 func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
+	authMod := authmod.New(db, false)
 	userRepo := repo.NewUserRepo(db)
 	sessionRepo := repo.NewSessionRepo(db)
 	projectRepo := repo.NewProjectRepo(db)
@@ -81,7 +82,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 
 	SeedTemplates(templateRepo)
 
-	apiKeysHandler := handler.NewAPIKeysHandler(apiKeyRepo, userRepo)
 	settingsHandler := handler.NewSettingsHandler(settingRepo)
 	backupHandler := handler.NewBackupHandler(settingRepo, cfg.BackupDir)
 	auditHandler := handler.NewAuditHandler(auditRepo, userRepo)
@@ -94,7 +94,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
 	}
 
-	authHandler := handler.NewAuthHandler(userRepo, sessionRepo, false)
 	projectsHandler := handler.NewProjectsHandler(projectRepo)
 	applicationsHandler := handler.NewApplicationsHandler(appRepo, projectRepo, deployRepo, envVarRepo, caddyClient, settingRepo, dockerClient)
 	deploymentsHandler := handler.NewDeploymentsHandler(deployRepo, appRepo)
@@ -135,7 +134,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	apiAppHandler.SetEnvVarRepo(envVarRepo)
 
 	return &Container{
-		AuthHandler:                authHandler,
+		AuthMod:                    authMod,
 		AuthMiddleware:             authMiddleware,
 		APIKeyAuthMiddleware:       apiKeyAuthMiddleware,
 		ProjectsHandler:            projectsHandler,
@@ -152,7 +151,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		TerminalHandler:            terminalHandler,
 		NotificationsMod:           notificationsMod,
 		DropzoneHandler:            dropzoneHandler,
-		APIKeysHandler:             apiKeysHandler,
 		SettingsHandler:            settingsHandler,
 		BackupHandler:              backupHandler,
 		AuditHandler:               auditHandler,
