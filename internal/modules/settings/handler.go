@@ -123,15 +123,8 @@ func (h *Handler) SwitchMode(w http.ResponseWriter, r *http.Request) {
 	}
 	SetToast(w, label, ToastInfo)
 
-	redirectURL := r.Header.Get("HX-Current-URL")
-	if redirectURL == "" {
-		redirectURL = r.Referer()
-	}
-	if redirectURL == "" {
-		redirectURL = "/dashboard"
-	}
-
-	w.Header().Set("HX-Redirect", redirectURL)
+	// Pastikan client mereload halaman agar mode Pro/Lite aktif secara menyeluruh (sidebar, topbar, dan view)
+	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusOK)
 }
 

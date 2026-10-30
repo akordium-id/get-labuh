@@ -21,14 +21,9 @@ func CacheHeadersMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		etag := generateETag(r.URL.Path)
-		w.Header().Set("ETag", etag)
-
-		if match := r.Header.Get("If-None-Match"); match == etag {
-			w.WriteHeader(http.StatusNotModified)
-			return
-		}
-
+		// Rute HTML dinamis jangan diberi ETag statis berbasis URL path saja,
+		// agar perubahan state session/cookie langsung merender konten baru.
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		next.ServeHTTP(w, r)
 	})
 }
