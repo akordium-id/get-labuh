@@ -35,6 +35,8 @@ func New(db *sql.DB, secure bool) *Module {
 func (m *Module) RegisterPublicRoutes(r chi.Router) {
 	r.Get("/auth/login", m.Handler.LoginPage)
 	r.Post("/auth/login", m.Handler.Login)
+	r.Get("/auth/register", m.Handler.RegisterPage)
+	r.Post("/auth/register", m.Handler.Register)
 	r.Get("/auth/logout", m.Handler.Logout)
 }
 

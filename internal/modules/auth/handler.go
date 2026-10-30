@@ -31,7 +31,114 @@ func NewHandler(userRepo *UserRepo, sessionRepo *SessionRepo, apiKeyRepo *APIKey
 }
 
 func (h *Handler) LoginPage(w http.ResponseWriter, r *http.Request) {
+	// Jika belum ada user terdaftar sama sekali, redirect otomatis ke halaman onboarding register admin
+	count, err := h.userRepo.Count(r.Context())
+	if err == nil && count == 0 {
+		http.Redirect(w, r, "/auth/register", http.StatusFound)
+		return
+	}
 	templ.Handler(pages.LoginPage()).ServeHTTP(w, r)
+}
+
+func (h *Handler) RegisterPage(w http.ResponseWriter, r *http.Request) {
+	// Halaman register hanya boleh diakses saat belum ada user (first user setup)
+	count, err := h.userRepo.Count(r.Context())
+	if err == nil && count > 0 {
+		http.Redirect(w, r, "/auth/login", http.StatusFound)
+		return
+	}
+	templ.Handler(pages.RegisterPage()).ServeHTTP(w, r)
+}
+
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	count, err := h.userRepo.Count(ctx)
+	if err == nil && count > 0 {
+		w.Header().Set("HX-Retarget", "#register-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("<div class=\"bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg\">Registrasi ditutup. Administrator sudah terdaftar.</div>"))
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("name")
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	passwordConfirm := r.FormValue("password_confirm")
+
+	if name == "" || email == "" || password == "" {
+		w.Header().Set("HX-Retarget", "#register-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("<div class=\"bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg\">Semua kolom wajib diisi.</div>"))
+		return
+	}
+
+	if len(password) < 8 {
+		w.Header().Set("HX-Retarget", "#register-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("<div class=\"bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg\">Password minimal 8 karakter.</div>"))
+		return
+	}
+
+	if password != passwordConfirm {
+		w.Header().Set("HX-Retarget", "#register-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("<div class=\"bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg\">Konfirmasi password tidak cocok.</div>"))
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.userRepo.Create(ctx, models.CreateUserInput{
+		Email:        email,
+		PasswordHash: string(hashedPassword),
+		Name:         name,
+	})
+	if err != nil {
+		w.Header().Set("HX-Retarget", "#register-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("<div class=\"bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg\">Gagal mendaftarkan user: " + err.Error() + "</div>"))
+		return
+	}
+
+	// Login otomatis setelah registrasi berhasil
+	token, err := GenerateSessionToken()
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	tokenHash := HashToken(token)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	_, err = h.sessionRepo.Create(ctx, models.CreateSessionInput{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: expiresAt,
+	})
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	cookie := GenerateSessionCookie(token, h.secure)
+	http.SetCookie(w, cookie)
+
+	w.Header().Set("HX-Redirect", "/dashboard")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {

@@ -143,6 +143,12 @@ func (r *UserRepo) GetByID(ctx context.Context, id string) (*models.User, error)
 	return user, nil
 }
 
+func (r *UserRepo) Count(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&count)
+	return count, err
+}
+
 func (r *UserRepo) IncrementFailedLogin(ctx context.Context, id string) error {
 	_, err := r.db.ExecContext(ctx, "UPDATE users SET failed_login_count = failed_login_count + 1, updated_at = ? WHERE id = ?", time.Now(), id)
 	return err

@@ -30,13 +30,25 @@ func setupAuthModule(t *stdtesting.T) *auth.Module {
 func TestAuthModule_LoginPage(t *stdtesting.T) {
 	mod := setupAuthModule(t)
 
+	// Saat belum ada user, harus redirect 302 ke /auth/register (onboarding awal)
 	req := httptest.NewRequest(http.MethodGet, "/auth/login", nil)
 	w := httptest.NewRecorder()
-
 	mod.Handler.LoginPage(w, req)
-
 	resp := w.Result()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, "/auth/register", resp.Header.Get("Location"))
+
+	// Setelah ada user, harus render 200 OK
+	ctx := context.Background()
+	_, _ = mod.UserRepo.Create(ctx, models.CreateUserInput{
+		Email:        "admin@example.com",
+		PasswordHash: "somehash",
+		Name:         "Admin",
+	})
+
+	w2 := httptest.NewRecorder()
+	mod.Handler.LoginPage(w2, req)
+	assert.Equal(t, http.StatusOK, w2.Code)
 }
 
 func TestAuthModule_Login_InvalidCredentials(t *stdtesting.T) {
@@ -132,9 +144,15 @@ func TestAuthModule_RegisterRoutes(t *stdtesting.T) {
 		mod.RegisterProtectedRoutes(protected)
 	})
 
-	// Test login endpoint route
+	// Test register endpoint route
+	reqRegister := httptest.NewRequest(http.MethodGet, "/auth/register", nil)
+	wRegister := httptest.NewRecorder()
+	r.ServeHTTP(wRegister, reqRegister)
+	assert.Equal(t, http.StatusOK, wRegister.Code)
+
+	// Test login endpoint route (saat 0 user -> 302 ke /auth/register)
 	req := httptest.NewRequest(http.MethodGet, "/auth/login", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusFound, w.Code)
 }

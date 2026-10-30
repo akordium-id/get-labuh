@@ -28,6 +28,7 @@ type DeployWorker struct {
 	workerCount   int
 	notifier      EventNotifier
 	envRepo       *repo.ProjectRepo
+	stopOnce      sync.Once
 }
 
 func NewDeployWorker(bufferSize int) *DeployWorker {
@@ -219,7 +220,9 @@ func BuildDeploymentJob(app *models.Application, deploymentID string, envVars []
 }
 
 func (w *DeployWorker) Stop() {
-	w.cancel()
-	close(w.jobQueue)
-	w.wg.Wait()
+	w.stopOnce.Do(func() {
+		w.cancel()
+		close(w.jobQueue)
+		w.wg.Wait()
+	})
 }
