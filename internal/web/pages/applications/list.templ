@@ -141,209 +141,505 @@ func getStrVal(val *string, defaultVal string) string {
 }
 
 templ ApplicationDetailPage(app *models.Application, deployments []*models.Deployment, envVars []*models.AppEnvVar, cronJobs []*models.ApplicationCronJob) {
-	<div>
-		<div class="flex justify-between items-center mb-6">
-			<div>
-				<h1 class="text-3xl font-bold text-gray-900">{ app.Name }</h1>
-				<p class="text-gray-600 mt-1 font-mono text-sm">{ app.Slug }</p>
+	<div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general' }"
+	     @hashchange.window="tab = window.location.hash ? window.location.hash.substring(1) : 'general'">
+		<!-- Header Summary & Quick Actions -->
+		<div class="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-6 border-b border-gray-200 gap-4">
+			<div class="flex items-center gap-3">
+				<div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-100">
+					{ app.Name[:1] }
+				</div>
+				<div>
+					<div class="flex items-center gap-2.5">
+						<h1 class="text-2xl font-bold text-gray-900">{ app.Name }</h1>
+						@components.PollingStatusBadge(string(app.Status), "/applications/" + app.ID + "/status")
+					</div>
+					<div class="flex items-center gap-2 mt-1 text-xs text-gray-500 font-mono">
+						<span>{ app.Slug }</span>
+						<span>•</span>
+						<span class="uppercase font-semibold text-gray-700">{ string(app.SourceType) }</span>
+						if app.ServerID != nil && *app.ServerID != "" && *app.ServerID != "local" {
+							<span>•</span>
+							<span class="inline-flex items-center gap-1 text-indigo-600 font-medium font-sans">
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+								Remote ({ *app.ServerID })
+							</span>
+						}
+					</div>
+				</div>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center flex-wrap gap-2">
 				<form action={ templ.SafeURL("/applications/" + app.ID + "/start") } method="post" class="inline"
-				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Starting...'">
-					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 shadow-sm font-medium flex items-center transition-colors">Start</button>
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-3.5 w-3.5 mr-1\\'></span>Starting...'">
+					<button type="submit" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 shadow-sm text-xs font-semibold flex items-center gap-1 transition-colors">
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+						Start
+					</button>
 				</form>
 				<form action={ templ.SafeURL("/applications/" + app.ID + "/stop") } method="post" class="inline"
-				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Stopping...'">
-					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 shadow-sm font-medium flex items-center transition-colors">Stop</button>
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-3.5 w-3.5 mr-1\\'></span>Stopping...'">
+					<button type="submit" class="bg-rose-600 text-white px-3 py-1.5 rounded-lg hover:bg-rose-700 shadow-sm text-xs font-semibold flex items-center gap-1 transition-colors">
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path></svg>
+						Stop
+					</button>
 				</form>
 				<form action={ templ.SafeURL("/applications/" + app.ID + "/restart") } method="post" class="inline"
-				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Restarting...'">
-					<button type="submit" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 shadow-sm font-medium flex items-center transition-colors">Restart</button>
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-3.5 w-3.5 mr-1\\'></span>Restarting...'">
+					<button type="submit" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg hover:bg-amber-600 shadow-sm text-xs font-semibold flex items-center gap-1 transition-colors">
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+						Restart
+					</button>
 				</form>
-				<a href={ templ.SafeURL("/applications/" + app.ID + "/deploy") } class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 shadow-sm font-medium flex items-center transition-colors">Deploy</a>
+				<a href={ templ.SafeURL("/applications/" + app.ID + "/deploy") } class="bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 shadow-sm text-xs font-semibold flex items-center gap-1.5 transition-colors">
+					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+					Deploy
+				</a>
 				if app.ContainerID != nil && *app.ContainerID != "" {
-					<a href={ templ.SafeURL("/applications/" + app.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-1.5 font-medium shadow-sm transition-colors">
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+					<a href={ templ.SafeURL("/applications/" + app.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg hover:bg-gray-900 flex items-center gap-1.5 text-xs font-semibold shadow-sm transition-colors">
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
 						Terminal
 					</a>
 				}
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<h2 class="text-xl font-bold text-gray-900 mb-4">Application Info</h2>
-				<dl class="space-y-3">
-					<div class="flex justify-between items-center">
-						<dt class="text-gray-600">Status</dt>
-						<dd>
-							@components.PollingStatusBadge(string(app.Status), "/applications/" + app.ID + "/status")
-						</dd>
-					</div>
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Source Type</dt>
-						<dd class="text-gray-900">{ app.SourceType }</dd>
-					</div>
-					if app.RepositoryURL != nil {
-						<div class="flex justify-between">
-							<dt class="text-gray-600">Repository</dt>
-							<dd class="text-gray-900">{ *app.RepositoryURL }</dd>
-						</div>
+		<!-- Coolify-style Modern Resource Navigation Tabs -->
+		<div class="border-b border-gray-200 mb-6">
+			<nav class="flex space-x-2 sm:space-x-4 overflow-x-auto" aria-label="Tabs">
+				<a href="#general" @click="tab = 'general'"
+				   :class="tab === 'general' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm rounded-t-lg transition-all whitespace-nowrap">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+					<span>General</span>
+				</a>
+				<a href="#env" @click="tab = 'env'"
+				   :class="tab === 'env' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm rounded-t-lg transition-all whitespace-nowrap">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+					<span>Environment Variables</span>
+					<span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-gray-100 text-gray-600 font-mono">{ formatInt(len(envVars)) }</span>
+				</a>
+				<a href="#deployments" @click="tab = 'deployments'"
+				   :class="tab === 'deployments' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm rounded-t-lg transition-all whitespace-nowrap">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+					<span>Deployments</span>
+					<span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-gray-100 text-gray-600 font-mono">{ formatInt(len(deployments)) }</span>
+				</a>
+				<a href="#cron" @click="tab = 'cron'"
+				   :class="tab === 'cron' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm rounded-t-lg transition-all whitespace-nowrap">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+					<span>Cron Jobs</span>
+					if len(cronJobs) > 0 {
+						<span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-700 font-mono">{ formatInt(len(cronJobs)) }</span>
 					}
-					if app.DockerImage != nil {
-						<div class="flex justify-between">
-							<dt class="text-gray-600">Image</dt>
-							<dd class="text-gray-900">{ *app.DockerImage }</dd>
+				</a>
+				<a href="#monitoring" @click="tab = 'monitoring'"
+				   :class="tab === 'monitoring' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm rounded-t-lg transition-all whitespace-nowrap">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+					<span>Monitoring</span>
+				</a>
+				<a href="#advanced" @click="tab = 'advanced'"
+				   :class="tab === 'advanced' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm rounded-t-lg transition-all whitespace-nowrap">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+					<span>Advanced</span>
+				</a>
+			</nav>
+		</div>
+
+		<!-- TAB 1: GENERAL -->
+		<div x-show="tab === 'general'" class="space-y-6">
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<!-- Application Details Card -->
+				<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+					<h2 class="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+						<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+						General Information
+					</h2>
+					<dl class="divide-y divide-gray-100 text-sm">
+						<div class="py-2.5 flex justify-between">
+							<dt class="text-gray-500">Source Type</dt>
+							<dd class="text-gray-900 font-medium uppercase text-xs px-2 py-0.5 rounded bg-gray-100">{ app.SourceType }</dd>
 						</div>
-					}
-					<div class="flex justify-between">
-						<dt class="text-gray-600">App Port</dt>
-						<dd class="text-gray-900">{ app.AppPort }</dd>
-					</div>
-					if app.ServerID != nil && *app.ServerID != "" && *app.ServerID != "local" {
-						<div class="flex justify-between">
-							<dt class="text-gray-600">Target Server</dt>
-							<dd class="text-indigo-600 font-medium text-sm flex items-center gap-1">
-								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
-								Remote ({ *app.ServerID })
+						if app.RepositoryURL != nil {
+							<div class="py-2.5 flex justify-between items-center">
+								<dt class="text-gray-500">Git Repository</dt>
+								<dd class="text-gray-900 font-mono text-xs truncate max-w-xs">{ *app.RepositoryURL }</dd>
+							</div>
+						}
+						if app.Branch != nil {
+							<div class="py-2.5 flex justify-between">
+								<dt class="text-gray-500">Git Branch</dt>
+								<dd class="text-gray-900 font-mono text-xs">{ *app.Branch }</dd>
+							</div>
+						}
+						if app.DockerImage != nil {
+							<div class="py-2.5 flex justify-between items-center">
+								<dt class="text-gray-500">Docker Image</dt>
+								<dd class="text-gray-900 font-mono text-xs truncate max-w-xs">{ *app.DockerImage }</dd>
+							</div>
+						}
+						<div class="py-2.5 flex justify-between">
+							<dt class="text-gray-500">Port (Internal Container)</dt>
+							<dd class="text-gray-900 font-mono text-xs">{ formatInt(app.AppPort) }</dd>
+						</div>
+						<div class="py-2.5 flex justify-between items-center">
+							<dt class="text-gray-500">Target Node</dt>
+							<dd>
+								if app.ServerID != nil && *app.ServerID != "" && *app.ServerID != "local" {
+									<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium border border-indigo-200">
+										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+										Remote Server ({ *app.ServerID })
+									</span>
+								} else {
+									<span class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">Localhost (Default)</span>
+								}
 							</dd>
 						</div>
-					} else {
-						<div class="flex justify-between">
-							<dt class="text-gray-600">Target Server</dt>
-							<dd class="text-gray-900 text-sm">Localhost (Default)</dd>
-						</div>
-					}
-					if app.ContainerID != nil {
-						<div class="flex justify-between">
-							<dt class="text-gray-600">Container ID</dt>
-							<dd class="text-gray-900 font-mono text-sm">{ *app.ContainerID }</dd>
-						</div>
-					}
-				</dl>
-			</div>
-
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<h2 class="text-xl font-bold text-gray-900 mb-4">Custom Domain</h2>
-				if app.CustomDomain != nil {
-					<dl class="space-y-3 mb-4">
-						<div class="flex justify-between">
-							<dt class="text-gray-600">Domain</dt>
-							<dd class="text-gray-900">{ *app.CustomDomain }</dd>
-						</div>
-						<div class="flex justify-between">
-							<dt class="text-gray-600">HTTPS</dt>
-							<dd class="text-green-600">Enabled (via Caddy)</dd>
-						</div>
+						if app.ContainerID != nil {
+							<div class="py-2.5 flex justify-between items-center">
+								<dt class="text-gray-500">Active Container ID</dt>
+								<dd class="text-gray-900 font-mono text-xs truncate max-w-xs">{ *app.ContainerID }</dd>
+							</div>
+						}
 					</dl>
-					<form action={ templ.SafeURL("/applications/" + app.ID + "/domain/remove") } method="post" class="inline">
-						<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Remove Domain</button>
-					</form>
-				} else {
-					<form action={ templ.SafeURL("/applications/" + app.ID + "/domain") } method="post" class="space-y-4">
-						<div>
-							<label class="block text-sm font-medium text-gray-700">Custom Domain</label>
-							<input type="text" name="custom_domain" placeholder="example.com" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" required>
+				</div>
+
+				<!-- Custom Domain Card -->
+				<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+					<h2 class="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+						<svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+						Custom Domain & Routing
+					</h2>
+					<p class="text-xs text-gray-500 mb-4">Domain publik otomatis diamankan sertifikat SSL gratis via Caddy reverse proxy.</p>
+					if app.CustomDomain != nil {
+						<div class="p-4 bg-emerald-50/60 border border-emerald-200 rounded-lg mb-4">
+							<div class="flex items-center justify-between">
+								<div>
+									<span class="text-xs text-emerald-700 font-semibold uppercase tracking-wider block">Connected Domain</span>
+									<a href={ templ.SafeURL("https://" + *app.CustomDomain) } target="_blank" class="text-base font-bold text-emerald-900 hover:underline flex items-center gap-1 mt-0.5">
+										{ *app.CustomDomain }
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+									</a>
+								</div>
+								<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+									<svg class="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+									HTTPS Active
+								</span>
+							</div>
 						</div>
-						<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Set Domain</button>
-					</form>
+						<form action={ templ.SafeURL("/applications/" + app.ID + "/domain/remove") } method="post">
+							<button type="submit" class="text-xs text-rose-600 hover:text-rose-800 font-semibold px-3 py-1.5 rounded border border-rose-200 hover:bg-rose-50 transition-colors">
+								Remove Custom Domain
+							</button>
+						</form>
+					} else {
+						<form action={ templ.SafeURL("/applications/" + app.ID + "/domain") } method="post" class="space-y-3">
+							<div>
+								<label class="block text-xs font-semibold text-gray-700">Domain Name (FQDN)</label>
+								<input type="text" name="custom_domain" placeholder="app.domain.com" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm" required/>
+								<span class="text-[11px] text-gray-400 mt-1 block">Arahkan DNS Record A/CNAME domain Anda ke IP server sebelum menekan simpan.</span>
+							</div>
+							<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-md shadow-xs transition-colors">
+								Connect Domain
+							</button>
+						</form>
+					}
+				</div>
+			</div>
+		</div>
+
+		<!-- TAB 2: ENVIRONMENT VARIABLES -->
+		<div x-show="tab === 'env'" class="space-y-6">
+			<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+				<div class="flex justify-between items-center mb-4">
+					<div>
+						<h2 class="text-base font-bold text-gray-900">Environment Variables</h2>
+						<p class="text-xs text-gray-500 mt-0.5">Variabel environment otomatis diinjeksi ke dalam container kandidat dan dienkripsi di database.</p>
+					</div>
+				</div>
+
+				<!-- Form Add Env Var -->
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars") } method="post" class="mb-5 p-4 bg-gray-50 border border-gray-200 rounded-lg flex flex-col md:flex-row gap-3 items-end">
+					<div class="w-full md:w-1/3">
+						<label class="block text-xs font-semibold text-gray-700 mb-1">Key</label>
+						<input type="text" name="key" placeholder="e.g. DATABASE_URL" class="border border-gray-300 rounded px-3 py-1.5 text-xs font-mono w-full" required/>
+					</div>
+					<div class="w-full md:flex-1">
+						<label class="block text-xs font-semibold text-gray-700 mb-1">Value</label>
+						<input type="text" name="value" placeholder="value" class="border border-gray-300 rounded px-3 py-1.5 text-xs font-mono w-full" required/>
+					</div>
+					<div class="flex items-center gap-3">
+						<label class="flex items-center gap-1.5 text-xs font-medium text-gray-700 cursor-pointer">
+							<input type="checkbox" name="is_secret" class="rounded text-blue-600 focus:ring-blue-500"/>
+							<span>Secret (Masked)</span>
+						</label>
+						<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded shadow-xs transition-colors whitespace-nowrap">
+							Add Variable
+						</button>
+					</div>
+				</form>
+
+				<!-- Env Vars Table -->
+				if len(envVars) == 0 {
+					<div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-gray-500 text-xs">
+						Belum ada variabel environment yang didaftarkan.
+					</div>
+				} else {
+					<div class="overflow-x-auto border border-gray-200 rounded-lg">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+								<tr>
+									<th class="px-4 py-2.5 text-left font-semibold">Key</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Value</th>
+									<th class="px-4 py-2.5 text-right font-semibold">Action</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-200 text-xs">
+								for _, envVar := range envVars {
+									<tr class="hover:bg-gray-50">
+										<td class="px-4 py-2.5 font-mono font-semibold text-gray-900">{ envVar.Key }</td>
+										<td class="px-4 py-2.5 font-mono text-gray-600">
+											if envVar.IsSecret {
+												<span class="text-gray-400 font-mono tracking-widest">••••••••••••</span>
+											} else {
+												{ envVar.Value }
+											}
+										</td>
+										<td class="px-4 py-2.5 text-right">
+											<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete") } method="post" class="inline">
+												<button type="submit" class="text-rose-600 hover:text-rose-800 font-medium">Delete</button>
+											</form>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
 				}
 			</div>
+		</div>
 
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<h2 class="text-xl font-bold text-gray-900 mb-1">Resource Limits</h2>
-				<p class="text-xs text-gray-500 mb-4">Batas CPU & RAM container (Live update)</p>
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/resources") } method="post" class="space-y-3">
+		<!-- TAB 3: DEPLOYMENTS & INSTANT ROLLBACK -->
+		<div x-show="tab === 'deployments'" class="space-y-6">
+			<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+				<div class="flex justify-between items-center mb-4">
 					<div>
-						<label class="block text-xs font-semibold text-gray-700">CPU Limit (Cores, e.g. 0.5, 1.0)</label>
-						<input type="number" step="0.1" min="0.1" name="cpu_limit"
-							value={ formatCPULimit(app.CPULimit) }
-							placeholder="Unlimited (e.g. 1.0)"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+						<h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+							<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+							Deployment History &amp; Instant Rollback
+						</h2>
+						<p class="text-xs text-gray-500 mt-0.5">Sistem mempertahankan cache 5 image sukses terakhir untuk rollback tanpa proses build ulang.</p>
 					</div>
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Memory Limit (MB, e.g. 512, 1024)</label>
-						<input type="number" min="32" name="memory_limit"
-							value={ formatMemLimit(app.MemoryLimit) }
-							placeholder="Unlimited (e.g. 512)"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+					<a href={ templ.SafeURL("/applications/" + app.ID + "/deploy") } class="bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-700 shadow-xs flex items-center gap-1">
+						Trigger Deploy Now
+					</a>
+				</div>
+
+				if len(deployments) == 0 {
+					<div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-gray-500 text-xs">
+						Belum ada riwayat deployment.
 					</div>
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Memory Reservation / Soft Limit (MB)</label>
-						<input type="number" min="16" name="memory_reservation"
-							value={ formatMemLimit(app.MemoryReservation) }
-							placeholder="Optional (e.g. 256)"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+				} else {
+					<div class="overflow-x-auto border border-gray-200 rounded-lg">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+								<tr>
+									<th class="px-4 py-2.5 text-left font-semibold">Deployment ID</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Status</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Cached Image</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Commit / Info</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Date</th>
+									<th class="px-4 py-2.5 text-right font-semibold">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-200 text-xs">
+								for _, dep := range deployments {
+									<tr class="hover:bg-gray-50">
+										<td class="px-4 py-2.5 font-mono text-gray-900 font-semibold">
+											<a href={ templ.SafeURL("/deployments/" + dep.ID) } class="text-blue-600 hover:underline">
+												{ dep.ID[:8] }
+											</a>
+										</td>
+										<td class="px-4 py-2.5">
+											@components.StatusBadge(string(dep.Status))
+										</td>
+										<td class="px-4 py-2.5 font-mono text-gray-600">
+											if dep.ImageName != nil && *dep.ImageName != "" {
+												<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px]" title={ *dep.ImageName }>
+													Cached
+												</span>
+											} else {
+												<span class="text-gray-400">-</span>
+											}
+										</td>
+										<td class="px-4 py-2.5 text-gray-600">
+											if dep.CommitMessage != nil && *dep.CommitMessage != "" {
+												<span class="truncate block max-w-xs">{ *dep.CommitMessage }</span>
+											} else if dep.CommitHash != nil && *dep.CommitHash != "" {
+												<span class="font-mono text-xs">{ (*dep.CommitHash)[:7] }</span>
+											} else {
+												<span class="text-gray-400 italic">Manual trigger</span>
+											}
+										</td>
+										<td class="px-4 py-2.5 text-gray-500">
+											{ dep.CreatedAt.Format("2006-01-02 15:04") }
+										</td>
+										<td class="px-4 py-2.5 text-right">
+											<div class="flex items-center justify-end gap-2">
+												<a href={ templ.SafeURL("/deployments/" + dep.ID) } class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium">
+													Logs
+												</a>
+												if dep.Status == models.DeployStatusSuccess {
+													<form action={ templ.SafeURL("/deployments/" + dep.ID + "/rollback") } method="post" class="inline"
+													      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Rolling back...'">
+														<button type="submit" class="inline-flex items-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium px-2 py-1 rounded shadow-xs" title="Instant rollback to this container image">
+															<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+															Rollback
+														</button>
+													</form>
+												}
+											</div>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
 					</div>
-					<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md">
-						Save & Apply Limits
-					</button>
-				</form>
+				}
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<div class="flex items-center gap-2 mb-1">
-					<svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-					<h2 class="text-xl font-bold text-gray-900">Custom Healthcheck</h2>
+		<!-- TAB 4: CRON JOBS -->
+		<div x-show="tab === 'cron'" class="space-y-6">
+			<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+				<div class="flex justify-between items-center mb-4">
+					<div>
+						<h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+							<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+							Application Cron Jobs
+						</h2>
+						<p class="text-xs text-gray-500 mt-0.5">Jalankan command terjadwal secara periodik langsung di dalam container aplikasi (Coolify-style).</p>
+					</div>
 				</div>
-				<p class="text-xs text-gray-500 mb-4">Ubah path endpoint dan batas waktu evaluasi kesiapan container sebelum traffic dialihkan (Zero-Downtime gate).</p>
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/healthcheck") } method="post" class="space-y-3">
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Healthcheck HTTP Path</label>
-						<input type="text" name="healthcheck_path"
-							value={ getStrVal(app.HealthcheckPath, "/") }
-							placeholder="/"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
-						<span class="text-[11px] text-gray-400 mt-0.5 block">Contoh: /, /healthz, /api/health</span>
-					</div>
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Healthcheck Timeout (Detik)</label>
-						<input type="number" min="5" max="300" name="healthcheck_timeout"
-							value={ formatHealthcheckTimeout(app.HealthcheckTimeout) }
-							placeholder="30"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
-						<span class="text-[11px] text-gray-400 mt-0.5 block">Waktu maksimal menunggu container menjawab HTTP status &lt; 500 (Default: 30s)</span>
-					</div>
-					<button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 rounded-md transition-colors">
-						Simpan Konfigurasi Healthcheck
-					</button>
-				</form>
-			</div>
 
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<div class="flex items-center gap-2 mb-1">
-					<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-					<h2 class="text-xl font-bold text-gray-900">HTTP Basic Auth (Caddy)</h2>
-				</div>
-				<p class="text-xs text-gray-500 mb-4">Lindungi endpoint aplikasi dengan otentikasi login browser HTTP Basic via Caddy proxy.</p>
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/basic-auth") } method="post" class="space-y-3">
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Username</label>
-						<input type="text" name="basic_auth_user"
-							value={ getStrVal(app.BasicAuthUser, "") }
-							placeholder="Kosongkan jika dinonaktifkan"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+				<!-- Form Tambah Cron Job Baru -->
+				<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs") } method="post" class="mb-5 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+					<h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">New Scheduled Command</h3>
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1">Name</label>
+							<input type="text" name="name" placeholder="e.g. Laravel Scheduler" class="border border-gray-300 rounded px-3 py-1.5 text-xs w-full" required/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1">Cron Expression</label>
+							<input type="text" name="cron_expression" placeholder="* * * * * or @hourly" class="border border-gray-300 rounded px-3 py-1.5 text-xs font-mono w-full" required/>
+							<span class="text-[10px] text-gray-400 mt-0.5 block">Preset: * * * * * (tiap menit), 0 * * * * (@hourly)</span>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1">Command (in container)</label>
+							<input type="text" name="command" placeholder="e.g. php artisan schedule:run" class="border border-gray-300 rounded px-3 py-1.5 text-xs font-mono w-full" required/>
+						</div>
 					</div>
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Password</label>
-						<input type="password" name="basic_auth_password"
-							value={ getStrVal(app.BasicAuthPassword, "") }
-							placeholder="Kosongkan jika dinonaktifkan"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
-						<span class="text-[11px] text-gray-400 mt-0.5 block">Di-hash secara aman dengan bcrypt sebelum dikirim ke Caddy Admin API. Kosongkan username &amp; password untuk menonaktifkan.</span>
-					</div>
-					<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md transition-colors">
-						Simpan &amp; Terapkan Basic Auth
+					<button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded shadow-xs transition-colors">
+						Save Cron Job
 					</button>
 				</form>
+
+				<!-- Daftar Cron Jobs -->
+				if len(cronJobs) == 0 {
+					<div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-gray-500 text-xs">
+						Belum ada cron job yang didaftarkan untuk aplikasi ini.
+					</div>
+				} else {
+					<div class="overflow-x-auto border border-gray-200 rounded-lg">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+								<tr>
+									<th class="px-4 py-2.5 text-left font-semibold">Job Name</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Schedule</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Command</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Status / Last Run</th>
+									<th class="px-4 py-2.5 text-left font-semibold">Last Output</th>
+									<th class="px-4 py-2.5 text-right font-semibold">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-200 text-xs">
+								for _, cj := range cronJobs {
+									<tr class="hover:bg-gray-50">
+										<td class="px-4 py-2.5 font-medium text-gray-900">
+											<div class="flex items-center gap-2">
+												<span class={ "inline-block w-2 h-2 rounded-full", templ.KV("bg-emerald-500", cj.IsEnabled), templ.KV("bg-gray-300", !cj.IsEnabled) }></span>
+												{ cj.Name }
+											</div>
+										</td>
+										<td class="px-4 py-2.5 font-mono text-gray-600">
+											<span class="bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{ cj.CronExpression }</span>
+										</td>
+										<td class="px-4 py-2.5 font-mono text-gray-700 max-w-xs truncate" title={ cj.Command }>
+											{ cj.Command }
+										</td>
+										<td class="px-4 py-2.5">
+											if cj.LastStatus != nil {
+												if *cj.LastStatus == models.CronJobStatusSuccess {
+													<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800">Success</span>
+												} else if *cj.LastStatus == models.CronJobStatusRunning {
+													<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800">Running</span>
+												} else {
+													<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 text-rose-800">Failed</span>
+												}
+											} else {
+												<span class="text-gray-400 italic">Never run</span>
+											}
+											if cj.LastRunAt != nil {
+												<span class="block text-[10px] text-gray-500 mt-0.5">{ cj.LastRunAt.Format("2006-01-02 15:04:05") }</span>
+											}
+										</td>
+										<td class="px-4 py-2.5 font-mono text-gray-500 max-w-xs truncate" title={ getStrVal(cj.LastOutput, "") }>
+											if cj.LastOutput != nil && *cj.LastOutput != "" {
+												{ *cj.LastOutput }
+											} else {
+												<span class="text-gray-400 italic">-</span>
+											}
+										</td>
+										<td class="px-4 py-2.5 text-right">
+											<div class="flex items-center justify-end gap-1.5">
+												<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/run") } method="post" class="inline"
+												      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Running...'">
+													<button type="submit" class="inline-flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium px-2 py-1 rounded">
+														Run Now
+													</button>
+												</form>
+												<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/toggle") } method="post" class="inline">
+													<button type="submit" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded">
+														if cj.IsEnabled {
+															Disable
+														} else {
+															Enable
+														}
+													</button>
+												</form>
+												<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/delete") } method="post" class="inline">
+													<button type="submit" class="text-xs text-rose-600 hover:text-rose-800 px-1.5 py-1">Delete</button>
+												</form>
+											</div>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
 			</div>
 		</div>
 
-		<div class="mt-6">
+		<!-- TAB 5: MONITORING & METRICS -->
+		<div x-show="tab === 'monitoring'" class="space-y-6">
 			<div id="metrics-card" hx-get={ templ.SafeURL("/applications/" + app.ID + "/stats") } hx-trigger="load, every 3s" hx-swap="outerHTML">
-				<div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex items-center justify-between">
+				<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6 flex items-center justify-between">
 					<span class="text-sm text-gray-500 flex items-center gap-2">
 						@components.Spinner("sm", "blue")
 						Connecting to container metrics...
@@ -352,302 +648,125 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 			</div>
 		</div>
 
-		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
-			<div class="flex justify-between items-center mb-4">
-				<div>
-					<h2 class="text-xl font-bold text-gray-900">Git Webhook & Auto-Deploy</h2>
-					<p class="text-xs text-gray-500 mt-1">Otomatiskan deploy setiap kali ada push commit ke target branch.</p>
+		<!-- TAB 6: ADVANCED CONFIGURATION -->
+		<div x-show="tab === 'advanced'" class="space-y-6">
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<!-- Resource Limits -->
+				<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+					<h2 class="text-base font-bold text-gray-900 mb-1">Resource Limits</h2>
+					<p class="text-xs text-gray-500 mb-4">Batas CPU & RAM container (Live update)</p>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/resources") } method="post" class="space-y-3">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">CPU Limit (Cores, e.g. 0.5, 1.0)</label>
+							<input type="number" step="0.1" min="0.1" name="cpu_limit"
+								value={ formatCPULimit(app.CPULimit) }
+								placeholder="Unlimited (e.g. 1.0)"
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Memory Limit (MB, e.g. 512, 1024)</label>
+							<input type="number" min="32" name="memory_limit"
+								value={ formatMemLimit(app.MemoryLimit) }
+								placeholder="Unlimited (e.g. 512)"
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Memory Reservation / Soft Limit (MB)</label>
+							<input type="number" min="16" name="memory_reservation"
+								value={ formatMemLimit(app.MemoryReservation) }
+								placeholder="Optional (e.g. 256)"
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs"/>
+						</div>
+						<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-md transition-colors">
+							Save &amp; Apply Limits
+						</button>
+					</form>
 				</div>
-				<form action={ templ.SafeURL("/applications/" + app.ID + "/webhook/regenerate") } method="post" class="inline">
-					<button type="submit" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border border-gray-300 font-medium">
-						Regenerate Secret
-					</button>
-				</form>
-			</div>
 
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-				<div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">GitHub Webhook URL</span>
-					<div class="flex items-center gap-2">
-						<input type="text" readonly value={ "/webhooks/github/" + app.ID } class="font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800" onclick="this.select()"/>
-					</div>
-					<span class="text-[11px] text-gray-400 mt-1 block">Content type: application/json • Secret token: required</span>
-				</div>
-				<div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">GitLab Webhook URL</span>
-					<div class="flex items-center gap-2">
-						<input type="text" readonly value={ "/webhooks/gitlab/" + app.ID } class="font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800" onclick="this.select()"/>
-					</div>
-					<span class="text-[11px] text-gray-400 mt-1 block">Trigger: Push events • Secret token: required</span>
-				</div>
-			</div>
-
-			<div class="p-3 bg-gray-50 rounded-lg border border-gray-200 mb-4">
-				<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1">Webhook Secret</span>
-				if app.WebhookSecret != nil && *app.WebhookSecret != "" {
-					<input type="text" readonly value={ *app.WebhookSecret } class="font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800" onclick="this.select()"/>
-				} else {
-					<span class="text-xs text-amber-600 italic">Belum ada secret. Klik Regenerate Secret di atas untuk mengaktifkannya.</span>
-				}
-			</div>
-
-			<div class="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3">
-				<strong class="text-blue-800">Petunjuk Konfigurasi:</strong>
-				<ul class="list-disc list-inside mt-1 space-y-1 text-blue-700">
-					<li><strong>GitHub:</strong> Buka Repo Settings &rarr; Webhooks &rarr; Add Webhook. Masukkan URL GitHub di atas, pilih Content type: <code class="bg-blue-100 px-1 py-0.5 rounded">application/json</code>, isi Secret, dan pilih event <em>Just the push event</em>.</li>
-					<li><strong>GitLab:</strong> Buka Repo Settings &rarr; Webhooks. Masukkan URL GitLab, paste Secret Token, dan centang event <em>Push events</em>.</li>
-					<li><strong>Filter Otomatis:</strong> Push ke branch lain akan diabaikan tanpa error demi menghemat resource server.</li>
-				</ul>
-			</div>
-		</div>
-
-		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
-			<div class="flex justify-between items-center mb-4">
-				<div>
-					<h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
-						<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-						</svg>
-						Recent Deployments &amp; Instant Rollback
+				<!-- Custom Healthcheck -->
+				<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+					<h2 class="text-base font-bold text-gray-900 mb-1 flex items-center gap-1.5">
+						<svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+						Custom Healthcheck
 					</h2>
-					<p class="text-xs text-gray-500 mt-1">Sistem menyimpan cache 5 image sukses terakhir (Coolify-style) untuk rollback instan tanpa git clone/re-build.</p>
+					<p class="text-xs text-gray-500 mb-4">Evaluasi kesiapan container sebelum traffic dialihkan (Zero-Downtime gate).</p>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/healthcheck") } method="post" class="space-y-3">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Healthcheck HTTP Path</label>
+							<input type="text" name="healthcheck_path"
+								value={ getStrVal(app.HealthcheckPath, "/") }
+								placeholder="/"
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs"/>
+							<span class="text-[10px] text-gray-400 mt-0.5 block">Contoh: /, /healthz, /api/health</span>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Healthcheck Timeout (Detik)</label>
+							<input type="number" min="5" max="300" name="healthcheck_timeout"
+								value={ formatHealthcheckTimeout(app.HealthcheckTimeout) }
+								placeholder="30"
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs"/>
+							<span class="text-[10px] text-gray-400 mt-0.5 block">Maksimal menunggu response status &lt; 500 (Default: 30s)</span>
+						</div>
+						<button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-md transition-colors">
+							Save Healthcheck
+						</button>
+					</form>
 				</div>
-			</div>
-			if len(deployments) == 0 {
-				<p class="text-sm text-gray-500 italic py-4 text-center">Belum ada riwayat deployment untuk aplikasi ini.</p>
-			} else {
-				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
-							<tr>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Deployment ID</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Cached Image</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Commit / Info</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-								<th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
-							</tr>
-						</thead>
-						<tbody class="bg-white divide-y divide-gray-200">
-							for _, dep := range deployments {
-								<tr class="hover:bg-gray-50 transition-colors">
-									<td class="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">
-										<a href={ templ.SafeURL("/deployments/" + dep.ID) } class="text-blue-600 hover:text-blue-800 hover:underline">
-											{ dep.ID[:8] }
-										</a>
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-sm">
-										@components.StatusBadge(string(dep.Status))
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600">
-										if dep.ImageName != nil && *dep.ImageName != "" {
-											<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" title={ *dep.ImageName }>
-												<svg class="w-3 h-3 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-												Cached
-											</span>
-										} else {
-											<span class="text-gray-400">-</span>
-										}
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-										if dep.CommitMessage != nil && *dep.CommitMessage != "" {
-											<span class="truncate block max-w-xs">{ *dep.CommitMessage }</span>
-										} else if dep.CommitHash != nil && *dep.CommitHash != "" {
-											<span class="font-mono text-xs">{ (*dep.CommitHash)[:7] }</span>
-										} else {
-											<span class="text-gray-400 italic text-xs">Manual trigger</span>
-										}
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-										{ dep.CreatedAt.Format("2006-01-02 15:04") }
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-right text-sm">
-										<div class="flex items-center justify-end gap-2">
-											<a href={ templ.SafeURL("/deployments/" + dep.ID) } class="text-xs text-gray-600 hover:text-gray-900 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors">
-												Logs
-											</a>
-											if dep.Status == models.DeployStatusSuccess {
-												<form action={ templ.SafeURL("/deployments/" + dep.ID + "/rollback") } method="post" class="inline"
-												      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Rolling back...'">
-													<button type="submit" class="inline-flex items-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded shadow-sm transition-colors" title="Instant rollback to this container image">
-														<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
-														Instant Rollback
-													</button>
-												</form>
-											}
-										</div>
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				</div>
-			}
-		</div>
 
-		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
-			<div class="flex justify-between items-center mb-4">
-				<div>
-					<h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
-						<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-						</svg>
-						Application Cron Jobs (Coolify-style)
+				<!-- HTTP Basic Auth -->
+				<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+					<h2 class="text-base font-bold text-gray-900 mb-1 flex items-center gap-1.5">
+						<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+						HTTP Basic Auth (Caddy)
 					</h2>
-					<p class="text-xs text-gray-500 mt-1">Jalankan command terjadwal secara periodik langsung di dalam container aplikasi yang aktif (misal: scheduler Laravel, cleanup script, dsb.).</p>
+					<p class="text-xs text-gray-500 mb-4">Proteksi endpoint browser via Caddy reverse proxy.</p>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/basic-auth") } method="post" class="space-y-3">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Username</label>
+							<input type="text" name="basic_auth_user"
+								value={ getStrVal(app.BasicAuthUser, "") }
+								placeholder="Kosongkan jika dinonaktifkan"
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Password</label>
+							<input type="password" name="basic_auth_password"
+								value={ getStrVal(app.BasicAuthPassword, "") }
+								placeholder="Kosongkan jika dinonaktifkan"
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs"/>
+						</div>
+						<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-md transition-colors">
+							Save Basic Auth
+						</button>
+					</form>
+				</div>
+
+				<!-- Webhooks Card -->
+				<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+					<div class="flex justify-between items-center mb-3">
+						<h2 class="text-base font-bold text-gray-900">Git Webhook & Auto-Deploy</h2>
+						<form action={ templ.SafeURL("/applications/" + app.ID + "/webhook/regenerate") } method="post" class="inline">
+							<button type="submit" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded border border-gray-300 font-medium">
+								Regenerate Secret
+							</button>
+						</form>
+					</div>
+					<div class="space-y-2 text-xs">
+						<div class="p-2.5 bg-gray-50 rounded border border-gray-200">
+							<span class="font-semibold text-gray-600 block mb-1">GitHub / GitLab Payload URL</span>
+							<input type="text" readonly value={ "/webhooks/github/" + app.ID } class="font-mono text-[11px] bg-white border border-gray-300 rounded px-2 py-1 w-full text-gray-800" onclick="this.select()"/>
+						</div>
+						<div class="p-2.5 bg-gray-50 rounded border border-gray-200">
+							<span class="font-semibold text-gray-600 block mb-1">Webhook Secret Token</span>
+							if app.WebhookSecret != nil && *app.WebhookSecret != "" {
+								<input type="text" readonly value={ *app.WebhookSecret } class="font-mono text-[11px] bg-white border border-gray-300 rounded px-2 py-1 w-full text-gray-800" onclick="this.select()"/>
+							} else {
+								<span class="text-amber-600 italic">Belum ada secret. Klik Regenerate Secret.</span>
+							}
+						</div>
+					</div>
 				</div>
 			</div>
-
-			<!-- Form Tambah Cron Job Baru -->
-			<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs") } method="post" class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-				<h3 class="text-sm font-semibold text-gray-800 mb-3">Add New Cron Job</h3>
-				<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-					<div>
-						<label class="block text-xs font-medium text-gray-700 mb-1">Name</label>
-						<input type="text" name="name" placeholder="e.g. Laravel Scheduler" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full" required/>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-gray-700 mb-1">Cron Expression</label>
-						<input type="text" name="cron_expression" placeholder="* * * * * or @hourly" class="border border-gray-300 rounded px-3 py-1.5 text-sm font-mono w-full" required/>
-						<span class="text-[10px] text-gray-400 mt-0.5 block">Preset: * * * * * (tiap menit), 0 * * * * (@hourly), 0 2 * * * (@daily)</span>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-gray-700 mb-1">Command (inside container)</label>
-						<input type="text" name="command" placeholder="e.g. php artisan schedule:run" class="border border-gray-300 rounded px-3 py-1.5 text-sm font-mono w-full" required/>
-					</div>
-				</div>
-				<button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded shadow-sm transition-colors">
-					Add Cron Job
-				</button>
-			</form>
-
-			<!-- Daftar Cron Jobs -->
-			if len(cronJobs) == 0 {
-				<p class="text-sm text-gray-500 italic py-3 text-center">Belum ada cron job yang didaftarkan untuk aplikasi ini.</p>
-			} else {
-				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
-							<tr>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Job Name</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Schedule</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Command</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status / Last Run</th>
-								<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Output</th>
-								<th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-							</tr>
-						</thead>
-						<tbody class="bg-white divide-y divide-gray-200">
-							for _, cj := range cronJobs {
-								<tr class="hover:bg-gray-50 transition-colors">
-									<td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-										<div class="flex items-center gap-2">
-											<span class={ "inline-block w-2 h-2 rounded-full", templ.KV("bg-emerald-500", cj.IsEnabled), templ.KV("bg-gray-300", !cj.IsEnabled) }></span>
-											{ cj.Name }
-										</div>
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600">
-										<span class="bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{ cj.CronExpression }</span>
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-700 max-w-xs truncate" title={ cj.Command }>
-										{ cj.Command }
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-xs">
-										if cj.LastStatus != nil {
-											if *cj.LastStatus == models.CronJobStatusSuccess {
-												<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800">Success</span>
-											} else if *cj.LastStatus == models.CronJobStatusRunning {
-												<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800">Running</span>
-											} else {
-												<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 text-rose-800">Failed</span>
-											}
-										} else {
-											<span class="text-gray-400 italic">Never run</span>
-										}
-										if cj.LastRunAt != nil {
-											<span class="block text-[11px] text-gray-500 mt-0.5">{ cj.LastRunAt.Format("2006-01-02 15:04:05") }</span>
-										}
-									</td>
-									<td class="px-4 py-3 text-xs font-mono text-gray-500 max-w-xs truncate" title={ getStrVal(cj.LastOutput, "") }>
-										if cj.LastOutput != nil && *cj.LastOutput != "" {
-											{ *cj.LastOutput }
-										} else {
-											<span class="text-gray-400 italic">-</span>
-										}
-									</td>
-									<td class="px-4 py-3 whitespace-nowrap text-right text-xs">
-										<div class="flex items-center justify-end gap-1.5">
-											<!-- Run Now Button -->
-											<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/run") } method="post" class="inline"
-											      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Running...'">
-												<button type="submit" class="inline-flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium px-2 py-1 rounded transition-colors" title="Execute command immediately in container">
-													<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-													Run Now
-												</button>
-											</form>
-											<!-- Toggle Enabled Button -->
-											<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/toggle") } method="post" class="inline">
-												<button type="submit" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors">
-													if cj.IsEnabled {
-														Disable
-													} else {
-														Enable
-													}
-												</button>
-											</form>
-											<!-- Delete Button -->
-											<form action={ templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/delete") } method="post" class="inline">
-												<button type="submit" class="text-xs text-rose-600 hover:text-rose-800 px-1.5 py-1">Delete</button>
-											</form>
-										</div>
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				</div>
-			}
-		</div>
-
-		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
-			<h2 class="text-xl font-bold text-gray-900 mb-4">Environment Variables</h2>
-			<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars") } method="post" class="mb-4 flex gap-2">
-				<input type="text" name="key" placeholder="KEY" class="border border-gray-300 rounded px-2 py-1 text-sm w-32" required>
-				<input type="text" name="value" placeholder="value" class="border border-gray-300 rounded px-2 py-1 text-sm flex-1" required>
-				<label class="flex items-center text-sm">
-					<input type="checkbox" name="is_secret" class="mr-1">
-					Secret
-				</label>
-				<button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Add</button>
-			</form>
-			<table class="min-w-full divide-y divide-gray-200">
-				<thead class="bg-gray-50">
-					<tr>
-						<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Key</th>
-						<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-						<th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
-					</tr>
-				</thead>
-				<tbody class="bg-white divide-y divide-gray-200">
-					for _, envVar := range envVars {
-						<tr>
-							<td class="px-4 py-2 text-sm text-gray-900">{ envVar.Key }</td>
-							<td class="px-4 py-2 text-sm text-gray-500">
-								if envVar.IsSecret {
-									••••••••
-								} else {
-									{ envVar.Value }
-								}
-							</td>
-							<td class="px-4 py-2 text-right">
-								<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete") } method="post" class="inline">
-									<button type="submit" class="text-red-600 hover:text-red-900 text-sm">Delete</button>
-								</form>
-							</td>
-						</tr>
-					}
-				</tbody>
-			</table>
 		</div>
 	</div>
 }

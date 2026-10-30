@@ -132,233 +132,317 @@ func formatMemLimit(val *int64) string {
 }
 
 templ DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.DatabaseBackupConfig, destinations []*models.StorageDestination, backups []*models.DatabaseBackup) {
-	<div>
-		<div class="flex justify-between items-center mb-6">
-			<div>
-				<h1 class="text-3xl font-bold text-gray-900">{ dbService.Name }</h1>
-				<p class="text-gray-600 mt-1 font-mono text-sm">{ dbService.Slug }</p>
+	<div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general' }" @hashchange.window="tab = window.location.hash ? window.location.hash.substring(1) : 'general'">
+		<!-- Header Modern ala Coolify -->
+		<div class="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-6 border-b border-gray-200 gap-4">
+			<div class="flex items-center gap-4">
+				<div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-bold text-xl shadow-md">
+					if dbService.Engine == "postgres" {
+						PG
+					} else if dbService.Engine == "mysql" {
+						MY
+					} else if dbService.Engine == "redis" {
+						RD
+					} else {
+						DB
+					}
+				</div>
+				<div>
+					<div class="flex items-center gap-2.5">
+						<h1 class="text-2xl font-bold text-gray-900 tracking-tight">{ dbService.Name }</h1>
+						@components.PollingStatusBadge(string(dbService.Status), "/databases/" + dbService.ID + "/status")
+					</div>
+					<div class="flex items-center gap-3 text-xs text-gray-500 mt-1">
+						<span class="font-mono bg-gray-100 text-gray-700 px-2 py-0.5 rounded border border-gray-200 uppercase font-semibold">{ dbService.Engine } { dbService.Version }</span>
+						<span>•</span>
+						<span class="font-mono">{ dbService.Slug }</span>
+						<span>•</span>
+						<span>Port: <strong class="text-gray-700">{ formatInt(dbService.Port) }</strong></span>
+					</div>
+				</div>
 			</div>
+			<!-- Action Buttons -->
 			<div class="flex items-center gap-2">
 				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/start") } method="post" class="inline"
 				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Starting...'">
-					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 shadow-sm font-medium flex items-center transition-colors">Start</button>
+					<button type="submit" class="bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-700 shadow-sm font-medium text-sm flex items-center transition-colors">Start</button>
 				</form>
 				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/stop") } method="post" class="inline"
 				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Stopping...'">
-					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 shadow-sm font-medium flex items-center transition-colors">Stop</button>
-				</form>
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete this database?')"
-				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Deleting...'">
-					<button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 shadow-sm font-medium flex items-center transition-colors">Delete</button>
+					<button type="submit" class="bg-amber-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-amber-700 shadow-sm font-medium text-sm flex items-center transition-colors">Stop</button>
 				</form>
 				if dbService.ContainerID != nil && *dbService.ContainerID != "" {
-					<a href={ templ.SafeURL("/databases/" + dbService.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-1.5 font-medium shadow-sm transition-colors">
+					<a href={ templ.SafeURL("/databases/" + dbService.ID + "/terminal") } target="_blank" class="bg-gray-800 text-white px-3.5 py-1.5 rounded-lg hover:bg-gray-900 flex items-center gap-1.5 font-medium text-sm shadow-sm transition-colors">
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
 						Terminal
 					</a>
 				}
+				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete this database?')"
+				      hx-on:htmx:config-request="this.querySelector('button').disabled=true;this.querySelector('button').classList.add('opacity-70');this.querySelector('button').innerHTML='<span class=\\'inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-4 w-4 mr-1.5\\'></span>Deleting...'">
+					<button type="submit" class="bg-red-50 text-red-600 border border-red-200 px-3.5 py-1.5 rounded-lg hover:bg-red-100 font-medium text-sm flex items-center transition-colors">Delete</button>
+				</form>
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<h2 class="text-xl font-bold text-gray-900 mb-4">Database Info</h2>
-				<dl class="space-y-3">
-					<div class="flex justify-between items-center">
-						<dt class="text-gray-600">Status</dt>
-						<dd>
-							@components.PollingStatusBadge(string(dbService.Status), "/databases/" + dbService.ID + "/status")
-						</dd>
-					</div>
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Engine</dt>
-						<dd class="text-gray-900">{ dbService.Engine }</dd>
-					</div>
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Version</dt>
-						<dd class="text-gray-900">{ dbService.Version }</dd>
-					</div>
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Port</dt>
-						<dd class="text-gray-900">{ formatInt(dbService.Port) }</dd>
-					</div>
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Username</dt>
-						<dd class="text-gray-900 font-mono text-sm">{ dbService.Username }</dd>
-					</div>
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Database</dt>
-						<dd class="text-gray-900 font-mono text-sm">{ dbService.DatabaseName }</dd>
-					</div>
-					if dbService.ConnectionString != nil {
-						<div class="flex justify-between">
-							<dt class="text-gray-600">Connection String</dt>
-							<dd class="text-gray-900 font-mono text-sm">{ *dbService.ConnectionString }</dd>
+		<!-- Navigasi Tabs Coolify Style -->
+		<div class="border-b border-gray-200 mb-6">
+			<nav class="flex space-x-8 -mb-px" aria-label="Tabs">
+				<a href="#general" @click.prevent="tab = 'general'; window.location.hash = 'general'"
+				   :class="tab === 'general' ? 'border-emerald-600 text-emerald-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="py-3 px-1 border-b-2 text-sm flex items-center gap-2 cursor-pointer transition-colors">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v-4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17v-8"></path></svg>
+					General & Connection
+				</a>
+				<a href="#backups" @click.prevent="tab = 'backups'; window.location.hash = 'backups'"
+				   :class="tab === 'backups' ? 'border-emerald-600 text-emerald-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="py-3 px-1 border-b-2 text-sm flex items-center gap-2 cursor-pointer transition-colors">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+					Backups & S3 Automation
+					<span class="bg-gray-100 text-gray-700 text-xs py-0.5 px-2 rounded-full font-semibold">{ string(rune('0' + len(backups))) }</span>
+				</a>
+				<a href="#resources" @click.prevent="tab = 'resources'; window.location.hash = 'resources'"
+				   :class="tab === 'resources' ? 'border-emerald-600 text-emerald-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="py-3 px-1 border-b-2 text-sm flex items-center gap-2 cursor-pointer transition-colors">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+					Monitoring & Resource Limits
+				</a>
+			</nav>
+		</div>
+
+		<!-- TAB 1: General & Connection -->
+		<div x-show="tab === 'general'" x-cloak class="space-y-6">
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+				<!-- Credentials & Details -->
+				<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+					<h2 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-100">Database Parameters</h2>
+					<dl class="divide-y divide-gray-100 text-sm">
+						<div class="py-2.5 flex justify-between items-center">
+							<dt class="text-gray-500 font-medium">Status</dt>
+							<dd>
+								@components.PollingStatusBadge(string(dbService.Status), "/databases/" + dbService.ID + "/status")
+							</dd>
 						</div>
-					}
-				</dl>
-			</div>
-
-			<div id="metrics-card" hx-get={ templ.SafeURL("/databases/" + dbService.ID + "/stats") } hx-trigger="load, every 3s" hx-swap="outerHTML">
-				<div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex items-center justify-between">
-					<span class="text-sm text-gray-500 flex items-center gap-2">
-						@components.Spinner("sm", "blue")
-						Connecting to database metrics...
-					</span>
+						<div class="py-2.5 flex justify-between items-center">
+							<dt class="text-gray-500 font-medium">Database Engine</dt>
+							<dd class="text-gray-900 font-semibold uppercase">{ dbService.Engine }</dd>
+						</div>
+						<div class="py-2.5 flex justify-between items-center">
+							<dt class="text-gray-500 font-medium">Engine Version</dt>
+							<dd class="text-gray-900 font-mono">{ dbService.Version }</dd>
+						</div>
+						<div class="py-2.5 flex justify-between items-center">
+							<dt class="text-gray-500 font-medium">Port</dt>
+							<dd class="text-gray-900 font-mono font-medium">{ formatInt(dbService.Port) }</dd>
+						</div>
+						<div class="py-2.5 flex justify-between items-center">
+							<dt class="text-gray-500 font-medium">Username</dt>
+							<dd class="text-gray-900 font-mono">{ dbService.Username }</dd>
+						</div>
+						<div class="py-2.5 flex justify-between items-center">
+							<dt class="text-gray-500 font-medium">Database Name</dt>
+							<dd class="text-gray-900 font-mono font-medium">{ dbService.DatabaseName }</dd>
+						</div>
+					</dl>
 				</div>
-			</div>
 
-			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-				<h2 class="text-xl font-bold text-gray-900 mb-1">Resource Limits</h2>
-				<p class="text-xs text-gray-500 mb-4">Batas CPU & RAM database (Live update)</p>
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/resources") } method="post" class="space-y-3">
+				<!-- Connection String & Quick Connect -->
+				<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between">
 					<div>
-						<label class="block text-xs font-semibold text-gray-700">CPU Limit (Cores, e.g. 0.5, 1.0)</label>
-						<input type="number" step="0.1" min="0.1" name="cpu_limit"
-							value={ formatCPULimit(dbService.CPULimit) }
-							placeholder="Unlimited (e.g. 1.0)"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+						<h2 class="text-base font-semibold text-gray-900 mb-2">Connection String (Internal / External)</h2>
+						<p class="text-xs text-gray-500 mb-4">Gunakan connection URI berikut untuk menghubungkan aplikasi Anda ke service database ini.</p>
+						
+						if dbService.ConnectionString != nil {
+							<div class="bg-gray-900 rounded-lg p-4 font-mono text-xs text-emerald-400 break-all select-all border border-gray-800 shadow-inner">
+								{ *dbService.ConnectionString }
+							</div>
+						} else {
+							<div class="bg-gray-50 border border-gray-200 rounded-lg p-4 font-mono text-xs text-gray-500 italic">
+								Connection string belum digenerate atau database belum dijalankan.
+							</div>
+						}
 					</div>
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Memory Limit (MB, e.g. 512, 1024)</label>
-						<input type="number" min="32" name="memory_limit"
-							value={ formatMemLimit(dbService.MemoryLimit) }
-							placeholder="Unlimited (e.g. 512)"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
+
+					<div class="mt-6 pt-4 border-t border-gray-100 text-xs text-gray-500">
+						<p class="font-semibold text-gray-700 mb-1">💡 Tips Akses Docker Network:</p>
+						<p>Dari container aplikasi di network yang sama, Anda dapat menggunakan nama host <code class="bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono">{ dbService.Slug }</code> dan port <code class="bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono">{ formatInt(dbService.Port) }</code>.</p>
 					</div>
-					<div>
-						<label class="block text-xs font-semibold text-gray-700">Memory Reservation / Soft Limit (MB)</label>
-						<input type="number" min="16" name="memory_reservation"
-							value={ formatMemLimit(dbService.MemoryReservation) }
-							placeholder="Optional (e.g. 256)"
-							class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"/>
-					</div>
-					<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md">
-						Save & Apply Limits
-					</button>
-				</form>
+				</div>
 			</div>
 		</div>
 
-		<!-- Database Backups Card -->
-		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-			<div class="flex justify-between items-center mb-6">
-				<div>
-					<h2 class="text-xl font-bold text-gray-900">Database Backups & S3 Automation</h2>
-					<p class="text-xs text-gray-500 mt-1">Dump otomatis terkompresi gzip langsung dialirkan ke S3 / Cloudflare R2 / MinIO atau penyimpanan lokal.</p>
-				</div>
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/create") } method="post" class="inline">
-					<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded text-sm shadow-sm">
-						Backup Now
-					</button>
-				</form>
-			</div>
-
-			<!-- Form Konfigurasi Auto Backup -->
-			<div class="bg-gray-50 border border-gray-200 rounded-lg p-5 mb-6">
-				<h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">Auto Backup Configuration</h3>
-				<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/config") } method="post" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+		<!-- TAB 2: Backups & S3 Automation -->
+		<div x-show="tab === 'backups'" x-cloak class="space-y-6">
+			<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+				<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
 					<div>
-						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Status Auto-Backup</label>
-						<select name="enabled" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white">
-							if backupConfig != nil && backupConfig.Enabled {
-								<option value="true" selected>Enabled</option>
-								<option value="false">Disabled</option>
-							} else {
-								<option value="false" selected>Disabled</option>
-								<option value="true">Enabled</option>
-							}
-						</select>
+						<h2 class="text-base font-semibold text-gray-900">Database Backups & S3 Automation</h2>
+						<p class="text-xs text-gray-500 mt-1">Dump otomatis terkompresi gzip dialirkan langsung ke S3 / Cloudflare R2 / MinIO atau disk lokal.</p>
 					</div>
+					<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/create") } method="post" class="inline">
+						<button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm shadow-sm flex items-center gap-1.5 transition-colors">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+							Backup Now
+						</button>
+					</form>
+				</div>
 
-					<div>
-						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Storage Destination</label>
-						<select name="storage_destination_id" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white">
-							<option value="">(Default Global / Local Only)</option>
-							for _, dest := range destinations {
-								if backupConfig != nil && backupConfig.StorageDestinationID != nil && *backupConfig.StorageDestinationID == dest.ID {
-									<option value={ dest.ID } selected>{ dest.Name } (Bucket: { dest.Bucket })</option>
+				<!-- Form Konfigurasi Auto Backup -->
+				<div class="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-6">
+					<h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Schedule & Storage Target</h3>
+					<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/config") } method="post" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Status Auto-Backup</label>
+							<select name="enabled" class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full bg-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+								if backupConfig != nil && backupConfig.Enabled {
+									<option value="true" selected>Enabled</option>
+									<option value="false">Disabled</option>
 								} else {
-									<option value={ dest.ID }>{ dest.Name } (Bucket: { dest.Bucket })</option>
+									<option value="false" selected>Disabled</option>
+									<option value="true">Enabled</option>
 								}
-							}
-						</select>
-					</div>
+							</select>
+						</div>
 
-					<div>
-						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Jadwal (Cron)</label>
-						<select name="cron_expression" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white">
-							<option value="0 2 * * *">Harian (Jam 02:00 Pagi)</option>
-							<option value="0 0 * * *">Tengah Malam (00:00)</option>
-							<option value="@hourly">Setiap Jam</option>
-						</select>
-					</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Storage Destination</label>
+							<select name="storage_destination_id" class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full bg-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+								<option value="">(Default Global / Local Only)</option>
+								for _, dest := range destinations {
+									if backupConfig != nil && backupConfig.StorageDestinationID != nil && *backupConfig.StorageDestinationID == dest.ID {
+										<option value={ dest.ID } selected>{ dest.Name } (Bucket: { dest.Bucket })</option>
+									} else {
+										<option value={ dest.ID }>{ dest.Name } (Bucket: { dest.Bucket })</option>
+									}
+								}
+							</select>
+						</div>
 
-					<div>
-						<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Retensi (Simpan Terakhir)</label>
-						<div class="flex gap-2">
-							<input type="number" name="retention_count" value="7" min="1" max="100" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-full bg-white"/>
-							<button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white font-medium px-4 py-1.5 rounded text-sm whitespace-nowrap">
-								Save
-							</button>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Jadwal (Cron)</label>
+							<select name="cron_expression" class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full bg-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+								<option value="0 2 * * *">Harian (Jam 02:00 Pagi)</option>
+								<option value="0 0 * * *">Tengah Malam (00:00)</option>
+								<option value="@hourly">Setiap Jam</option>
+							</select>
+						</div>
+
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Retensi Snapshot</label>
+							<div class="flex gap-2">
+								<input type="number" name="retention_count" value="7" min="1" max="100" class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full bg-white shadow-sm"/>
+								<button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white font-medium px-4 py-2 rounded-lg text-sm whitespace-nowrap shadow-sm transition-colors">
+									Save
+								</button>
+							</div>
+						</div>
+					</form>
+				</div>
+
+				<!-- Tabel Riwayat Backup -->
+				<h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Backup History ({ string(rune('0' + len(backups))) })</h3>
+				if len(backups) == 0 {
+					<div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-8 text-center text-gray-500 text-sm">
+						Belum ada snapshot backup untuk database ini. Klik <strong class="text-gray-700">Backup Now</strong> di atas untuk membuat snapshot pertama.
+					</div>
+				} else {
+					<div class="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Filename</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Size</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Storage</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
+									<th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-600 uppercase">Action</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200 text-sm">
+								for _, b := range backups {
+									<tr class="hover:bg-gray-50 transition-colors">
+										<td class="px-4 py-3 font-mono text-xs text-gray-900">{ b.Filename }</td>
+										<td class="px-4 py-3 text-gray-600 text-xs font-mono">{ formatBytes(b.FileSize) }</td>
+										<td class="px-4 py-3 text-xs">
+											if b.StorageType == "s3" {
+												<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium border border-indigo-200">S3 / R2</span>
+											} else {
+												<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200">Local Disk</span>
+											}
+										</td>
+										<td class="px-4 py-3">
+											if b.Status == "completed" {
+												<span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">Completed</span>
+											} else if b.Status == "pending" {
+												<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded">Pending</span>
+											} else {
+												<span class="bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded">Failed</span>
+											}
+										</td>
+										<td class="px-4 py-3 text-xs text-gray-500">{ b.CreatedAt.Format("2006-01-02 15:04:05") }</td>
+										<td class="px-4 py-3 text-right text-xs">
+											<a href={ templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/download") } class="text-emerald-600 hover:text-emerald-900 font-medium mr-3">Download</a>
+											<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Hapus file backup ini?')">
+												<button type="submit" class="text-red-600 hover:text-red-900 font-medium">Delete</button>
+											</form>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
+		</div>
+
+		<!-- TAB 3: Monitoring & Resource Limits -->
+		<div x-show="tab === 'resources'" x-cloak class="space-y-6">
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<!-- Live Metrics -->
+				<div>
+					<h2 class="text-base font-semibold text-gray-900 mb-2">Live Resource Metrics</h2>
+					<p class="text-xs text-gray-500 mb-4">Pemantauan real-time CPU & Memori container database.</p>
+					<div id="metrics-card" hx-get={ templ.SafeURL("/databases/" + dbService.ID + "/stats") } hx-trigger="load, every 3s" hx-swap="outerHTML">
+						<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center justify-between">
+							<span class="text-sm text-gray-500 flex items-center gap-2">
+								@components.Spinner("sm", "blue")
+								Connecting to database live metrics...
+							</span>
 						</div>
 					</div>
-				</form>
-			</div>
+				</div>
 
-			<!-- Tabel Riwayat Backup -->
-			<h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">Backup History ({ string(rune('0' + len(backups))) })</h3>
-			if len(backups) == 0 {
-				<div class="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500 text-sm">
-					Belum ada riwayat backup untuk database ini. Klik <strong>Backup Now</strong> di atas untuk membuat snapshot pertama.
+				<!-- Resource Limits Form -->
+				<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+					<h2 class="text-base font-semibold text-gray-900 mb-1">Resource Limits</h2>
+					<p class="text-xs text-gray-500 mb-4">Batas penggunaan CPU & RAM untuk isolasi performa server (Live update tanpa restart).</p>
+					<form action={ templ.SafeURL("/databases/" + dbService.ID + "/resources") } method="post" class="space-y-4">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">CPU Limit (Cores, e.g. 0.5, 1.0)</label>
+							<input type="number" step="0.1" min="0.1" name="cpu_limit"
+								value={ formatCPULimit(dbService.CPULimit) }
+								placeholder="Unlimited (e.g. 1.0)"
+								class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm shadow-sm focus:ring-emerald-500 focus:border-emerald-500"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Memory Limit (MB, e.g. 512, 1024)</label>
+							<input type="number" min="32" name="memory_limit"
+								value={ formatMemLimit(dbService.MemoryLimit) }
+								placeholder="Unlimited (e.g. 512)"
+								class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm shadow-sm focus:ring-emerald-500 focus:border-emerald-500"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Memory Reservation / Soft Limit (MB)</label>
+							<input type="number" min="16" name="memory_reservation"
+								value={ formatMemLimit(dbService.MemoryReservation) }
+								placeholder="Optional (e.g. 256)"
+								class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm shadow-sm focus:ring-emerald-500 focus:border-emerald-500"/>
+						</div>
+						<button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2.5 rounded-lg shadow-sm transition-colors">
+							Save & Apply Limits
+						</button>
+					</form>
 				</div>
-			} else {
-				<div class="overflow-x-auto border border-gray-200 rounded-lg">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
-							<tr>
-								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Filename</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Size</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Storage</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-								<th class="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Action</th>
-							</tr>
-						</thead>
-						<tbody class="bg-white divide-y divide-gray-200 text-sm">
-							for _, b := range backups {
-								<tr>
-									<td class="px-4 py-3 font-mono text-xs text-gray-900">{ b.Filename }</td>
-									<td class="px-4 py-3 text-gray-600 text-xs">{ formatBytes(b.FileSize) }</td>
-									<td class="px-4 py-3 text-xs">
-										if b.StorageType == "s3" {
-											<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium border border-indigo-200">S3 / R2</span>
-										} else {
-											<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200">Local Disk</span>
-										}
-									</td>
-									<td class="px-4 py-3">
-										if b.Status == "completed" {
-											<span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">Completed</span>
-										} else if b.Status == "pending" {
-											<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded">Pending</span>
-										} else {
-											<span class="bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded">Failed</span>
-										}
-									</td>
-									<td class="px-4 py-3 text-xs text-gray-500">{ b.CreatedAt.Format("2006-01-02 15:04:05") }</td>
-									<td class="px-4 py-3 text-right text-xs">
-										<a href={ templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/download") } class="text-blue-600 hover:text-blue-900 font-medium mr-3">Download</a>
-										<form action={ templ.SafeURL("/databases/" + dbService.ID + "/backups/" + b.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Hapus file backup ini?')">
-											<button type="submit" class="text-red-600 hover:text-red-900 font-medium">Delete</button>
-										</form>
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				</div>
-			}
+			</div>
 		</div>
 	</div>
 }
