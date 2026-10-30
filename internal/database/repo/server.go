@@ -37,13 +37,14 @@ func (r *ServerRepo) Create(input models.CreateServerInput) (*models.Server, err
 	}
 
 	_, err := r.db.Exec(
-		`INSERT INTO servers (id, name, host, port, ssh_user, ssh_key_path, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		server.ID, server.Name, server.Host, server.Port, server.SSHUser, server.SSHKeyPath, server.Status, server.CreatedAt, server.UpdatedAt,
+		`INSERT INTO servers (id, name, host, port, ssh_user, ssh_key_path, ssh_key_content, status, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		server.ID, server.Name, server.Host, server.Port, server.SSHUser, server.SSHKeyPath, input.SSHKeyContent, server.Status, server.CreatedAt, server.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
+	server.SSHKeyContent = input.SSHKeyContent
 
 	return server, nil
 }
@@ -51,10 +52,10 @@ func (r *ServerRepo) Create(input models.CreateServerInput) (*models.Server, err
 func (r *ServerRepo) GetByID(id string) (*models.Server, error) {
 	server := &models.Server{}
 	err := r.db.QueryRow(
-		`SELECT id, name, host, port, ssh_user, ssh_key_path, status, last_seen, created_at, updated_at
+		`SELECT id, name, host, port, ssh_user, ssh_key_path, ssh_key_content, status, last_seen, created_at, updated_at
 		 FROM servers WHERE id = ?`,
 		id,
-	).Scan(&server.ID, &server.Name, &server.Host, &server.Port, &server.SSHUser, &server.SSHKeyPath, &server.Status, &server.LastSeen, &server.CreatedAt, &server.UpdatedAt)
+	).Scan(&server.ID, &server.Name, &server.Host, &server.Port, &server.SSHUser, &server.SSHKeyPath, &server.SSHKeyContent, &server.Status, &server.LastSeen, &server.CreatedAt, &server.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,7 @@ func (r *ServerRepo) GetByID(id string) (*models.Server, error) {
 
 func (r *ServerRepo) GetAll() ([]*models.Server, error) {
 	rows, err := r.db.Query(
-		`SELECT id, name, host, port, ssh_user, ssh_key_path, status, last_seen, created_at, updated_at
+		`SELECT id, name, host, port, ssh_user, ssh_key_path, ssh_key_content, status, last_seen, created_at, updated_at
 		 FROM servers ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -75,7 +76,7 @@ func (r *ServerRepo) GetAll() ([]*models.Server, error) {
 	var servers []*models.Server
 	for rows.Next() {
 		server := &models.Server{}
-		err := rows.Scan(&server.ID, &server.Name, &server.Host, &server.Port, &server.SSHUser, &server.SSHKeyPath, &server.Status, &server.LastSeen, &server.CreatedAt, &server.UpdatedAt)
+		err := rows.Scan(&server.ID, &server.Name, &server.Host, &server.Port, &server.SSHUser, &server.SSHKeyPath, &server.SSHKeyContent, &server.Status, &server.LastSeen, &server.CreatedAt, &server.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}

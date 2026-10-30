@@ -498,223 +498,247 @@ func ApplicationDetailPage(app *models.Application, deployments []*models.Deploy
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if app.ContainerID != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"flex justify-between\"><dt class=\"text-gray-600\">Container ID</dt><dd class=\"text-gray-900 font-mono text-sm\">")
+		if app.ServerID != nil && *app.ServerID != "" && *app.ServerID != "local" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"flex justify-between\"><dt class=\"text-gray-600\">Target Server</dt><dd class=\"text-indigo-600 font-medium text-sm flex items-center gap-1\"><svg class=\"w-3.5 h-3.5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01\"></path></svg> Remote (")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var25 string
-			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(*app.ContainerID)
+			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(*app.ServerID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 206, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 208, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</dd></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, ")</dd></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<div class=\"flex justify-between\"><dt class=\"text-gray-600\">Target Server</dt><dd class=\"text-gray-900 text-sm\">Localhost (Default)</dd></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</dl></div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Custom Domain</h2>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if app.CustomDomain != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<dl class=\"space-y-3 mb-4\"><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Domain</dt><dd class=\"text-gray-900\">")
+		if app.ContainerID != nil {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<div class=\"flex justify-between\"><dt class=\"text-gray-600\">Container ID</dt><dd class=\"text-gray-900 font-mono text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var26 string
-			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(*app.CustomDomain)
+			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(*app.ContainerID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 218, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 220, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">HTTPS</dt><dd class=\"text-green-600\">Enabled (via Caddy)</dd></div></dl><form action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</dd></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</dl></div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Custom Domain</h2>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if app.CustomDomain != nil {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<dl class=\"space-y-3 mb-4\"><div class=\"flex justify-between\"><dt class=\"text-gray-600\">Domain</dt><dd class=\"text-gray-900\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var27 string
-			templ_7745c5c3_Var27, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/domain/remove")).ResolveURL(ctx)
+			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(*app.CustomDomain)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 225, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 232, Col: 52}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700\">Remove Domain</button></form>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<form action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</dd></div><div class=\"flex justify-between\"><dt class=\"text-gray-600\">HTTPS</dt><dd class=\"text-green-600\">Enabled (via Caddy)</dd></div></dl><form action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var28 string
-			templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/domain")).ResolveURL(ctx)
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/domain/remove")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 229, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 239, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Custom Domain</label> <input type=\"text\" name=\"custom_domain\" placeholder=\"example.com\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\" required></div><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Set Domain</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700\">Remove Domain</button></form>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<form action=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var29 string
+			templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/domain")).ResolveURL(ctx)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 243, Col: 72}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Custom Domain</label> <input type=\"text\" name=\"custom_domain\" placeholder=\"example.com\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\" required></div><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Set Domain</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-1\">Resource Limits</h2><p class=\"text-xs text-gray-500 mb-4\">Batas CPU & RAM container (Live update)</p><form action=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/resources")).ResolveURL(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 242, Col: 74}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700\">CPU Limit (Cores, e.g. 0.5, 1.0)</label> <input type=\"number\" step=\"0.1\" min=\"0.1\" name=\"cpu_limit\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-1\">Resource Limits</h2><p class=\"text-xs text-gray-500 mb-4\">Batas CPU & RAM container (Live update)</p><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var30 string
-		templ_7745c5c3_Var30, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatCPULimit(app.CPULimit)).Resolve(ctx)
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/resources")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 246, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 256, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\" placeholder=\"Unlimited (e.g. 1.0)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700\">Memory Limit (MB, e.g. 512, 1024)</label> <input type=\"number\" min=\"32\" name=\"memory_limit\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700\">CPU Limit (Cores, e.g. 0.5, 1.0)</label> <input type=\"number\" step=\"0.1\" min=\"0.1\" name=\"cpu_limit\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var31 string
-		templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatMemLimit(app.MemoryLimit)).Resolve(ctx)
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatCPULimit(app.CPULimit)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 253, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 260, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\" placeholder=\"Unlimited (e.g. 512)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700\">Memory Reservation / Soft Limit (MB)</label> <input type=\"number\" min=\"16\" name=\"memory_reservation\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" placeholder=\"Unlimited (e.g. 1.0)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700\">Memory Limit (MB, e.g. 512, 1024)</label> <input type=\"number\" min=\"32\" name=\"memory_limit\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var32 string
-		templ_7745c5c3_Var32, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatMemLimit(app.MemoryReservation)).Resolve(ctx)
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatMemLimit(app.MemoryLimit)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 260, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 267, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" placeholder=\"Optional (e.g. 256)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><button type=\"submit\" class=\"w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md\">Save & Apply Limits</button></form></div></div><div class=\"grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6\"><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex items-center gap-2 mb-1\"><svg class=\"w-5 h-5 text-emerald-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg><h2 class=\"text-xl font-bold text-gray-900\">Custom Healthcheck</h2></div><p class=\"text-xs text-gray-500 mb-4\">Ubah path endpoint dan batas waktu evaluasi kesiapan container sebelum traffic dialihkan (Zero-Downtime gate).</p><form action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" placeholder=\"Unlimited (e.g. 512)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700\">Memory Reservation / Soft Limit (MB)</label> <input type=\"number\" min=\"16\" name=\"memory_reservation\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var33 string
-		templ_7745c5c3_Var33, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/healthcheck")).ResolveURL(ctx)
+		templ_7745c5c3_Var33, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatMemLimit(app.MemoryReservation)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 278, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 274, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700\">Healthcheck HTTP Path</label> <input type=\"text\" name=\"healthcheck_path\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" placeholder=\"Optional (e.g. 256)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><button type=\"submit\" class=\"w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md\">Save & Apply Limits</button></form></div></div><div class=\"grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6\"><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex items-center gap-2 mb-1\"><svg class=\"w-5 h-5 text-emerald-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg><h2 class=\"text-xl font-bold text-gray-900\">Custom Healthcheck</h2></div><p class=\"text-xs text-gray-500 mb-4\">Ubah path endpoint dan batas waktu evaluasi kesiapan container sebelum traffic dialihkan (Zero-Downtime gate).</p><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var34 string
-		templ_7745c5c3_Var34, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.HealthcheckPath, "/")).Resolve(ctx)
+		templ_7745c5c3_Var34, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/healthcheck")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 282, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 292, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" placeholder=\"/\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"> <span class=\"text-[11px] text-gray-400 mt-0.5 block\">Contoh: /, /healthz, /api/health</span></div><div><label class=\"block text-xs font-semibold text-gray-700\">Healthcheck Timeout (Detik)</label> <input type=\"number\" min=\"5\" max=\"300\" name=\"healthcheck_timeout\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700\">Healthcheck HTTP Path</label> <input type=\"text\" name=\"healthcheck_path\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatHealthcheckTimeout(app.HealthcheckTimeout)).Resolve(ctx)
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.HealthcheckPath, "/")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 290, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 296, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" placeholder=\"30\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"> <span class=\"text-[11px] text-gray-400 mt-0.5 block\">Waktu maksimal menunggu container menjawab HTTP status &lt; 500 (Default: 30s)</span></div><button type=\"submit\" class=\"w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 rounded-md transition-colors\">Simpan Konfigurasi Healthcheck</button></form></div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex items-center gap-2 mb-1\"><svg class=\"w-5 h-5 text-indigo-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z\"></path></svg><h2 class=\"text-xl font-bold text-gray-900\">HTTP Basic Auth (Caddy)</h2></div><p class=\"text-xs text-gray-500 mb-4\">Lindungi endpoint aplikasi dengan otentikasi login browser HTTP Basic via Caddy proxy.</p><form action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" placeholder=\"/\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"> <span class=\"text-[11px] text-gray-400 mt-0.5 block\">Contoh: /, /healthz, /api/health</span></div><div><label class=\"block text-xs font-semibold text-gray-700\">Healthcheck Timeout (Detik)</label> <input type=\"number\" min=\"5\" max=\"300\" name=\"healthcheck_timeout\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var36 string
-		templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/basic-auth")).ResolveURL(ctx)
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatHealthcheckTimeout(app.HealthcheckTimeout)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 307, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 304, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700\">Username</label> <input type=\"text\" name=\"basic_auth_user\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" placeholder=\"30\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"> <span class=\"text-[11px] text-gray-400 mt-0.5 block\">Waktu maksimal menunggu container menjawab HTTP status &lt; 500 (Default: 30s)</span></div><button type=\"submit\" class=\"w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 rounded-md transition-colors\">Simpan Konfigurasi Healthcheck</button></form></div><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex items-center gap-2 mb-1\"><svg class=\"w-5 h-5 text-indigo-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z\"></path></svg><h2 class=\"text-xl font-bold text-gray-900\">HTTP Basic Auth (Caddy)</h2></div><p class=\"text-xs text-gray-500 mb-4\">Lindungi endpoint aplikasi dengan otentikasi login browser HTTP Basic via Caddy proxy.</p><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var37 string
-		templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.BasicAuthUser, "")).Resolve(ctx)
+		templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/basic-auth")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 311, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 321, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" placeholder=\"Kosongkan jika dinonaktifkan\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700\">Password</label> <input type=\"password\" name=\"basic_auth_password\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700\">Username</label> <input type=\"text\" name=\"basic_auth_user\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.BasicAuthPassword, "")).Resolve(ctx)
+		templ_7745c5c3_Var38, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.BasicAuthUser, "")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 318, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 325, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" placeholder=\"Kosongkan jika dinonaktifkan\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"> <span class=\"text-[11px] text-gray-400 mt-0.5 block\">Di-hash secara aman dengan bcrypt sebelum dikirim ke Caddy Admin API. Kosongkan username &amp; password untuk menonaktifkan.</span></div><button type=\"submit\" class=\"w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md transition-colors\">Simpan &amp; Terapkan Basic Auth</button></form></div></div><div class=\"mt-6\"><div id=\"metrics-card\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" placeholder=\"Kosongkan jika dinonaktifkan\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700\">Password</label> <input type=\"password\" name=\"basic_auth_password\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var39 string
-		templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/stats")).Resolve(ctx)
+		templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.BasicAuthPassword, "")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 331, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 332, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" hx-trigger=\"load, every 3s\" hx-swap=\"outerHTML\"><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6 flex items-center justify-between\"><span class=\"text-sm text-gray-500 flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" placeholder=\"Kosongkan jika dinonaktifkan\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm\"> <span class=\"text-[11px] text-gray-400 mt-0.5 block\">Di-hash secara aman dengan bcrypt sebelum dikirim ke Caddy Admin API. Kosongkan username &amp; password untuk menonaktifkan.</span></div><button type=\"submit\" class=\"w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md transition-colors\">Simpan &amp; Terapkan Basic Auth</button></form></div></div><div class=\"mt-6\"><div id=\"metrics-card\" hx-get=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var40 string
+		templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/stats")).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 345, Col: 86}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" hx-trigger=\"load, every 3s\" hx-swap=\"outerHTML\"><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6 flex items-center justify-between\"><span class=\"text-sm text-gray-500 flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -722,115 +746,115 @@ func ApplicationDetailPage(app *models.Application, deployments []*models.Deploy
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, " Connecting to container metrics...</span></div></div></div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-4\"><div><h2 class=\"text-xl font-bold text-gray-900\">Git Webhook & Auto-Deploy</h2><p class=\"text-xs text-gray-500 mt-1\">Otomatiskan deploy setiap kali ada push commit ke target branch.</p></div><form action=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var40 string
-		templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/webhook/regenerate")).ResolveURL(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 347, Col: 83}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border border-gray-300 font-medium\">Regenerate Secret</button></form></div><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4 mb-4\"><div class=\"p-3 bg-gray-50 rounded-lg border border-gray-200\"><span class=\"text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1\">GitHub Webhook URL</span><div class=\"flex items-center gap-2\"><input type=\"text\" readonly value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, " Connecting to container metrics...</span></div></div></div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-4\"><div><h2 class=\"text-xl font-bold text-gray-900\">Git Webhook & Auto-Deploy</h2><p class=\"text-xs text-gray-500 mt-1\">Otomatiskan deploy setiap kali ada push commit ke target branch.</p></div><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var41 string
-		templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/webhooks/github/" + app.ID).Resolve(ctx)
+		templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/webhook/regenerate")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 358, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 361, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" class=\"font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800\" onclick=\"this.select()\"></div><span class=\"text-[11px] text-gray-400 mt-1 block\">Content type: application/json • Secret token: required</span></div><div class=\"p-3 bg-gray-50 rounded-lg border border-gray-200\"><span class=\"text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1\">GitLab Webhook URL</span><div class=\"flex items-center gap-2\"><input type=\"text\" readonly value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border border-gray-300 font-medium\">Regenerate Secret</button></form></div><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4 mb-4\"><div class=\"p-3 bg-gray-50 rounded-lg border border-gray-200\"><span class=\"text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1\">GitHub Webhook URL</span><div class=\"flex items-center gap-2\"><input type=\"text\" readonly value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var42 string
-		templ_7745c5c3_Var42, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/webhooks/gitlab/" + app.ID).Resolve(ctx)
+		templ_7745c5c3_Var42, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/webhooks/github/" + app.ID).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 365, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 372, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" class=\"font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800\" onclick=\"this.select()\"></div><span class=\"text-[11px] text-gray-400 mt-1 block\">Trigger: Push events • Secret token: required</span></div></div><div class=\"p-3 bg-gray-50 rounded-lg border border-gray-200 mb-4\"><span class=\"text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1\">Webhook Secret</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\" class=\"font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800\" onclick=\"this.select()\"></div><span class=\"text-[11px] text-gray-400 mt-1 block\">Content type: application/json • Secret token: required</span></div><div class=\"p-3 bg-gray-50 rounded-lg border border-gray-200\"><span class=\"text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1\">GitLab Webhook URL</span><div class=\"flex items-center gap-2\"><input type=\"text\" readonly value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var43 string
+		templ_7745c5c3_Var43, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/webhooks/gitlab/" + app.ID).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 379, Col: 70}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "\" class=\"font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800\" onclick=\"this.select()\"></div><span class=\"text-[11px] text-gray-400 mt-1 block\">Trigger: Push events • Secret token: required</span></div></div><div class=\"p-3 bg-gray-50 rounded-lg border border-gray-200 mb-4\"><span class=\"text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-1\">Webhook Secret</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if app.WebhookSecret != nil && *app.WebhookSecret != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<input type=\"text\" readonly value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<input type=\"text\" readonly value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var43 string
-			templ_7745c5c3_Var43, templ_7745c5c3_Err = templruntime.NewAttributeExpression(*app.WebhookSecret).Resolve(ctx)
+			var templ_7745c5c3_Var44 string
+			templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(*app.WebhookSecret).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 374, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 388, Col: 59}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\" class=\"font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800\" onclick=\"this.select()\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\" class=\"font-mono text-xs bg-white border border-gray-300 rounded px-2 py-1.5 w-full text-gray-800\" onclick=\"this.select()\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<span class=\"text-xs text-amber-600 italic\">Belum ada secret. Klik Regenerate Secret di atas untuk mengaktifkannya.</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<span class=\"text-xs text-amber-600 italic\">Belum ada secret. Klik Regenerate Secret di atas untuk mengaktifkannya.</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</div><div class=\"text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3\"><strong class=\"text-blue-800\">Petunjuk Konfigurasi:</strong><ul class=\"list-disc list-inside mt-1 space-y-1 text-blue-700\"><li><strong>GitHub:</strong> Buka Repo Settings &rarr; Webhooks &rarr; Add Webhook. Masukkan URL GitHub di atas, pilih Content type: <code class=\"bg-blue-100 px-1 py-0.5 rounded\">application/json</code>, isi Secret, dan pilih event <em>Just the push event</em>.</li><li><strong>GitLab:</strong> Buka Repo Settings &rarr; Webhooks. Masukkan URL GitLab, paste Secret Token, dan centang event <em>Push events</em>.</li><li><strong>Filter Otomatis:</strong> Push ke branch lain akan diabaikan tanpa error demi menghemat resource server.</li></ul></div></div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-4\"><div><h2 class=\"text-xl font-bold text-gray-900 flex items-center gap-2\"><svg class=\"w-5 h-5 text-blue-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg> Recent Deployments &amp; Instant Rollback</h2><p class=\"text-xs text-gray-500 mt-1\">Sistem menyimpan cache 5 image sukses terakhir (Coolify-style) untuk rollback instan tanpa git clone/re-build.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</div><div class=\"text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3\"><strong class=\"text-blue-800\">Petunjuk Konfigurasi:</strong><ul class=\"list-disc list-inside mt-1 space-y-1 text-blue-700\"><li><strong>GitHub:</strong> Buka Repo Settings &rarr; Webhooks &rarr; Add Webhook. Masukkan URL GitHub di atas, pilih Content type: <code class=\"bg-blue-100 px-1 py-0.5 rounded\">application/json</code>, isi Secret, dan pilih event <em>Just the push event</em>.</li><li><strong>GitLab:</strong> Buka Repo Settings &rarr; Webhooks. Masukkan URL GitLab, paste Secret Token, dan centang event <em>Push events</em>.</li><li><strong>Filter Otomatis:</strong> Push ke branch lain akan diabaikan tanpa error demi menghemat resource server.</li></ul></div></div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-4\"><div><h2 class=\"text-xl font-bold text-gray-900 flex items-center gap-2\"><svg class=\"w-5 h-5 text-blue-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg> Recent Deployments &amp; Instant Rollback</h2><p class=\"text-xs text-gray-500 mt-1\">Sistem menyimpan cache 5 image sukses terakhir (Coolify-style) untuk rollback instan tanpa git clone/re-build.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(deployments) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<p class=\"text-sm text-gray-500 italic py-4 text-center\">Belum ada riwayat deployment untuk aplikasi ini.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<p class=\"text-sm text-gray-500 italic py-4 text-center\">Belum ada riwayat deployment untuk aplikasi ini.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<div class=\"overflow-x-auto\"><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Deployment ID</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Status</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Cached Image</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Commit / Info</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Date</th><th class=\"px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<div class=\"overflow-x-auto\"><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Deployment ID</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Status</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Cached Image</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Commit / Info</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Date</th><th class=\"px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, dep := range deployments {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900\"><a href=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var44 string
-				templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID)).ResolveURL(ctx)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 421, Col: 59}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "\" class=\"text-blue-600 hover:text-blue-800 hover:underline\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900\"><a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var45 string
-				templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(dep.ID[:8])
+				templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 422, Col: 23}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 435, Col: 59}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</a></td><td class=\"px-4 py-3 whitespace-nowrap text-sm\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "\" class=\"text-blue-600 hover:text-blue-800 hover:underline\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var46 string
+				templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(dep.ID[:8])
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 436, Col: 23}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "</a></td><td class=\"px-4 py-3 whitespace-nowrap text-sm\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -838,168 +862,168 @@ func ApplicationDetailPage(app *models.Application, deployments []*models.Deploy
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if dep.ImageName != nil && *dep.ImageName != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<span class=\"inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200\" title=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var46 string
-					templ_7745c5c3_Var46, templ_7745c5c3_Err = templruntime.NewAttributeExpression(*dep.ImageName).Resolve(ctx)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 430, Col: 155}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "\"><svg class=\"w-3 h-3 text-emerald-500\" fill=\"currentColor\" viewBox=\"0 0 20 20\"><path fill-rule=\"evenodd\" d=\"M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z\" clip-rule=\"evenodd\"></path></svg> Cached</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<span class=\"text-gray-400\">-</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "</td><td class=\"px-4 py-3 whitespace-nowrap text-sm text-gray-600\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if dep.CommitMessage != nil && *dep.CommitMessage != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<span class=\"truncate block max-w-xs\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<span class=\"inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200\" title=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var47 string
-					templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(*dep.CommitMessage)
+					templ_7745c5c3_Var47, templ_7745c5c3_Err = templruntime.NewAttributeExpression(*dep.ImageName).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 440, Col: 69}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 444, Col: 155}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</span>")
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-				} else if dep.CommitHash != nil && *dep.CommitHash != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<span class=\"font-mono text-xs\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "\"><svg class=\"w-3 h-3 text-emerald-500\" fill=\"currentColor\" viewBox=\"0 0 20 20\"><path fill-rule=\"evenodd\" d=\"M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z\" clip-rule=\"evenodd\"></path></svg> Cached</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<span class=\"text-gray-400\">-</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "</td><td class=\"px-4 py-3 whitespace-nowrap text-sm text-gray-600\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if dep.CommitMessage != nil && *dep.CommitMessage != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<span class=\"truncate block max-w-xs\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var48 string
-					templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs((*dep.CommitHash)[:7])
+					templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(*dep.CommitMessage)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 442, Col: 66}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 454, Col: 69}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else if dep.CommitHash != nil && *dep.CommitHash != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "<span class=\"font-mono text-xs\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var49 string
+					templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs((*dep.CommitHash)[:7])
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 456, Col: 66}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<span class=\"text-gray-400 italic text-xs\">Manual trigger</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "<span class=\"text-gray-400 italic text-xs\">Manual trigger</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs text-gray-500\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var49 string
-				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(dep.CreatedAt.Format("2006-01-02 15:04"))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 448, Col: 52}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "</td><td class=\"px-4 py-3 whitespace-nowrap text-right text-sm\"><div class=\"flex items-center justify-end gap-2\"><a href=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs text-gray-500\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var50 string
-				templ_7745c5c3_Var50, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID)).ResolveURL(ctx)
+				templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(dep.CreatedAt.Format("2006-01-02 15:04"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 452, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 462, Col: 52}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "\" class=\"text-xs text-gray-600 hover:text-gray-900 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors\">Logs</a> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "</td><td class=\"px-4 py-3 whitespace-nowrap text-right text-sm\"><div class=\"flex items-center justify-end gap-2\"><a href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var51 string
+				templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID)).ResolveURL(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 466, Col: 60}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "\" class=\"text-xs text-gray-600 hover:text-gray-900 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors\">Logs</a> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if dep.Status == models.DeployStatusSuccess {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<form action=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "<form action=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var51 string
-					templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID + "/rollback")).ResolveURL(ctx)
+					var templ_7745c5c3_Var52 string
+					templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/deployments/" + dep.ID + "/rollback")).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 456, Col: 80}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 470, Col: 80}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "\" method=\"post\" class=\"inline\" hx-on:htmx:config-request=\"this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Rolling back...'\"><button type=\"submit\" class=\"inline-flex items-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded shadow-sm transition-colors\" title=\"Instant rollback to this container image\"><svg class=\"w-3 h-3\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6\"></path></svg> Instant Rollback</button></form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "\" method=\"post\" class=\"inline\" hx-on:htmx:config-request=\"this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Rolling back...'\"><button type=\"submit\" class=\"inline-flex items-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded shadow-sm transition-colors\" title=\"Instant rollback to this container image\"><svg class=\"w-3 h-3\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6\"></path></svg> Instant Rollback</button></form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</div></td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</div></td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "</tbody></table></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "</div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-4\"><div><h2 class=\"text-xl font-bold text-gray-900 flex items-center gap-2\"><svg class=\"w-5 h-5 text-indigo-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg> Application Cron Jobs (Coolify-style)</h2><p class=\"text-xs text-gray-500 mt-1\">Jalankan command terjadwal secara periodik langsung di dalam container aplikasi yang aktif (misal: scheduler Laravel, cleanup script, dsb.).</p></div></div><!-- Form Tambah Cron Job Baru --><form action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "</div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><div class=\"flex justify-between items-center mb-4\"><div><h2 class=\"text-xl font-bold text-gray-900 flex items-center gap-2\"><svg class=\"w-5 h-5 text-indigo-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg> Application Cron Jobs (Coolify-style)</h2><p class=\"text-xs text-gray-500 mt-1\">Jalankan command terjadwal secara periodik langsung di dalam container aplikasi yang aktif (misal: scheduler Laravel, cleanup script, dsb.).</p></div></div><!-- Form Tambah Cron Job Baru --><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var52 string
-		templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs")).ResolveURL(ctx)
+		var templ_7745c5c3_Var53 string
+		templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 488, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 502, Col: 73}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "\" method=\"post\" class=\"mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg\"><h3 class=\"text-sm font-semibold text-gray-800 mb-3\">Add New Cron Job</h3><div class=\"grid grid-cols-1 md:grid-cols-3 gap-3 mb-3\"><div><label class=\"block text-xs font-medium text-gray-700 mb-1\">Name</label> <input type=\"text\" name=\"name\" placeholder=\"e.g. Laravel Scheduler\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full\" required></div><div><label class=\"block text-xs font-medium text-gray-700 mb-1\">Cron Expression</label> <input type=\"text\" name=\"cron_expression\" placeholder=\"* * * * * or @hourly\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm font-mono w-full\" required> <span class=\"text-[10px] text-gray-400 mt-0.5 block\">Preset: * * * * * (tiap menit), 0 * * * * (@hourly), 0 2 * * * (@daily)</span></div><div><label class=\"block text-xs font-medium text-gray-700 mb-1\">Command (inside container)</label> <input type=\"text\" name=\"command\" placeholder=\"e.g. php artisan schedule:run\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm font-mono w-full\" required></div></div><button type=\"submit\" class=\"bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded shadow-sm transition-colors\">Add Cron Job</button></form><!-- Daftar Cron Jobs -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "\" method=\"post\" class=\"mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg\"><h3 class=\"text-sm font-semibold text-gray-800 mb-3\">Add New Cron Job</h3><div class=\"grid grid-cols-1 md:grid-cols-3 gap-3 mb-3\"><div><label class=\"block text-xs font-medium text-gray-700 mb-1\">Name</label> <input type=\"text\" name=\"name\" placeholder=\"e.g. Laravel Scheduler\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm w-full\" required></div><div><label class=\"block text-xs font-medium text-gray-700 mb-1\">Cron Expression</label> <input type=\"text\" name=\"cron_expression\" placeholder=\"* * * * * or @hourly\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm font-mono w-full\" required> <span class=\"text-[10px] text-gray-400 mt-0.5 block\">Preset: * * * * * (tiap menit), 0 * * * * (@hourly), 0 2 * * * (@daily)</span></div><div><label class=\"block text-xs font-medium text-gray-700 mb-1\">Command (inside container)</label> <input type=\"text\" name=\"command\" placeholder=\"e.g. php artisan schedule:run\" class=\"border border-gray-300 rounded px-3 py-1.5 text-sm font-mono w-full\" required></div></div><button type=\"submit\" class=\"bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded shadow-sm transition-colors\">Add Cron Job</button></form><!-- Daftar Cron Jobs -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(cronJobs) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "<p class=\"text-sm text-gray-500 italic py-3 text-center\">Belum ada cron job yang didaftarkan untuk aplikasi ini.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "<p class=\"text-sm text-gray-500 italic py-3 text-center\">Belum ada cron job yang didaftarkan untuk aplikasi ini.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "<div class=\"overflow-x-auto\"><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Job Name</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Schedule</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Command</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Status / Last Run</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Last Output</th><th class=\"px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider\">Actions</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "<div class=\"overflow-x-auto\"><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Job Name</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Schedule</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Command</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Status / Last Run</th><th class=\"px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider\">Last Output</th><th class=\"px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider\">Actions</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, cj := range cronJobs {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900\"><div class=\"flex items-center gap-2\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900\"><div class=\"flex items-center gap-2\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -1007,25 +1031,25 @@ func ApplicationDetailPage(app *models.Application, deployments []*models.Deploy
 					templ_7745c5c3_ElementWriter := templ_7745c5c3_Buffer
 					templ_7745c5c3_Buffer := templ.GetBuffer()
 					var templ_7745c5c3_ElementScripts []templ.ComponentScript
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "<span class=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "<span class=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var53 = []any{"inline-block w-2 h-2 rounded-full", templ.KV("bg-emerald-500", cj.IsEnabled), templ.KV("bg-gray-300", !cj.IsEnabled)}
-					templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var53...)
+					var templ_7745c5c3_Var54 = []any{"inline-block w-2 h-2 rounded-full", templ.KV("bg-emerald-500", cj.IsEnabled), templ.KV("bg-gray-300", !cj.IsEnabled)}
+					templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var54...)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var54 string
-					templ_7745c5c3_Var54, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.CSSClasses(templ_7745c5c3_Var53).String()).Resolve(ctx)
+					var templ_7745c5c3_Var55 string
+					templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.CSSClasses(templ_7745c5c3_Var54).String()).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 1, Col: 0}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var54)
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, "\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -1039,271 +1063,271 @@ func ApplicationDetailPage(app *models.Application, deployments []*models.Deploy
 					}
 					templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "></span> ")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var55 string
-				templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(cj.Name)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 532, Col: 20}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "</div></td><td class=\"px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600\"><span class=\"bg-gray-100 px-2 py-0.5 rounded border border-gray-200\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "></span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var56 string
-				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(cj.CronExpression)
+				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(cj.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 536, Col: 98}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 546, Col: 20}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, "</span></td><td class=\"px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-700 max-w-xs truncate\" title=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "</div></td><td class=\"px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600\"><span class=\"bg-gray-100 px-2 py-0.5 rounded border border-gray-200\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var57 string
-				templ_7745c5c3_Var57, templ_7745c5c3_Err = templruntime.NewAttributeExpression(cj.Command).Resolve(ctx)
+				templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(cj.CronExpression)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 538, Col: 117}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 550, Col: 98}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "</span></td><td class=\"px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-700 max-w-xs truncate\" title=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var58 string
-				templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(cj.Command)
+				templ_7745c5c3_Var58, templ_7745c5c3_Err = templruntime.NewAttributeExpression(cj.Command).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 539, Col: 22}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 552, Col: 117}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var59 string
+				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(cj.Command)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 553, Col: 22}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "</td><td class=\"px-4 py-3 whitespace-nowrap text-xs\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if cj.LastStatus != nil {
 					if *cj.LastStatus == models.CronJobStatusSuccess {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "<span class=\"inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800\">Success</span> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "<span class=\"inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800\">Success</span> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else if *cj.LastStatus == models.CronJobStatusRunning {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "<span class=\"inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800\">Running</span> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "<span class=\"inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800\">Running</span> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "<span class=\"inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 text-rose-800\">Failed</span> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "<span class=\"inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 text-rose-800\">Failed</span> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "<span class=\"text-gray-400 italic\">Never run</span> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "<span class=\"text-gray-400 italic\">Never run</span> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 				if cj.LastRunAt != nil {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "<span class=\"block text-[11px] text-gray-500 mt-0.5\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "<span class=\"block text-[11px] text-gray-500 mt-0.5\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var59 string
-					templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(cj.LastRunAt.Format("2006-01-02 15:04:05"))
+					var templ_7745c5c3_Var60 string
+					templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(cj.LastRunAt.Format("2006-01-02 15:04:05"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 554, Col: 108}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 568, Col: 108}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "</td><td class=\"px-4 py-3 text-xs font-mono text-gray-500 max-w-xs truncate\" title=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "</td><td class=\"px-4 py-3 text-xs font-mono text-gray-500 max-w-xs truncate\" title=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var60 string
-				templ_7745c5c3_Var60, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(cj.LastOutput, "")).Resolve(ctx)
+				var templ_7745c5c3_Var61 string
+				templ_7745c5c3_Var61, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(cj.LastOutput, "")).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 557, Col: 117}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 571, Col: 117}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var60)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var61)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if cj.LastOutput != nil && *cj.LastOutput != "" {
-					var templ_7745c5c3_Var61 string
-					templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(*cj.LastOutput)
+					var templ_7745c5c3_Var62 string
+					templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(*cj.LastOutput)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 559, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 573, Col: 27}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "<span class=\"text-gray-400 italic\">-</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "<span class=\"text-gray-400 italic\">-</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "</td><td class=\"px-4 py-3 whitespace-nowrap text-right text-xs\"><div class=\"flex items-center justify-end gap-1.5\"><!-- Run Now Button --><form action=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var62 string
-				templ_7745c5c3_Var62, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/run")).ResolveURL(ctx)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 567, Col: 99}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var62)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "\" method=\"post\" class=\"inline\" hx-on:htmx:config-request=\"this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Running...'\"><button type=\"submit\" class=\"inline-flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium px-2 py-1 rounded transition-colors\" title=\"Execute command immediately in container\"><svg class=\"w-3 h-3\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z\"></path><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg> Run Now</button></form><!-- Toggle Enabled Button --><form action=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, "</td><td class=\"px-4 py-3 whitespace-nowrap text-right text-xs\"><div class=\"flex items-center justify-end gap-1.5\"><!-- Run Now Button --><form action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var63 string
-				templ_7745c5c3_Var63, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/toggle")).ResolveURL(ctx)
+				templ_7745c5c3_Var63, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/run")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 575, Col: 102}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 581, Col: 99}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if cj.IsEnabled {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, "Disable")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "Enable")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, "</button></form><!-- Delete Button --><form action=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "\" method=\"post\" class=\"inline\" hx-on:htmx:config-request=\"this.querySelector('button').disabled=true;this.querySelector('button').innerHTML='Running...'\"><button type=\"submit\" class=\"inline-flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium px-2 py-1 rounded transition-colors\" title=\"Execute command immediately in container\"><svg class=\"w-3 h-3\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z\"></path><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg> Run Now</button></form><!-- Toggle Enabled Button --><form action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var64 string
-				templ_7745c5c3_Var64, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/delete")).ResolveURL(ctx)
+				templ_7745c5c3_Var64, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/toggle")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 585, Col: 102}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 589, Col: 102}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var64)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs text-rose-600 hover:text-rose-800 px-1.5 py-1\">Delete</button></form></div></td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if cj.IsEnabled {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "Disable")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "Enable")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "</button></form><!-- Delete Button --><form action=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var65 string
+				templ_7745c5c3_Var65, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/cron-jobs/" + cj.ID + "/delete")).ResolveURL(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 599, Col: 102}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var65)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs text-rose-600 hover:text-rose-800 px-1.5 py-1\">Delete</button></form></div></td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "</tbody></table></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "</div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Environment Variables</h2><form action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "</div><div class=\"mt-6 bg-white rounded-lg shadow border border-gray-200 p-6\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Environment Variables</h2><form action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var65 string
-		templ_7745c5c3_Var65, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars")).ResolveURL(ctx)
+		var templ_7745c5c3_Var66 string
+		templ_7745c5c3_Var66, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 600, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 614, Col: 72}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var65)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var66)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "\" method=\"post\" class=\"mb-4 flex gap-2\"><input type=\"text\" name=\"key\" placeholder=\"KEY\" class=\"border border-gray-300 rounded px-2 py-1 text-sm w-32\" required> <input type=\"text\" name=\"value\" placeholder=\"value\" class=\"border border-gray-300 rounded px-2 py-1 text-sm flex-1\" required> <label class=\"flex items-center text-sm\"><input type=\"checkbox\" name=\"is_secret\" class=\"mr-1\"> Secret</label> <button type=\"submit\" class=\"bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700\">Add</button></form><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Key</th><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Value</th><th class=\"px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "\" method=\"post\" class=\"mb-4 flex gap-2\"><input type=\"text\" name=\"key\" placeholder=\"KEY\" class=\"border border-gray-300 rounded px-2 py-1 text-sm w-32\" required> <input type=\"text\" name=\"value\" placeholder=\"value\" class=\"border border-gray-300 rounded px-2 py-1 text-sm flex-1\" required> <label class=\"flex items-center text-sm\"><input type=\"checkbox\" name=\"is_secret\" class=\"mr-1\"> Secret</label> <button type=\"submit\" class=\"bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700\">Add</button></form><table class=\"min-w-full divide-y divide-gray-200\"><thead class=\"bg-gray-50\"><tr><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Key</th><th class=\"px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase\">Value</th><th class=\"px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase\">Action</th></tr></thead> <tbody class=\"bg-white divide-y divide-gray-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, envVar := range envVars {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "<tr><td class=\"px-4 py-2 text-sm text-gray-900\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "<tr><td class=\"px-4 py-2 text-sm text-gray-900\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var66 string
-			templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Key)
+			var templ_7745c5c3_Var67 string
+			templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Key)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 620, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 634, Col: 63}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "</td><td class=\"px-4 py-2 text-sm text-gray-500\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "</td><td class=\"px-4 py-2 text-sm text-gray-500\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if envVar.IsSecret {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "••••••••")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, "••••••••")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				var templ_7745c5c3_Var67 string
-				templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Value)
+				var templ_7745c5c3_Var68 string
+				templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(envVar.Value)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 625, Col: 23}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 639, Col: 23}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "</td><td class=\"px-4 py-2 text-right\"><form action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "</td><td class=\"px-4 py-2 text-right\"><form action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var68 string
-			templ_7745c5c3_Var68, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete")).ResolveURL(ctx)
+			var templ_7745c5c3_Var69 string
+			templ_7745c5c3_Var69, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/env-vars/" + envVar.ID + "/delete")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 629, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 643, Col: 102}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var68)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var69)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-red-600 hover:text-red-900 text-sm\">Delete</button></form></td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 127, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-red-600 hover:text-red-900 text-sm\">Delete</button></form></td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, "</tbody></table></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 128, "</tbody></table></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1328,7 +1352,7 @@ func ApplicationCreatePage() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 129, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Target Server ID</label> <input type=\"text\" name=\"server_id\" placeholder=\"local (or remote server ID)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><p class=\"text-xs text-gray-400 mt-1\">Kosongkan untuk deploy ke Docker host lokal (\"local\"), atau masukkan ID server remote dari Settings &rarr; Servers.</p></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

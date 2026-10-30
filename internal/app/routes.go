@@ -85,6 +85,14 @@ func SetupRoutes(c *Container) http.Handler {
 		c.AuthMod.RegisterProtectedRoutes(r)
 		c.NotificationsMod.RegisterRoutes(r)
 		c.SettingsMod.RegisterRoutes(r)
+
+		if c.ServersHandler != nil {
+			r.Get("/settings/servers", c.ServersHandler.List)
+			r.Get("/settings/servers/new", c.ServersHandler.CreateForm)
+			r.Post("/settings/servers", c.ServersHandler.Create)
+			r.Post("/settings/servers/{id}/test", c.ServersHandler.Test)
+			r.Post("/settings/servers/{id}/delete", c.ServersHandler.Delete)
+		}
 	})
 
 	c.ApplicationsMod.RegisterPublicRoutes(r)

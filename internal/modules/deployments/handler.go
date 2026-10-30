@@ -197,6 +197,7 @@ func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 			EnvVars:       envList,
 			LogPath:       logPath,
 			Priority:      0, // High priority untuk instant rollback
+			ServerID:      app.ServerID,
 		}
 
 		// Jika image tersedia di cache, deploy langsung via docker_image tanpa re-build

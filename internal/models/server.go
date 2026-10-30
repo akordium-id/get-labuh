@@ -11,22 +11,24 @@ const (
 )
 
 type Server struct {
-	ID         string
-	Name       string
-	Host       string
-	Port       int
-	SSHUser    string
-	SSHKeyPath string
-	Status     ServerStatus
-	LastSeen   *time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID            string
+	Name          string
+	Host          string
+	Port          int
+	SSHUser       string
+	SSHKeyPath    string
+	SSHKeyContent *string
+	Status        ServerStatus
+	LastSeen      *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type CreateServerInput struct {
-	Name       string
-	Host       string
-	Port       int
-	SSHUser    string
-	SSHKeyPath string
+	Name          string
+	Host          string
+	Port          int
+	SSHUser       string
+	SSHKeyPath    string
+	SSHKeyContent *string
 }

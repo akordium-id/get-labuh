@@ -38,6 +38,7 @@ type Application struct {
 	AppPort            int
 	ContainerID        *string
 	ContainerName      *string
+	ServerID           *string
 	Status             AppStatus
 	WebhookSecret      *string
 	CPULimit           *float64
@@ -53,6 +54,7 @@ type Application struct {
 
 type CreateApplicationInput struct {
 	EnvironmentID      string
+	ServerID           *string
 	Name               string
 	Slug               string
 	SourceType         SourceType

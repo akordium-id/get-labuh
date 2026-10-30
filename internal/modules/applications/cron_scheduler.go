@@ -40,9 +40,7 @@ func NewCronScheduler(cronRepo *CronJobRepo, appRepo *Repo, envVarRepo *EnvVarRe
 }
 
 func (s *CronScheduler) Start() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
@@ -54,7 +52,7 @@ func (s *CronScheduler) Start() {
 				s.checkAndTriggerJobs(now)
 			}
 		}
-	}()
+	})
 	slog.Info("application cron scheduler started")
 }
 

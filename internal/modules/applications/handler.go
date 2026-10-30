@@ -139,6 +139,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	repoURL := r.FormValue("repository_url")
 	branch := r.FormValue("branch")
 	dockerImage := r.FormValue("docker_image")
+	serverID := strings.TrimSpace(r.FormValue("server_id"))
 	appPort, _ := strconv.Atoi(r.FormValue("app_port"))
 	if appPort == 0 {
 		appPort = 8080
@@ -158,6 +159,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if dockerImage != "" {
 		dockerImagePtr = &dockerImage
 	}
+	var serverIDPtr *string
+	if serverID != "" {
+		serverIDPtr = &serverID
+	}
 
 	_, err := h.appRepo.CreateWithContext(r.Context(), models.CreateApplicationInput{
 		EnvironmentID: envID,
@@ -168,6 +173,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Branch:        branchPtr,
 		DockerImage:   dockerImagePtr,
 		AppPort:       appPort,
+		ServerID:      serverIDPtr,
 	})
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

@@ -37,6 +37,8 @@ type Container struct {
 	MonitoringHandler    *handler.MonitoringHandler
 	TemplatesHandler     *handler.TemplatesHandler
 	TerminalHandler      *handler.TerminalHandler
+	ServersHandler       *handler.ServersHandler
+	DockerPool           *docker.ClientPool
 	ProjectsMod          *projectsmod.Module
 	NotificationsMod     *notifications.Module
 	SettingsMod          *settingsmod.Module
@@ -48,6 +50,7 @@ type Container struct {
 	AppRepo    *repo.ApplicationRepo
 	DeployRepo *repo.DeploymentRepo
 	AuditRepo  *repo.AuditLogRepo
+	ServerRepo *repo.ServerRepo
 
 	DeployWorker    *worker.DeployWorker
 	BackupScheduler *backup.BackupScheduler
@@ -72,6 +75,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	storageRepo := repo.NewStorageDestinationRepo(db)
 	databaseBackupRepo := repo.NewDatabaseBackupRepo(db)
 	notificationsMod := notifications.New(db, projectRepo)
+	serverRepo := repo.NewServerRepo(db)
 
 	_ = settingRepo.InitializeDefaults()
 	_ = encryption.Init(cfg.MasterKeyEnv)
@@ -89,6 +93,8 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
 	}
+
+	dockerPool := docker.NewClientPool(dockerClient, serverRepo)
 
 	projectsMod := projectsmod.New(db, userRepo)
 	composeMod := composemod.New(db, caddyClient, settingsMod.SettingRepo)
@@ -114,12 +120,14 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
+	serversHandler := handler.NewServersHandler(serverRepo)
+	serversHandler.SetDockerPool(dockerPool)
 
 	deployWorker := worker.NewDeployWorker(10)
 	deployWorker.SetMaxConcurrent(3)
 	deployWorker.SetWorkerCount(1)
 	deployWorker.SetNotifier(notificationsMod.Notifier, projectRepo)
-	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
+	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo, dockerPool)
 
 	applicationsMod.SetDeployWorker(deployWorker)
 	deploymentsMod.SetDeployWorker(deployWorker)
@@ -140,6 +148,8 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		MonitoringHandler:     monitoringHandler,
 		TemplatesHandler:      templatesHandler,
 		TerminalHandler:       terminalHandler,
+		ServersHandler:        serversHandler,
+		DockerPool:            dockerPool,
 		ProjectsMod:           projectsMod,
 		NotificationsMod:      notificationsMod,
 		SettingsMod:           settingsMod,
@@ -149,6 +159,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		AppRepo:               appRepo,
 		DeployRepo:            deployRepo,
 		AuditRepo:             auditRepo,
+		ServerRepo:            serverRepo,
 		DeployWorker:          deployWorker,
 		BackupScheduler:       backupScheduler,
 	}, nil

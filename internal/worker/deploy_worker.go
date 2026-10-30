@@ -59,8 +59,11 @@ func (w *DeployWorker) SetWorkerCount(count int) {
 	}
 }
 
-func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, appRepo *repo.ApplicationRepo, deployRepo *repo.DeploymentRepo) {
+func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, appRepo *repo.ApplicationRepo, deployRepo *repo.DeploymentRepo, dockerPool *docker.ClientPool) {
 	pipeline := deploy.NewPipeline(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
+	if dockerPool != nil {
+		pipeline.SetDockerPool(dockerPool)
+	}
 
 	if w.semaphore == nil {
 		w.semaphore = make(chan struct{}, w.maxConcurrent)
@@ -89,6 +92,7 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 						EnvVars:        job.EnvVars,
 						LogPath:        job.LogPath,
 						Priority:       job.Priority,
+						ServerID:       job.ServerID,
 					}
 					err := pipeline.Execute(jobCtx, deployJob)
 					cancel()
@@ -210,6 +214,7 @@ func BuildDeploymentJob(app *models.Application, deploymentID string, envVars []
 		EnvVars:        envList,
 		LogPath:        "/tmp/labuh-logs/" + deploymentID + ".log",
 		Priority:       1,
+		ServerID:       app.ServerID,
 	}
 }
 

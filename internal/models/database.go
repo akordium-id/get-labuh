@@ -33,6 +33,7 @@ type DatabaseService struct {
 	Port              int
 	ContainerID       *string
 	ContainerName     *string
+	ServerID          *string
 	Status            DatabaseStatus
 	ConnectionString  *string
 	CPULimit          *float64
@@ -44,6 +45,7 @@ type DatabaseService struct {
 
 type CreateDatabaseServiceInput struct {
 	EnvironmentID     string
+	ServerID          *string
 	Name              string
 	Slug              string
 	Engine            DatabaseEngine

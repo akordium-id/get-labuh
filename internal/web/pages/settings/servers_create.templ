@@ -28,9 +28,14 @@ templ ServerCreatePage() {
 					<input type="text" id="ssh_user" name="ssh_user" value="root" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
 				</div>
 				<div>
-					<label for="ssh_key_path" class="block text-sm font-medium text-gray-700">SSH Key Path</label>
-					<input type="text" id="ssh_key_path" name="ssh_key_path" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="/root/.ssh/id_rsa">
-					<p class="mt-1 text-sm text-red-600 hidden" id="ssh_key_path-error">SSH Key Path is required</p>
+					<label for="ssh_key_path" class="block text-sm font-medium text-gray-700">SSH Key Path (Local to host)</label>
+					<input type="text" id="ssh_key_path" name="ssh_key_path" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="/root/.ssh/id_rsa">
+					<p class="text-xs text-gray-400 mt-1">Opsional jika Private Key ditempel di bawah.</p>
+				</div>
+				<div>
+					<label for="ssh_key_content" class="block text-sm font-medium text-gray-700">SSH Private Key (Direct Paste)</label>
+					<textarea id="ssh_key_content" name="ssh_key_content" rows="4" class="mt-1 block w-full rounded-md border-gray-300 font-mono text-xs shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."></textarea>
+					<p class="text-xs text-gray-400 mt-1">Tempel private key OpenSSH/RSA jika tidak menggunakan file path lokal server.</p>
 				</div>
 				<div class="flex justify-end">
 					<a href="/settings/servers" class="text-gray-600 hover:text-gray-900 mr-4">Cancel</a>

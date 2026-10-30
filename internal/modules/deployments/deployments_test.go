@@ -53,18 +53,14 @@ func setupTestModule(t *stdtesting.T) (*Module, *Repo, *Handler) {
 	return mod, mod.Repo, mod.Handler
 }
 
-func ptrString(s string) *string {
-	return &s
-}
-
 func TestDeploymentRepo_CRUD(t *stdtesting.T) {
 	_, repo, _ := setupTestModule(t)
 
 	// Create
 	deploy, err := repo.CreateWithContext(context.Background(), models.CreateDeploymentInput{
 		ApplicationID: "app-1",
-		CommitHash:    ptrString("abc1234"),
-		CommitMessage: ptrString("initial commit"),
+		CommitHash:    new("abc1234"),
+		CommitMessage: new("initial commit"),
 	})
 	require.NoError(t, err)
 	assert.NotEmpty(t, deploy.ID)
@@ -114,9 +110,9 @@ func TestDeploymentsHandler_StartAndRollback(t *stdtesting.T) {
 	// Create initial successful deployment with cached image
 	deploy1, err := repo.CreateWithContext(context.Background(), models.CreateDeploymentInput{
 		ApplicationID: "app-1",
-		CommitHash:    ptrString("commit-v1"),
-		CommitMessage: ptrString("v1 stable"),
-		ImageName:     ptrString("labuh-app-1:v1-stable"),
+		CommitHash:    new("commit-v1"),
+		CommitMessage: new("v1 stable"),
+		ImageName:     new("labuh-app-1:v1-stable"),
 	})
 	require.NoError(t, err)
 	require.NoError(t, repo.UpdateStatusWithContext(context.Background(), deploy1.ID, models.DeployStatusSuccess))
@@ -124,8 +120,8 @@ func TestDeploymentsHandler_StartAndRollback(t *stdtesting.T) {
 	// Create failed deployment
 	deploy2, err := repo.CreateWithContext(context.Background(), models.CreateDeploymentInput{
 		ApplicationID: "app-1",
-		CommitHash:    ptrString("commit-v2"),
-		CommitMessage: ptrString("v2 broken"),
+		CommitHash:    new("commit-v2"),
+		CommitMessage: new("v2 broken"),
 	})
 	require.NoError(t, err)
 	require.NoError(t, repo.UpdateStatusWithContext(context.Background(), deploy2.ID, models.DeployStatusFailed))

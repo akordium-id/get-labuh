@@ -31,6 +31,7 @@ type DeploymentJob struct {
 	EnvVars        []models.AppEnvVar
 	LogPath        string
 	Priority       int
+	ServerID       *string
 	AppSlug        string
 	CustomDomain   *string
 	ExtraLogWriter io.Writer
@@ -46,6 +47,7 @@ type ComposeJob struct {
 
 type Pipeline struct {
 	dockerClient *docker.Client
+	dockerPool   *docker.ClientPool
 	caddyClient  *caddy.Client
 	settingRepo  *repo.SettingRepo
 	appRepo      *repo.ApplicationRepo
@@ -60,6 +62,10 @@ func NewPipeline(dockerClient *docker.Client, caddyClient *caddy.Client, setting
 		appRepo:      appRepo,
 		deployRepo:   deployRepo,
 	}
+}
+
+func (p *Pipeline) SetDockerPool(pool *docker.ClientPool) {
+	p.dockerPool = pool
 }
 
 func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
@@ -97,6 +103,20 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	writeLog(activeLogWriter, "Starting deployment pipeline...")
 	if p.deployRepo != nil {
 		_ = p.deployRepo.MarkStarted(job.DeploymentID)
+	}
+
+	targetDockerClient := p.dockerClient
+	if p.dockerPool != nil && job.ServerID != nil && *job.ServerID != "" && *job.ServerID != "local" {
+		writeLog(activeLogWriter, fmt.Sprintf("Routing deployment to target remote server (ID: %s)...", *job.ServerID))
+		cli, err := p.dockerPool.GetClient(ctx, job.ServerID)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to connect to remote server docker daemon: %v", err)
+			writeLog(activeLogWriter, errMsg)
+			updateStep("init", models.DeployStatusFailed, errMsg)
+			return &DeployError{Step: "init", Cause: err, Output: errMsg}
+		}
+		targetDockerClient = cli
+		writeLog(activeLogWriter, "Successfully connected to remote Docker daemon via SSH tunnel.")
 	}
 
 	var imageName string
@@ -386,10 +406,10 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	}
 
 	// Blue-Green container naming: generate candidate container name with timestamp
-	candidateName := fmt.Sprintf("%s-%d", p.dockerClient.GenerateContainerName("prod", appSlug, job.ApplicationID), time.Now().Unix())
+	candidateName := fmt.Sprintf("%s-%d", targetDockerClient.GenerateContainerName("prod", appSlug, job.ApplicationID), time.Now().Unix())
 	writeLog(activeLogWriter, fmt.Sprintf("Launching new candidate container (%s)...", candidateName))
 
-	candidateContainerID, err := p.dockerClient.RunContainerWithCustomName(ctx, job.ApplicationID, candidateName, imageName, appPort, dockerEnvVars, resLimits)
+	candidateContainerID, err := targetDockerClient.RunContainerWithCustomName(ctx, job.ApplicationID, candidateName, imageName, appPort, dockerEnvVars, resLimits)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to run candidate container: %v", err)
 		writeLog(activeLogWriter, errMsg)
@@ -401,11 +421,11 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	updateStep("healthcheck", models.DeployStatusDeploying, "")
 
 	// Healthcheck gate: wait for container to answer on healthcheckPath or stay running
-	if err := p.dockerClient.WaitForHealthCustom(ctx, candidateContainerID, appPort, healthcheckPath, healthcheckTimeout); err != nil {
+	if err := targetDockerClient.WaitForHealthCustom(ctx, candidateContainerID, appPort, healthcheckPath, healthcheckTimeout); err != nil {
 		errMsg := fmt.Sprintf("Healthcheck failed for candidate container: %v. Rolling back...", err)
 		writeLog(activeLogWriter, errMsg)
-		_ = p.dockerClient.StopContainer(ctx, candidateContainerID, 5)
-		_ = p.dockerClient.RemoveContainer(ctx, candidateContainerID)
+		_ = targetDockerClient.StopContainer(ctx, candidateContainerID, 5)
+		_ = targetDockerClient.RemoveContainer(ctx, candidateContainerID)
 		updateStep("healthcheck", models.DeployStatusFailed, errMsg)
 		return &DeployError{Step: "healthcheck", Cause: err, Output: errMsg}
 	}
@@ -430,8 +450,8 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	// Zero-Downtime Cleanup: Stop and remove old container only after candidate is healthy and live
 	if oldContainerID != "" && oldContainerID != candidateContainerID {
 		writeLog(activeLogWriter, fmt.Sprintf("Stopping previous container (%s)...", oldContainerID))
-		_ = p.dockerClient.StopContainer(ctx, oldContainerID, 10)
-		_ = p.dockerClient.RemoveContainer(ctx, oldContainerID)
+		_ = targetDockerClient.StopContainer(ctx, oldContainerID, 10)
+		_ = targetDockerClient.RemoveContainer(ctx, oldContainerID)
 		writeLog(activeLogWriter, "Previous container stopped and cleaned up")
 	}
 
@@ -445,14 +465,14 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	}
 
 	// Retention policy: Cache 5 image sukses terakhir per aplikasi (seperti Coolify)
-	p.pruneOldCachedImages(ctx, job.ApplicationID, imageName, activeLogWriter)
+	p.pruneOldCachedImages(ctx, targetDockerClient, job.ApplicationID, imageName, activeLogWriter)
 
 	return nil
 }
 
 // pruneOldCachedImages membersihkan image docker lama milik aplikasi dengan mempertahankan 5 image sukses terbaru.
-func (p *Pipeline) pruneOldCachedImages(ctx context.Context, appID, currentImage string, logWriter logging.LogWriter) {
-	if p.deployRepo == nil || p.dockerClient == nil {
+func (p *Pipeline) pruneOldCachedImages(ctx context.Context, dockerClient *docker.Client, appID, currentImage string, logWriter logging.LogWriter) {
+	if p.deployRepo == nil || dockerClient == nil {
 		return
 	}
 
@@ -471,9 +491,9 @@ func (p *Pipeline) pruneOldCachedImages(ctx context.Context, appID, currentImage
 		keepSet[currentImage] = true
 	}
 
-	// Cari semua image lokal yang memiliki prefix labuh-<appID>:
+	// Cari semua image yang memiliki prefix labuh-<appID>:
 	prefix := fmt.Sprintf("labuh-%s:", appID)
-	localImages, err := p.dockerClient.ListImagesByPrefix(ctx, prefix)
+	localImages, err := dockerClient.ListImagesByPrefix(ctx, prefix)
 	if err != nil {
 		writeLog(logWriter, fmt.Sprintf("Warning: failed to list images for retention prune: %v", err))
 		return
@@ -482,7 +502,7 @@ func (p *Pipeline) pruneOldCachedImages(ctx context.Context, appID, currentImage
 	for _, localImg := range localImages {
 		if !keepSet[localImg] {
 			writeLog(logWriter, fmt.Sprintf("Pruning older cached image to free space: %s", localImg))
-			if err := p.dockerClient.RemoveImage(ctx, localImg); err != nil {
+			if err := dockerClient.RemoveImage(ctx, localImg); err != nil {
 				writeLog(logWriter, fmt.Sprintf("Notice: could not remove image %s (might be in use): %v", localImg, err))
 			}
 		}

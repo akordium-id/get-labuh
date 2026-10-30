@@ -25,4 +25,5 @@ type DeploymentJob struct {
 	EnvVars        []AppEnvVar
 	LogPath        string
 	Priority       int
+	ServerID       *string
 }

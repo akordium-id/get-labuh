@@ -40,5 +40,6 @@ func BuildDeploymentJob(app *models.Application, deploymentID string, envVars []
 		EnvVars:        envList,
 		LogPath:        "/tmp/labuh-logs/" + deploymentID + ".log",
 		Priority:       1,
+		ServerID:       app.ServerID,
 	}
 }

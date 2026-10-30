@@ -43,6 +43,7 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateApplica
 		HealthcheckTimeout: input.HealthcheckTimeout,
 		BasicAuthUser:      input.BasicAuthUser,
 		BasicAuthPassword:  input.BasicAuthPassword,
+		ServerID:           input.ServerID,
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
 	}
@@ -84,9 +85,9 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateApplica
 
 	_, err := r.db.ExecContext(
 		ctx,
-		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, input.CPULimit, input.MemoryLimit, input.MemoryReservation, app.HealthcheckPath, app.HealthcheckTimeout, app.BasicAuthUser, app.BasicAuthPassword, app.CreatedAt, app.UpdatedAt,
+		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, input.CPULimit, input.MemoryLimit, input.MemoryReservation, app.HealthcheckPath, app.HealthcheckTimeout, app.BasicAuthUser, app.BasicAuthPassword, app.ServerID, app.CreatedAt, app.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -108,10 +109,10 @@ func (r *Repo) GetByIDWithContext(ctx context.Context, id string) (*models.Appli
 	app := &models.Application{}
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE id = ?`,
 		id,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -128,10 +129,10 @@ func (r *Repo) GetBySlugWithContext(ctx context.Context, envID, slug string) (*m
 	app := &models.Application{}
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE environment_id = ? AND slug = ?`,
 		envID, slug,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -148,10 +149,10 @@ func (r *Repo) GetByContainerNameWithContext(ctx context.Context, containerName 
 	app := &models.Application{}
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE container_name = ?`,
 		containerName,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +168,7 @@ func (r *Repo) GetByContainerName(containerName string) (*models.Application, er
 func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) ([]*models.Application, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC`,
 		envID,
 	)
@@ -179,7 +180,7 @@ func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) 
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +198,7 @@ func (r *Repo) GetByEnvironmentID(envID string) ([]*models.Application, error) {
 func (r *Repo) GetAllWithContext(ctx context.Context) ([]*models.Application, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -208,7 +209,7 @@ func (r *Repo) GetAllWithContext(ctx context.Context) ([]*models.Application, er
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -232,7 +233,7 @@ func (r *Repo) GetByEnvironmentIDPaginatedWithContext(ctx context.Context, envID
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, limit, offset,
 	)
@@ -244,7 +245,7 @@ func (r *Repo) GetByEnvironmentIDPaginatedWithContext(ctx context.Context, envID
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -269,7 +270,7 @@ func (r *Repo) SearchPaginatedWithContext(ctx context.Context, envID, search str
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, searchPattern, searchPattern, limit, offset,
 	)
@@ -281,7 +282,7 @@ func (r *Repo) SearchPaginatedWithContext(ctx context.Context, envID, search str
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -299,7 +300,7 @@ func (r *Repo) SearchPaginated(envID, search string, limit, offset int) ([]*mode
 func (r *Repo) GetByStatusWithContext(ctx context.Context, status models.AppStatus) ([]*models.Application, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE status = ? ORDER BY created_at DESC`,
 		status,
 	)
@@ -311,7 +312,7 @@ func (r *Repo) GetByStatusWithContext(ctx context.Context, status models.AppStat
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -330,10 +331,10 @@ func (r *Repo) GetByCustomDomainWithContext(ctx context.Context, domain string) 
 	app := &models.Application{}
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, created_at, updated_at
+		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
 		 FROM applications WHERE custom_domain = ?`,
 		domain,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.CreatedAt, &app.UpdatedAt)
+	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
