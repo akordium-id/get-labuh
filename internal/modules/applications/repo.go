@@ -82,12 +82,17 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateApplica
 
 	containerName := generateContainerName("env", app.Slug, app.ID)
 	app.ContainerName = &containerName
+	app.ParentAppID = input.ParentAppID
+	app.PRNumber = input.PRNumber
+	app.IsPreview = input.IsPreview
+	app.PreviewTemplateDomain = input.PreviewTemplateDomain
+	app.PRPreviewsEnabled = input.PRPreviewsEnabled
 
 	_, err := r.db.ExecContext(
 		ctx,
-		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, input.CPULimit, input.MemoryLimit, input.MemoryReservation, app.HealthcheckPath, app.HealthcheckTimeout, app.BasicAuthUser, app.BasicAuthPassword, app.ServerID, app.CreatedAt, app.UpdatedAt,
+		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, parent_app_id, pr_number, is_preview, preview_template_domain, pr_previews_enabled, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, input.CPULimit, input.MemoryLimit, input.MemoryReservation, app.HealthcheckPath, app.HealthcheckTimeout, app.BasicAuthUser, app.BasicAuthPassword, app.ServerID, app.ParentAppID, app.PRNumber, app.IsPreview, app.PreviewTemplateDomain, app.PRPreviewsEnabled, app.CreatedAt, app.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -104,16 +109,29 @@ func (r *Repo) Create(input models.CreateApplicationInput) (*models.Application,
 	return r.CreateWithContext(context.Background(), input)
 }
 
+const applicationColumns = `id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, parent_app_id, pr_number, is_preview, preview_template_domain, pr_previews_enabled, created_at, updated_at`
+
+func scanApplication(scanner interface{ Scan(dest ...any) error }, app *models.Application) error {
+	return scanner.Scan(
+		&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType,
+		&app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage,
+		&app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status,
+		&app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation,
+		&app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword,
+		&app.ServerID, &app.ParentAppID, &app.PRNumber, &app.IsPreview, &app.PreviewTemplateDomain,
+		&app.PRPreviewsEnabled, &app.CreatedAt, &app.UpdatedAt,
+	)
+}
+
 // GetByIDWithContext mengambil aplikasi berdasarkan ID dengan context.
 func (r *Repo) GetByIDWithContext(ctx context.Context, id string) (*models.Application, error) {
 	app := &models.Application{}
-	err := r.db.QueryRowContext(
+	row := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE id = ?`,
+		`SELECT `+applicationColumns+` FROM applications WHERE id = ?`,
 		id,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-	if err != nil {
+	)
+	if err := scanApplication(row, app); err != nil {
 		return nil, err
 	}
 
@@ -127,13 +145,12 @@ func (r *Repo) GetByID(id string) (*models.Application, error) {
 // GetBySlugWithContext mengambil aplikasi berdasarkan environment dan slug dengan context.
 func (r *Repo) GetBySlugWithContext(ctx context.Context, envID, slug string) (*models.Application, error) {
 	app := &models.Application{}
-	err := r.db.QueryRowContext(
+	row := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE environment_id = ? AND slug = ?`,
+		`SELECT `+applicationColumns+` FROM applications WHERE environment_id = ? AND slug = ?`,
 		envID, slug,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-	if err != nil {
+	)
+	if err := scanApplication(row, app); err != nil {
 		return nil, err
 	}
 
@@ -147,13 +164,12 @@ func (r *Repo) GetBySlug(envID, slug string) (*models.Application, error) {
 // GetByContainerNameWithContext mengambil aplikasi berdasarkan nama container dengan context.
 func (r *Repo) GetByContainerNameWithContext(ctx context.Context, containerName string) (*models.Application, error) {
 	app := &models.Application{}
-	err := r.db.QueryRowContext(
+	row := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE container_name = ?`,
+		`SELECT `+applicationColumns+` FROM applications WHERE container_name = ?`,
 		containerName,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-	if err != nil {
+	)
+	if err := scanApplication(row, app); err != nil {
 		return nil, err
 	}
 
@@ -168,8 +184,7 @@ func (r *Repo) GetByContainerName(containerName string) (*models.Application, er
 func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) ([]*models.Application, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC`,
+		`SELECT `+applicationColumns+` FROM applications WHERE environment_id = ? ORDER BY created_at DESC`,
 		envID,
 	)
 	if err != nil {
@@ -180,8 +195,7 @@ func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) 
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-		if err != nil {
+		if err := scanApplication(rows, app); err != nil {
 			return nil, err
 		}
 		apps = append(apps, app)
@@ -198,8 +212,7 @@ func (r *Repo) GetByEnvironmentID(envID string) ([]*models.Application, error) {
 func (r *Repo) GetAllWithContext(ctx context.Context) ([]*models.Application, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications ORDER BY created_at DESC`,
+		`SELECT `+applicationColumns+` FROM applications ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -209,8 +222,7 @@ func (r *Repo) GetAllWithContext(ctx context.Context) ([]*models.Application, er
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-		if err != nil {
+		if err := scanApplication(rows, app); err != nil {
 			return nil, err
 		}
 		apps = append(apps, app)
@@ -233,8 +245,7 @@ func (r *Repo) GetByEnvironmentIDPaginatedWithContext(ctx context.Context, envID
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE environment_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		`SELECT `+applicationColumns+` FROM applications WHERE environment_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, limit, offset,
 	)
 	if err != nil {
@@ -245,8 +256,7 @@ func (r *Repo) GetByEnvironmentIDPaginatedWithContext(ctx context.Context, envID
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-		if err != nil {
+		if err := scanApplication(rows, app); err != nil {
 			return nil, 0, err
 		}
 		apps = append(apps, app)
@@ -270,8 +280,7 @@ func (r *Repo) SearchPaginatedWithContext(ctx context.Context, envID, search str
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		`SELECT `+applicationColumns+` FROM applications WHERE environment_id = ? AND (name LIKE ? OR slug LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		envID, searchPattern, searchPattern, limit, offset,
 	)
 	if err != nil {
@@ -282,8 +291,7 @@ func (r *Repo) SearchPaginatedWithContext(ctx context.Context, envID, search str
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-		if err != nil {
+		if err := scanApplication(rows, app); err != nil {
 			return nil, 0, err
 		}
 		apps = append(apps, app)
@@ -300,8 +308,7 @@ func (r *Repo) SearchPaginated(envID, search string, limit, offset int) ([]*mode
 func (r *Repo) GetByStatusWithContext(ctx context.Context, status models.AppStatus) ([]*models.Application, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE status = ? ORDER BY created_at DESC`,
+		`SELECT `+applicationColumns+` FROM applications WHERE status = ? ORDER BY created_at DESC`,
 		status,
 	)
 	if err != nil {
@@ -312,8 +319,7 @@ func (r *Repo) GetByStatusWithContext(ctx context.Context, status models.AppStat
 	var apps []*models.Application
 	for rows.Next() {
 		app := &models.Application{}
-		err := rows.Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-		if err != nil {
+		if err := scanApplication(rows, app); err != nil {
 			return nil, err
 		}
 		apps = append(apps, app)
@@ -329,13 +335,12 @@ func (r *Repo) GetByStatus(status models.AppStatus) ([]*models.Application, erro
 // GetByCustomDomainWithContext mengambil aplikasi berdasarkan domain dengan context.
 func (r *Repo) GetByCustomDomainWithContext(ctx context.Context, domain string) (*models.Application, error) {
 	app := &models.Application{}
-	err := r.db.QueryRowContext(
+	row := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, created_at, updated_at
-		 FROM applications WHERE custom_domain = ?`,
+		`SELECT `+applicationColumns+` FROM applications WHERE custom_domain = ?`,
 		domain,
-	).Scan(&app.ID, &app.EnvironmentID, &app.Name, &app.Slug, &app.SourceType, &app.RepositoryURL, &app.Branch, &app.BuildPath, &app.DockerfilePath, &app.DockerImage, &app.CustomDomain, &app.AppPort, &app.ContainerID, &app.ContainerName, &app.Status, &app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation, &app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword, &app.ServerID, &app.CreatedAt, &app.UpdatedAt)
-	if err != nil {
+	)
+	if err := scanApplication(row, app); err != nil {
 		return nil, err
 	}
 
@@ -478,6 +483,67 @@ func (r *Repo) UpdateWebhookSecretWithContext(ctx context.Context, id string, se
 
 func (r *Repo) UpdateWebhookSecret(id string, secret *string) error {
 	return r.UpdateWebhookSecretWithContext(context.Background(), id, secret)
+}
+
+// UpdatePRPreviewsConfigWithContext memperbarui konfigurasi PR previews aplikasi.
+func (r *Repo) UpdatePRPreviewsConfigWithContext(ctx context.Context, id string, enabled bool, templateDomain *string) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE applications SET pr_previews_enabled = ?, preview_template_domain = ?, updated_at = ? WHERE id = ?`,
+		enabled, templateDomain, time.Now(), id,
+	)
+	return err
+}
+
+func (r *Repo) UpdatePRPreviewsConfig(id string, enabled bool, templateDomain *string) error {
+	return r.UpdatePRPreviewsConfigWithContext(context.Background(), id, enabled, templateDomain)
+}
+
+// GetByParentAndPR mengambil aplikasi preview berdasarkan parent ID dan nomor PR.
+func (r *Repo) GetByParentAndPRWithContext(ctx context.Context, parentID string, prNumber int) (*models.Application, error) {
+	app := &models.Application{}
+	row := r.db.QueryRowContext(
+		ctx,
+		`SELECT `+applicationColumns+` FROM applications WHERE parent_app_id = ? AND pr_number = ?`,
+		parentID, prNumber,
+	)
+	if err := scanApplication(row, app); err != nil {
+		return nil, err
+	}
+
+	return app, nil
+}
+
+func (r *Repo) GetByParentAndPR(parentID string, prNumber int) (*models.Application, error) {
+	return r.GetByParentAndPRWithContext(context.Background(), parentID, prNumber)
+}
+
+// ListPreviewsWithContext mengambil seluruh preview application aktif dari sebuah parent application.
+func (r *Repo) ListPreviewsWithContext(ctx context.Context, parentID string) ([]*models.Application, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT `+applicationColumns+` FROM applications WHERE parent_app_id = ? ORDER BY pr_number DESC`,
+		parentID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var apps []*models.Application
+	for rows.Next() {
+		app := &models.Application{}
+		if err := scanApplication(rows, app); err != nil {
+			return nil, err
+		}
+		apps = append(apps, app)
+	}
+
+	return apps, rows.Err()
+}
+
+func (r *Repo) ListPreviews(parentID string) ([]*models.Application, error) {
+	return r.ListPreviewsWithContext(context.Background(), parentID)
 }
 
 // UpdateResourceLimitsWithContext memperbarui batasan CPU dan RAM aplikasi dengan context.

@@ -2,6 +2,9 @@ package applications
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -412,4 +415,160 @@ func TestApplications_CronJobs(t *stdtesting.T) {
 	jobsAfterDelete, err := mod.CronRepo.GetByApplicationIDWithContext(context.Background(), app.ID)
 	require.NoError(t, err)
 	assert.Len(t, jobsAfterDelete, 1)
+}
+
+func TestApplications_PRPreviews(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+
+	// Buat parent app dengan PR previews enabled
+	tmplDomain := "{{app}}-pr-{{pr}}.preview.test"
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID:         "env-1",
+		Name:                  "Core API",
+		Slug:                  "core-api",
+		SourceType:            models.SourceTypeGit,
+		PRPreviewsEnabled:     true,
+		PreviewTemplateDomain: &tmplDomain,
+	})
+	require.NoError(t, err)
+
+	// Tambahkan env var di parent
+	_, err = mod.EnvVarRepo.CreateWithContext(context.Background(), models.CreateAppEnvVarInput{
+		ApplicationID: app.ID,
+		Key:           "APP_KEY",
+		Value:         "base64:secretkey123",
+	})
+	require.NoError(t, err)
+
+	// Helper untuk HMAC GitHub signature
+	signGH := func(body string) string {
+		mac := hmac.New(sha256.New, []byte(*app.WebhookSecret))
+		mac.Write([]byte(body))
+		return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	}
+
+	// 1. Test Webhook GitHub: Pull Request Opened -> Spawn Preview App
+	ghPayload := `{
+		"action": "opened",
+		"number": 42,
+		"pull_request": {
+			"title": "feat: add payment gateway",
+			"head": {
+				"ref": "feature/payments",
+				"sha": "abc123commit"
+			}
+		}
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/github/"+app.ID, strings.NewReader(ghPayload))
+	req.Header.Set("X-GitHub-Event", "pull_request")
+	req.Header.Set("X-Hub-Signature-256", signGH(ghPayload))
+	req.Header.Set("Content-Type", "application/json")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("application_id", app.ID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	mod.Webhooks.GitHub(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// Verifikasi Preview App terbentuk di repo
+	previews, err := mod.Repo.ListPreviewsWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.Len(t, previews, 1)
+	preview := previews[0]
+
+	assert.Equal(t, "Core API (PR #42)", preview.Name)
+	assert.Equal(t, "core-api-pr-42", preview.Slug)
+	assert.True(t, preview.IsPreview)
+	require.NotNil(t, preview.ParentAppID)
+	assert.Equal(t, app.ID, *preview.ParentAppID)
+	require.NotNil(t, preview.PRNumber)
+	assert.Equal(t, 42, *preview.PRNumber)
+	require.NotNil(t, preview.Branch)
+	assert.Equal(t, "feature/payments", *preview.Branch)
+	require.NotNil(t, preview.CustomDomain)
+	assert.Equal(t, "core-api-pr-42.preview.test", *preview.CustomDomain)
+
+	// Verifikasi env vars ter-clone ke preview app
+	previewVars, err := mod.EnvVarRepo.GetByApplicationIDWithContext(context.Background(), preview.ID)
+	require.NoError(t, err)
+	require.Len(t, previewVars, 1)
+	assert.Equal(t, "APP_KEY", previewVars[0].Key)
+	assert.Equal(t, "base64:secretkey123", previewVars[0].Value)
+
+	// 2. Test Webhook GitHub: Pull Request Closed -> Teardown Preview App
+	ghClosePayload := `{
+		"action": "closed",
+		"number": 42,
+		"pull_request": {
+			"title": "feat: add payment gateway",
+			"head": {
+				"ref": "feature/payments",
+				"sha": "abc123commit"
+			}
+		}
+	}`
+	reqClose := httptest.NewRequest(http.MethodPost, "/webhooks/github/"+app.ID, strings.NewReader(ghClosePayload))
+	reqClose.Header.Set("X-GitHub-Event", "pull_request")
+	reqClose.Header.Set("X-Hub-Signature-256", signGH(ghClosePayload))
+	reqClose.Header.Set("Content-Type", "application/json")
+	rctxClose := chi.NewRouteContext()
+	rctxClose.URLParams.Add("application_id", app.ID)
+	reqClose = reqClose.WithContext(context.WithValue(reqClose.Context(), chi.RouteCtxKey, rctxClose))
+
+	recClose := httptest.NewRecorder()
+	mod.Webhooks.GitHub(recClose, reqClose)
+	assert.Equal(t, http.StatusOK, recClose.Code)
+
+	// Verifikasi Preview App terhapus
+	previewsAfterClose, err := mod.Repo.ListPreviewsWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	assert.Empty(t, previewsAfterClose)
+
+	// 3. Test Webhook GitLab: Merge Request Hook -> Spawn & Teardown
+	glPayload := `{
+		"object_kind": "merge_request",
+		"object_attributes": {
+			"iid": 99,
+			"title": "fix: resolve login bug",
+			"source_branch": "fix/login-bug",
+			"action": "open",
+			"last_commit": {
+				"id": "gitlabcommit123",
+				"message": "fix: null check"
+			}
+		}
+	}`
+	reqGL := httptest.NewRequest(http.MethodPost, "/webhooks/gitlab/"+app.ID, strings.NewReader(glPayload))
+	reqGL.Header.Set("X-Gitlab-Event", "Merge Request Hook")
+	reqGL.Header.Set("X-Gitlab-Token", *app.WebhookSecret)
+	reqGL.Header.Set("Content-Type", "application/json")
+	rctxGL := chi.NewRouteContext()
+	rctxGL.URLParams.Add("application_id", app.ID)
+	reqGL = reqGL.WithContext(context.WithValue(reqGL.Context(), chi.RouteCtxKey, rctxGL))
+
+	recGL := httptest.NewRecorder()
+	mod.Webhooks.GitLab(recGL, reqGL)
+	assert.Equal(t, http.StatusOK, recGL.Code)
+
+	glPreviews, err := mod.Repo.ListPreviewsWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.Len(t, glPreviews, 1)
+	assert.Equal(t, 99, *glPreviews[0].PRNumber)
+	assert.Equal(t, "fix/login-bug", *glPreviews[0].Branch)
+
+	// 4. Test HTTP Handler: Manual Teardown
+	teardownReq := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/previews/"+glPreviews[0].ID+"/teardown", nil)
+	rctxTeardown := chi.NewRouteContext()
+	rctxTeardown.URLParams.Add("id", app.ID)
+	rctxTeardown.URLParams.Add("preview_id", glPreviews[0].ID)
+	teardownReq = teardownReq.WithContext(context.WithValue(teardownReq.Context(), chi.RouteCtxKey, rctxTeardown))
+
+	recTeardown := httptest.NewRecorder()
+	mod.Handler.TeardownPRPreview(recTeardown, teardownReq)
+	assert.Equal(t, http.StatusOK, recTeardown.Code)
+
+	glPreviewsAfterManual, err := mod.Repo.ListPreviewsWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	assert.Empty(t, glPreviewsAfterManual)
 }

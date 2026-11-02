@@ -1,17 +1,22 @@
 package applications
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/akordium-id/get-labuh/internal/caddy"
+	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
@@ -21,6 +26,8 @@ type WebhooksHandler struct {
 	deployRepo   DeploymentCreator
 	envVarRepo   *EnvVarRepo
 	deployWorker DeployEnqueuer
+	dockerClient *docker.Client
+	caddyClient  *caddy.Client
 }
 
 // NewWebhooksHandler membuat instance baru WebhooksHandler.
@@ -37,7 +44,23 @@ func (h *WebhooksHandler) SetDeployWorker(w DeployEnqueuer) {
 	h.deployWorker = w
 }
 
+// SetClients menyetel docker dan caddy client untuk kebutuhan teardown ephemeral preview.
+func (h *WebhooksHandler) SetClients(dockerClient *docker.Client, caddyClient *caddy.Client) {
+	h.dockerClient = dockerClient
+	h.caddyClient = caddyClient
+}
+
 type githubWebhookPayload struct {
+	Action      string `json:"action"`
+	Number      int    `json:"number"`
+	PullRequest *struct {
+		Title string `json:"title"`
+		Head  struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		} `json:"head"`
+		Merged bool `json:"merged"`
+	} `json:"pull_request"`
 	Ref        string `json:"ref"`
 	Before     string `json:"before"`
 	After      string `json:"after"`
@@ -56,10 +79,21 @@ type githubWebhookPayload struct {
 }
 
 type gitlabWebhookPayload struct {
-	ObjectKind  string `json:"object_kind"`
-	Ref         string `json:"ref"`
-	CheckoutSHA string `json:"checkout_sha"`
-	Commits     []struct {
+	ObjectKind       string `json:"object_kind"`
+	Ref              string `json:"ref"`
+	CheckoutSHA      string `json:"checkout_sha"`
+	ObjectAttributes *struct {
+		IID          int    `json:"iid"`
+		Title        string `json:"title"`
+		SourceBranch string `json:"source_branch"`
+		LastCommit   struct {
+			ID      string `json:"id"`
+			Message string `json:"message"`
+		} `json:"last_commit"`
+		Action string `json:"action"`
+		State  string `json:"state"`
+	} `json:"object_attributes"`
+	Commits []struct {
 		ID      string `json:"id"`
 		Message string `json:"message"`
 		Author  struct {
@@ -199,6 +233,11 @@ func (h *WebhooksHandler) handleGitHub(w http.ResponseWriter, r *http.Request, a
 		_ = json.Unmarshal(bodyBytes, &payload)
 	}
 
+	if event == "pull_request" {
+		h.handleGitHubPullRequest(w, r, app, payload)
+		return
+	}
+
 	targetBranch := "main"
 	if app.Branch != nil && *app.Branch != "" {
 		targetBranch = *app.Branch
@@ -248,6 +287,11 @@ func (h *WebhooksHandler) handleGitLab(w http.ResponseWriter, r *http.Request, a
 	var payload gitlabWebhookPayload
 	if len(bodyBytes) > 0 {
 		_ = json.Unmarshal(bodyBytes, &payload)
+	}
+
+	if event == "Merge Request Hook" || payload.ObjectKind == "merge_request" {
+		h.handleGitLabMergeRequest(w, r, app, payload)
+		return
 	}
 
 	targetBranch := "main"
@@ -383,4 +427,247 @@ func (h *WebhooksHandler) dispatchDeployment(w http.ResponseWriter, app *models.
 		"commit_hash":    commitHash,
 		"commit_message": commitMsg,
 	})
+}
+
+func (h *WebhooksHandler) handleGitHubPullRequest(w http.ResponseWriter, r *http.Request, app *models.Application, payload githubWebhookPayload) {
+	if payload.PullRequest == nil || payload.Number <= 0 {
+		http.Error(w, `{"error":"invalid pull_request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	action := strings.ToLower(payload.Action)
+	prNum := payload.Number
+	branch := payload.PullRequest.Head.Ref
+	commitHash := payload.PullRequest.Head.SHA
+	commitMsg := payload.PullRequest.Title
+
+	switch action {
+	case "opened", "reopened", "synchronize":
+		if !app.PRPreviewsEnabled {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status": "ignored",
+				"reason": "pr previews disabled for this application",
+			})
+			return
+		}
+
+		previewApp, err := h.spawnOrUpdatePRPreview(r.Context(), app, prNum, branch)
+		if err != nil {
+			slog.Error("failed to spawn or update pr preview", "error", err, "pr_number", prNum)
+			http.Error(w, `{"error":"failed to prepare pr preview environment"}`, http.StatusInternalServerError)
+			return
+		}
+
+		h.dispatchDeployment(w, previewApp, branch, commitHash, commitMsg)
+
+	case "closed":
+		existing, err := h.appRepo.GetByParentAndPRWithContext(r.Context(), app.ID, prNum)
+		if err != nil || existing == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status": "ignored",
+				"reason": "no active preview found for this pr",
+			})
+			return
+		}
+
+		if err := h.teardownPreview(r.Context(), existing); err != nil {
+			slog.Error("failed to teardown preview", "error", err, "preview_id", existing.ID)
+			http.Error(w, `{"error":"failed to teardown preview"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":     "deleted",
+			"preview_id": existing.ID,
+			"pr_number":  prNum,
+		})
+
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "ignored",
+			"action": action,
+		})
+	}
+}
+
+func (h *WebhooksHandler) handleGitLabMergeRequest(w http.ResponseWriter, r *http.Request, app *models.Application, payload gitlabWebhookPayload) {
+	if payload.ObjectAttributes == nil || payload.ObjectAttributes.IID <= 0 {
+		http.Error(w, `{"error":"invalid merge_request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	mrNum := payload.ObjectAttributes.IID
+	action := strings.ToLower(payload.ObjectAttributes.Action)
+	if action == "" {
+		action = strings.ToLower(payload.ObjectAttributes.State)
+	}
+
+	branch := payload.ObjectAttributes.SourceBranch
+	commitHash := payload.ObjectAttributes.LastCommit.ID
+	commitMsg := payload.ObjectAttributes.LastCommit.Message
+	if commitMsg == "" {
+		commitMsg = payload.ObjectAttributes.Title
+	}
+
+	switch action {
+	case "open", "reopen", "update", "opened", "reopened":
+		if !app.PRPreviewsEnabled {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status": "ignored",
+				"reason": "pr previews disabled for this application",
+			})
+			return
+		}
+
+		previewApp, err := h.spawnOrUpdatePRPreview(r.Context(), app, mrNum, branch)
+		if err != nil {
+			slog.Error("failed to spawn or update pr preview", "error", err, "mr_number", mrNum)
+			http.Error(w, `{"error":"failed to prepare pr preview environment"}`, http.StatusInternalServerError)
+			return
+		}
+
+		h.dispatchDeployment(w, previewApp, branch, commitHash, commitMsg)
+
+	case "close", "closed", "merge", "merged":
+		existing, err := h.appRepo.GetByParentAndPRWithContext(r.Context(), app.ID, mrNum)
+		if err != nil || existing == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status": "ignored",
+				"reason": "no active preview found for this mr",
+			})
+			return
+		}
+
+		if err := h.teardownPreview(r.Context(), existing); err != nil {
+			slog.Error("failed to teardown preview", "error", err, "preview_id", existing.ID)
+			http.Error(w, `{"error":"failed to teardown preview"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":     "deleted",
+			"preview_id": existing.ID,
+			"mr_number":  mrNum,
+		})
+
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "ignored",
+			"action": action,
+		})
+	}
+}
+
+func (h *WebhooksHandler) spawnOrUpdatePRPreview(ctx context.Context, parent *models.Application, prNum int, branch string) (*models.Application, error) {
+	existing, err := h.appRepo.GetByParentAndPRWithContext(ctx, parent.ID, prNum)
+	if err == nil && existing != nil {
+		// Update branch if changed
+		if branch != "" && (existing.Branch == nil || *existing.Branch != branch) {
+			existing.Branch = &branch
+		}
+		return existing, nil
+	}
+
+	slug := fmt.Sprintf("%s-pr-%d", parent.Slug, prNum)
+	name := fmt.Sprintf("%s (PR #%d)", parent.Name, prNum)
+
+	var previewDomain *string
+	if parent.PreviewTemplateDomain != nil && *parent.PreviewTemplateDomain != "" {
+		resolved := strings.ReplaceAll(*parent.PreviewTemplateDomain, "{{pr}}", fmt.Sprintf("%d", prNum))
+		resolved = strings.ReplaceAll(resolved, "{{app}}", parent.Slug)
+		resolved = strings.TrimSpace(resolved)
+		if resolved != "" {
+			previewDomain = &resolved
+		}
+	}
+
+	input := models.CreateApplicationInput{
+		EnvironmentID:         parent.EnvironmentID,
+		ServerID:              parent.ServerID,
+		Name:                  name,
+		Slug:                  slug,
+		SourceType:            parent.SourceType,
+		RepositoryURL:         parent.RepositoryURL,
+		Branch:                &branch,
+		BuildPath:             parent.BuildPath,
+		DockerfilePath:        parent.DockerfilePath,
+		DockerImage:           parent.DockerImage,
+		AppPort:               parent.AppPort,
+		CustomDomain:          previewDomain,
+		HealthcheckPath:       parent.HealthcheckPath,
+		HealthcheckTimeout:    parent.HealthcheckTimeout,
+		CPULimit:              parent.CPULimit,
+		MemoryLimit:           parent.MemoryLimit,
+		MemoryReservation:     parent.MemoryReservation,
+		BasicAuthUser:         parent.BasicAuthUser,
+		BasicAuthPassword:     parent.BasicAuthPassword,
+		ParentAppID:           &parent.ID,
+		PRNumber:              &prNum,
+		IsPreview:             true,
+		PreviewTemplateDomain: parent.PreviewTemplateDomain,
+		PRPreviewsEnabled:     false,
+	}
+
+	previewApp, err := h.appRepo.CreateWithContext(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("create preview app error: %w", err)
+	}
+
+	// Kloning environment variables dari induk
+	if h.envVarRepo != nil {
+		parentVars, err := h.envVarRepo.GetByApplicationIDWithContext(ctx, parent.ID)
+		if err == nil {
+			for _, v := range parentVars {
+				_, _ = h.envVarRepo.CreateWithContext(ctx, models.CreateAppEnvVarInput{
+					ApplicationID: previewApp.ID,
+					Key:           v.Key,
+					Value:         v.Value,
+					IsSecret:      v.IsSecret,
+					IsEncrypted:   v.IsEncrypted,
+				})
+			}
+		}
+	}
+
+	return previewApp, nil
+}
+
+func (h *WebhooksHandler) teardownPreview(ctx context.Context, previewApp *models.Application) error {
+	// 1. Remove Docker Container
+	if h.dockerClient != nil && previewApp.ContainerID != nil && *previewApp.ContainerID != "" {
+		if err := h.dockerClient.RemoveContainer(ctx, *previewApp.ContainerID); err != nil {
+			slog.Warn("failed to remove docker container during preview teardown", "error", err, "container_id", *previewApp.ContainerID)
+		}
+	}
+
+	// 2. Remove Caddy Route if domain exists
+	if h.caddyClient != nil && previewApp.CustomDomain != nil && *previewApp.CustomDomain != "" {
+		if err := h.caddyClient.RemoveRoute(*previewApp.CustomDomain); err != nil {
+			slog.Warn("failed to remove caddy route during preview teardown", "error", err, "domain", *previewApp.CustomDomain)
+		}
+	}
+
+	// 3. Delete database record
+	return h.appRepo.DeleteWithContext(ctx, previewApp.ID)
+}
+
+// TeardownPRPreview mengeksekusi teardown preview aplikasi secara publik/handler.
+func (h *WebhooksHandler) TeardownPRPreview(ctx context.Context, previewApp *models.Application) error {
+	return h.teardownPreview(ctx, previewApp)
 }

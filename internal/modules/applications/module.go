@@ -40,6 +40,7 @@ func New(
 	handler.SetCronDependencies(cronRepo, cronScheduler)
 
 	webhooks := NewWebhooksHandler(repo, deployRepo, envVarRepo)
+	webhooks.SetClients(dockerClient, caddyClient)
 	dropzone := NewDropzoneHandler(repo, projectRepo, deployRepo, envVarRepo)
 	monitoring := NewMonitoringHandler(repo, dockerClient)
 
@@ -66,6 +67,7 @@ func (m *Module) SetDeployWorker(w DeployEnqueuer) {
 func (m *Module) SetDockerClient(c *docker.Client) {
 	m.Handler.SetDockerClient(c)
 	m.Monitoring.SetDockerClient(c)
+	m.Webhooks.dockerClient = c
 	if m.CronScheduler != nil {
 		m.CronScheduler.dockerClient = c
 	}
@@ -74,6 +76,7 @@ func (m *Module) SetDockerClient(c *docker.Client) {
 // SetCaddyClient menyetel caddy client.
 func (m *Module) SetCaddyClient(c *caddy.Client) {
 	m.Handler.SetCaddyClient(c)
+	m.Webhooks.caddyClient = c
 }
 
 // RegisterRoutes mendaftarkan rute dashboard dan manajemen aplikasi (terproteksi).
@@ -103,6 +106,10 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/applications/{id}/cron-jobs/{job_id}/toggle", m.Handler.ToggleCronJob)
 	r.Post("/applications/{id}/cron-jobs/{job_id}/run", m.Handler.RunCronJobNow)
 	r.Post("/applications/{id}/cron-jobs/{job_id}/delete", m.Handler.DeleteCronJob)
+
+	// Application PR Previews
+	r.Post("/applications/{id}/pr-previews", m.Handler.UpdatePRPreviewsConfig)
+	r.Post("/applications/{id}/previews/{preview_id}/teardown", m.Handler.TeardownPRPreview)
 }
 
 // RegisterPublicRoutes mendaftarkan rute publik webhook.

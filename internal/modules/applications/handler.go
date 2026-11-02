@@ -213,7 +213,12 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs))).ServeHTTP(w, r)
+	var prPreviews []*models.Application
+	if previews, err := h.appRepo.ListPreviewsWithContext(r.Context(), id); err == nil {
+		prPreviews = previews
+	}
+
+	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs, prPreviews))).ServeHTTP(w, r)
 }
 
 // Start menjalankan kontainer aplikasi.
@@ -885,5 +890,75 @@ func (h *Handler) DeleteCronJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("HX-Redirect", "/applications/"+appID)
+	w.WriteHeader(http.StatusOK)
+}
+
+// UpdatePRPreviewsConfig memperbarui konfigurasi otomatis ephemeral PR previews.
+func (h *Handler) UpdatePRPreviewsConfig(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	enabled := r.FormValue("pr_previews_enabled") == "on" || r.FormValue("pr_previews_enabled") == "true"
+	template := strings.TrimSpace(r.FormValue("preview_template_domain"))
+	var templatePtr *string
+	if template != "" {
+		templatePtr = &template
+	}
+
+	if err := h.appRepo.UpdatePRPreviewsConfigWithContext(r.Context(), id, enabled, templatePtr); err != nil {
+		http.Error(w, "Failed to update PR preview config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Konfigurasi PR Previews berhasil disimpan", "success")
+	w.Header().Set("HX-Redirect", "/applications/"+id+"#advanced")
+	w.WriteHeader(http.StatusOK)
+}
+
+// TeardownPRPreview menghapus environment PR preview secara manual.
+func (h *Handler) TeardownPRPreview(w http.ResponseWriter, r *http.Request) {
+	parentID := chi.URLParam(r, "id")
+	previewID := chi.URLParam(r, "preview_id")
+	if parentID == "" || previewID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	previewApp, err := h.appRepo.GetByIDWithContext(r.Context(), previewID)
+	if err != nil {
+		http.Error(w, "Preview Not Found", http.StatusNotFound)
+		return
+	}
+
+	// 1. Remove Docker Container
+	if h.dockerClient != nil && previewApp.ContainerID != nil && *previewApp.ContainerID != "" {
+		if err := h.dockerClient.RemoveContainer(r.Context(), *previewApp.ContainerID); err != nil {
+			slog.Warn("failed to remove docker container during preview teardown", "error", err, "container_id", *previewApp.ContainerID)
+		}
+	}
+
+	// 2. Remove Caddy Route if domain exists
+	if h.caddyClient != nil && previewApp.CustomDomain != nil && *previewApp.CustomDomain != "" {
+		if err := h.caddyClient.RemoveRoute(*previewApp.CustomDomain); err != nil {
+			slog.Warn("failed to remove caddy route during preview teardown", "error", err, "domain", *previewApp.CustomDomain)
+		}
+	}
+
+	// 3. Delete database record
+	if err := h.appRepo.DeleteWithContext(r.Context(), previewApp.ID); err != nil {
+		http.Error(w, "Failed to delete preview application: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Preview environment berhasil dihapus (teardown)", "success")
+	w.Header().Set("HX-Redirect", "/applications/"+parentID+"#previews")
 	w.WriteHeader(http.StatusOK)
 }
