@@ -41,6 +41,7 @@ func New(
 
 	webhooks := NewWebhooksHandler(repo, deployRepo, envVarRepo)
 	webhooks.SetClients(dockerClient, caddyClient)
+	webhooks.SetSettingRepo(settingRepo)
 	dropzone := NewDropzoneHandler(repo, projectRepo, deployRepo, envVarRepo)
 	monitoring := NewMonitoringHandler(repo, dockerClient)
 

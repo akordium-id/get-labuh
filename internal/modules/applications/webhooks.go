@@ -12,11 +12,14 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/encryption"
+	"github.com/akordium-id/get-labuh/internal/gitbot"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
@@ -28,15 +31,28 @@ type WebhooksHandler struct {
 	deployWorker DeployEnqueuer
 	dockerClient *docker.Client
 	caddyClient  *caddy.Client
+	settingRepo  SettingProvider
+	gitbotClient *gitbot.Client
 }
 
 // NewWebhooksHandler membuat instance baru WebhooksHandler.
 func NewWebhooksHandler(appRepo *Repo, deployRepo DeploymentCreator, envVarRepo *EnvVarRepo) *WebhooksHandler {
 	return &WebhooksHandler{
-		appRepo:    appRepo,
-		deployRepo: deployRepo,
-		envVarRepo: envVarRepo,
+		appRepo:      appRepo,
+		deployRepo:   deployRepo,
+		envVarRepo:   envVarRepo,
+		gitbotClient: gitbot.NewClient(),
 	}
+}
+
+// SetSettingRepo menyetel setting provider untuk membaca global bot tokens.
+func (h *WebhooksHandler) SetSettingRepo(s SettingProvider) {
+	h.settingRepo = s
+}
+
+// SetGitBotClient menyetel gitbot client (berguna untuk testing/mock).
+func (h *WebhooksHandler) SetGitBotClient(c *gitbot.Client) {
+	h.gitbotClient = c
 }
 
 // SetDeployWorker menyetel worker antrean deployment.
@@ -462,6 +478,12 @@ func (h *WebhooksHandler) handleGitHubPullRequest(w http.ResponseWriter, r *http
 
 		h.dispatchDeployment(w, previewApp, branch, commitHash, commitMsg)
 
+		h.postPRComment(r.Context(), app, prNum, gitbot.CommentParams{
+			Status:     gitbot.StatusBuilding,
+			CommitHash: commitHash,
+			Branch:     branch,
+		})
+
 	case "closed":
 		existing, err := h.appRepo.GetByParentAndPRWithContext(r.Context(), app.ID, prNum)
 		if err != nil || existing == nil {
@@ -479,6 +501,10 @@ func (h *WebhooksHandler) handleGitHubPullRequest(w http.ResponseWriter, r *http
 			http.Error(w, `{"error":"failed to teardown preview"}`, http.StatusInternalServerError)
 			return
 		}
+
+		h.postPRComment(r.Context(), app, prNum, gitbot.CommentParams{
+			Status: gitbot.StatusDestroyed,
+		})
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -538,6 +564,12 @@ func (h *WebhooksHandler) handleGitLabMergeRequest(w http.ResponseWriter, r *htt
 
 		h.dispatchDeployment(w, previewApp, branch, commitHash, commitMsg)
 
+		h.postPRComment(r.Context(), app, mrNum, gitbot.CommentParams{
+			Status:     gitbot.StatusBuilding,
+			CommitHash: commitHash,
+			Branch:     branch,
+		})
+
 	case "close", "closed", "merge", "merged":
 		existing, err := h.appRepo.GetByParentAndPRWithContext(r.Context(), app.ID, mrNum)
 		if err != nil || existing == nil {
@@ -555,6 +587,10 @@ func (h *WebhooksHandler) handleGitLabMergeRequest(w http.ResponseWriter, r *htt
 			http.Error(w, `{"error":"failed to teardown preview"}`, http.StatusInternalServerError)
 			return
 		}
+
+		h.postPRComment(r.Context(), app, mrNum, gitbot.CommentParams{
+			Status: gitbot.StatusDestroyed,
+		})
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -670,4 +706,58 @@ func (h *WebhooksHandler) teardownPreview(ctx context.Context, previewApp *model
 // TeardownPRPreview mengeksekusi teardown preview aplikasi secara publik/handler.
 func (h *WebhooksHandler) TeardownPRPreview(ctx context.Context, previewApp *models.Application) error {
 	return h.teardownPreview(ctx, previewApp)
+}
+
+func (h *WebhooksHandler) resolveGitToken(ctx context.Context, app *models.Application, provider string) string {
+	if app.GitToken != nil && *app.GitToken != "" {
+		// Coba decrypt jika terenkripsi
+		if decrypted, err := encryption.Decrypt(*app.GitToken); err == nil && decrypted != "" {
+			return decrypted
+		}
+		return *app.GitToken
+	}
+
+	if h.settingRepo != nil {
+		if provider == "github" {
+			val, _ := h.settingRepo.Get(ctx, "github_bot_token")
+			return val
+		} else if provider == "gitlab" {
+			val, _ := h.settingRepo.Get(ctx, "gitlab_bot_token")
+			return val
+		}
+	}
+	return ""
+}
+
+func (h *WebhooksHandler) postPRComment(ctx context.Context, app *models.Application, prNumber int, params gitbot.CommentParams) {
+	if h.gitbotClient == nil || app.RepositoryURL == nil || *app.RepositoryURL == "" {
+		return
+	}
+
+	provider, _, _, err := gitbot.ParseRepo(*app.RepositoryURL)
+	if err != nil {
+		return
+	}
+
+	token := h.resolveGitToken(ctx, app, provider)
+	if token == "" {
+		return
+	}
+
+	body := gitbot.FormatComment(params)
+	go func() {
+		reqCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		var postErr error
+		if provider == "github" {
+			postErr = h.gitbotClient.PostOrUpdateGitHubComment(reqCtx, *app.RepositoryURL, prNumber, token, body)
+		} else if provider == "gitlab" {
+			postErr = h.gitbotClient.PostOrUpdateGitLabNote(reqCtx, *app.RepositoryURL, prNumber, token, body)
+		}
+
+		if postErr != nil {
+			slog.Warn("failed to post pr preview comment", "provider", provider, "pr_number", prNumber, "error", postErr)
+		}
+	}()
 }

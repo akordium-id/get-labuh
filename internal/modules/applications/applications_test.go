@@ -5,17 +5,20 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	stdtesting "testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/akordium-id/get-labuh/internal/database"
+	"github.com/akordium-id/get-labuh/internal/gitbot"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
@@ -572,3 +575,84 @@ func TestApplications_PRPreviews(t *stdtesting.T) {
 	require.NoError(t, err)
 	assert.Empty(t, glPreviewsAfterManual)
 }
+
+func TestApplications_PRPreviews_GitBot(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+
+	var capturedComments []string
+	gitServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer app_secret_git_token", r.Header.Get("Authorization"))
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/comments") {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode([]any{})
+			return
+		}
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/comments") {
+			var body map[string]string
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			capturedComments = append(capturedComments, body["body"])
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 1, "body": body["body"]})
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer gitServer.Close()
+
+	// Inject custom gitbot client to webhooks handler
+	mod.Webhooks.SetGitBotClient(gitbot.NewClientWithBaseURLs(gitServer.URL, gitServer.URL))
+
+	repoURL := "https://github.com/myorg/myapp.git"
+	appToken := "app_secret_git_token"
+	tmplDomain := "{{app}}-pr-{{pr}}.preview.test"
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID:         "env-1",
+		Name:                  "Bot App",
+		Slug:                  "bot-app",
+		SourceType:            models.SourceTypeGit,
+		RepositoryURL:         &repoURL,
+		PRPreviewsEnabled:     true,
+		PreviewTemplateDomain: &tmplDomain,
+		GitToken:              &appToken,
+	})
+	require.NoError(t, err)
+
+	signGH := func(body string) string {
+		mac := hmac.New(sha256.New, []byte(*app.WebhookSecret))
+		mac.Write([]byte(body))
+		return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	}
+
+	// 1. Pull request opened -> must dispatch "Building & Deploying..." comment
+	ghOpenPayload := `{
+		"action": "opened",
+		"number": 77,
+		"pull_request": {
+			"title": "feat: test gitbot comment",
+			"head": {
+				"ref": "feature/bot",
+				"sha": "sha777"
+			}
+		}
+	}`
+	reqOpen := httptest.NewRequest(http.MethodPost, "/webhooks/github/"+app.ID, strings.NewReader(ghOpenPayload))
+	reqOpen.Header.Set("X-GitHub-Event", "pull_request")
+	reqOpen.Header.Set("X-Hub-Signature-256", signGH(ghOpenPayload))
+	reqOpen.Header.Set("Content-Type", "application/json")
+	rctxOpen := chi.NewRouteContext()
+	rctxOpen.URLParams.Add("application_id", app.ID)
+	reqOpen = reqOpen.WithContext(context.WithValue(reqOpen.Context(), chi.RouteCtxKey, rctxOpen))
+
+	recOpen := httptest.NewRecorder()
+	mod.Webhooks.GitHub(recOpen, reqOpen)
+	assert.Equal(t, http.StatusOK, recOpen.Code)
+
+	require.Eventually(t, func() bool {
+		return len(capturedComments) == 1
+	}, 1*time.Second, 10*time.Millisecond)
+
+	assert.Contains(t, capturedComments[0], gitbot.Marker)
+	assert.Contains(t, capturedComments[0], "Building & Deploying...")
+}
+
