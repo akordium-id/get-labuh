@@ -12,6 +12,7 @@ import (
 
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/components"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
@@ -916,6 +917,14 @@ func (h *Handler) UpdatePRPreviewsConfig(w http.ResponseWriter, r *http.Request)
 	if err := h.appRepo.UpdatePRPreviewsConfigWithContext(r.Context(), id, enabled, templatePtr); err != nil {
 		http.Error(w, "Failed to update PR preview config: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	gitTokenInput := strings.TrimSpace(r.FormValue("git_token"))
+	if gitTokenInput != "" {
+		encryptedToken, encErr := encryption.Encrypt(gitTokenInput)
+		if encErr == nil {
+			_ = h.appRepo.UpdateGitTokenWithContext(r.Context(), id, &encryptedToken)
+		}
 	}
 
 	setToast(w, "Konfigurasi PR Previews berhasil disimpan", "success")

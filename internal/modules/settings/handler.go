@@ -66,8 +66,10 @@ func (h *Handler) Caddy(w http.ResponseWriter, r *http.Request) {
 	caddyAPIURL, _ := h.settingRepo.Get(ctx, "caddy_api_url")
 	caddyAPIKey, _ := h.settingRepo.Get(ctx, "caddy_api_key")
 	caddyNetwork, _ := h.settingRepo.Get(ctx, "caddy_network")
+	githubBotToken, _ := h.settingRepo.Get(ctx, "github_bot_token")
+	gitlabBotToken, _ := h.settingRepo.Get(ctx, "gitlab_bot_token")
 
-	templ.Handler(layouts.AppLayout(pagesettings.CaddySettingsPage(caddyAPIURL, caddyAPIKey, caddyNetwork))).ServeHTTP(w, r)
+	templ.Handler(layouts.AppLayout(pagesettings.CaddySettingsPage(caddyAPIURL, caddyAPIKey, caddyNetwork, githubBotToken, gitlabBotToken))).ServeHTTP(w, r)
 }
 
 func (h *Handler) UpdateCaddy(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +91,14 @@ func (h *Handler) UpdateCaddy(w http.ResponseWriter, r *http.Request) {
 	_ = h.settingRepo.Set(ctx, "caddy_api_key", caddyAPIKey)
 	_ = h.settingRepo.Set(ctx, "caddy_network", caddyNetwork)
 
-	SetToast(w, "Pengaturan Caddy berhasil disimpan", ToastSuccess)
+	if r.Form.Has("github_bot_token") {
+		_ = h.settingRepo.Set(ctx, "github_bot_token", strings.TrimSpace(r.FormValue("github_bot_token")))
+	}
+	if r.Form.Has("gitlab_bot_token") {
+		_ = h.settingRepo.Set(ctx, "gitlab_bot_token", strings.TrimSpace(r.FormValue("gitlab_bot_token")))
+	}
+
+	SetToast(w, "Pengaturan berhasil disimpan", ToastSuccess)
 	w.Header().Set("HX-Redirect", "/settings/caddy")
 	w.WriteHeader(http.StatusOK)
 }

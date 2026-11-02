@@ -909,6 +909,13 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs font-mono"/>
 							<span class="text-[10px] text-gray-400 mt-0.5 block">Placeholder yang didukung: <code class="font-mono text-indigo-600">{"{{pr}}"}</code> (nomor PR), <code class="font-mono text-indigo-600">{"{{app}}"}</code> (slug app).</span>
 						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700">Git Bot Token (GitHub / GitLab)</label>
+							<input type="password" name="git_token"
+								placeholder={ func() string { if app.GitToken != nil && *app.GitToken != "" { return "•••••••••••• (tersimpan)" }; return "ghp_xxxx / glpat-xxxx (override global)" }() }
+								class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs font-mono"/>
+							<span class="text-[10px] text-gray-400 mt-0.5 block">Token personal/bot untuk posting komentar status di PR/MR. Biarkan kosong jika menggunakan global token di Settings.</span>
+						</div>
 						<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-md transition-colors">
 							Save PR Preview Settings
 						</button>

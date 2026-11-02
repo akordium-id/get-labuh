@@ -1,9 +1,10 @@
 package settings
 
-templ CaddySettingsPage(caddyAPIURL, caddyAPIKey, caddyNetwork string) {
+templ CaddySettingsPage(caddyAPIURL, caddyAPIKey, caddyNetwork, githubBotToken, gitlabBotToken string) {
 	<div>
-		<h1 class="text-3xl font-bold text-gray-900 mb-6">Caddy Settings</h1>
-		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+		<h1 class="text-3xl font-bold text-gray-900 mb-6">Caddy & Git Settings</h1>
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+			<h2 class="text-lg font-bold text-gray-900 mb-3">Reverse Proxy (Caddy)</h2>
 			<form action="/settings/caddy" method="post" class="space-y-4">
 				<div>
 					<label class="block text-sm font-medium text-gray-700">Caddy API URL</label>
@@ -19,11 +20,40 @@ templ CaddySettingsPage(caddyAPIURL, caddyAPIKey, caddyNetwork string) {
 					<input type="text" name="caddy_network" value={ caddyNetwork } class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
 				</div>
 				<div class="flex gap-2">
-					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Save Settings</button>
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Save Caddy Settings</button>
 					<form action="/settings/caddy/test" method="post" class="inline">
 						<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Test Connection</button>
 					</form>
 				</div>
+			</form>
+		</div>
+
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+			<h2 class="text-lg font-bold text-gray-900 mb-1">Global Git Bot Tokens</h2>
+			<p class="text-xs text-gray-500 mb-4">Token default untuk memposting komentar preview deploy di GitHub PR atau GitLab MR jika tidak di-override di level aplikasi.</p>
+			<form action="/settings/caddy" method="post" class="space-y-4">
+				<input type="hidden" name="caddy_api_url" value={ caddyAPIURL }/>
+				<input type="hidden" name="caddy_api_key" value={ caddyAPIKey }/>
+				<input type="hidden" name="caddy_network" value={ caddyNetwork }/>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">GitHub Bot Token (PAT / Fine-grained)</label>
+					<input type="password" name="github_bot_token"
+						value={ githubBotToken }
+						placeholder="ghp_xxxxxxxxxxxx"
+						class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"/>
+					<p class="text-xs text-gray-400 mt-1">Dibutuhkan scope <code class="font-mono text-indigo-600">repo</code> atau <code class="font-mono text-indigo-600">pull_requests:write</code>.</p>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700">GitLab Bot Token (Personal / Project Access Token)</label>
+					<input type="password" name="gitlab_bot_token"
+						value={ gitlabBotToken }
+						placeholder="glpat-xxxxxxxxxxxx"
+						class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"/>
+					<p class="text-xs text-gray-400 mt-1">Dibutuhkan scope <code class="font-mono text-indigo-600">api</code>.</p>
+				</div>
+				<button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium">
+					Save Git Bot Tokens
+				</button>
 			</form>
 		</div>
 	</div>
