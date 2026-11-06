@@ -1785,7 +1785,46 @@ func ApplicationDetailPage(app *models.Application, deployments []*models.Deploy
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs font-mono\"> <span class=\"text-[10px] text-gray-400 mt-0.5 block\">Token personal/bot untuk posting komentar status di PR/MR. Biarkan kosong jika menggunakan global token di Settings.</span></div><button type=\"submit\" class=\"w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-md transition-colors\">Save PR Preview Settings</button></form></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs font-mono\"> <span class=\"text-[10px] text-gray-400 mt-0.5 block\">Token personal/bot untuk posting komentar status di PR/MR. Biarkan kosong jika menggunakan global token di Settings.</span></div><button type=\"submit\" class=\"w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-md transition-colors\">Save PR Preview Settings</button></form></div><!-- Deployment Lifecycle Hooks Card --><div class=\"bg-white rounded-lg shadow-xs border border-gray-200 p-6\"><h2 class=\"text-base font-bold text-gray-900 mb-1 flex items-center gap-1.5\"><svg class=\"w-4 h-4 text-violet-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M13 10V3L4 14h7v7l9-11h-7z\"></path></svg> Deployment Lifecycle Hooks</h2><p class=\"text-xs text-gray-500 mb-4\">Perintah shell yang dieksekusi otomatis di dalam container kandidat sebelum healthcheck/switch (Pre) dan sesudah traffic live (Post).</p><form action=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var93 string
+		templ_7745c5c3_Var93, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/applications/" + app.ID + "/lifecycle-commands")).ResolveURL(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 932, Col: 84}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var93)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700\">Pre-deployment Command</label> <input type=\"text\" name=\"pre_deployment_command\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var94 string
+		templ_7745c5c3_Var94, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.PreDeploymentCommand, "")).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 936, Col: 55}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var94)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, "\" placeholder=\"php artisan migrate --force\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs font-mono\"> <span class=\"text-[10px] text-gray-400 mt-0.5 block\">Dijalankan sebelum healthcheck gate. Jika gagal, deploy dibatalkan &amp; di-rollback aman tanpa downtime.</span></div><div><label class=\"block text-xs font-semibold text-gray-700\">Post-deployment Command</label> <input type=\"text\" name=\"post_deployment_command\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var95 string
+		templ_7745c5c3_Var95, templ_7745c5c3_Err = templruntime.NewAttributeExpression(getStrVal(app.PostDeploymentCommand, "")).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/applications/list.templ`, Line: 944, Col: 56}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var95)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "\" placeholder=\"php artisan optimize:clear\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs font-mono\"> <span class=\"text-[10px] text-gray-400 mt-0.5 block\">Dijalankan setelah Caddy route switch live. Kegagalan bersifat non-fatal (warning).</span></div><button type=\"submit\" class=\"w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold py-2 rounded-md transition-colors\">Save Lifecycle Commands</button></form></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1810,7 +1849,7 @@ func ApplicationCreatePage() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Target Server ID</label> <input type=\"text\" name=\"server_id\" placeholder=\"local (or remote server ID)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><p class=\"text-xs text-gray-400 mt-1\">Kosongkan untuk deploy ke Docker host lokal (\"local\"), atau masukkan ID server remote dari Settings &rarr; Servers.</p></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, "<div><h1 class=\"text-3xl font-bold text-gray-900 mb-6\">New Application</h1><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\"><form action=\"/applications\" method=\"post\" class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700\">Name</label> <input type=\"text\" name=\"name\" required class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Source Type</label> <select name=\"source_type\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><option value=\"git\">Git</option> <option value=\"docker_image\">Docker Image</option> <option value=\"dockerfile\">Dockerfile</option></select></div><div><label class=\"block text-sm font-medium text-gray-700\">Repository URL</label> <input type=\"text\" name=\"repository_url\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Docker Image</label> <input type=\"text\" name=\"docker_image\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">App Port</label> <input type=\"number\" name=\"app_port\" value=\"8080\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"></div><div><label class=\"block text-sm font-medium text-gray-700\">Target Server ID</label> <input type=\"text\" name=\"server_id\" placeholder=\"local (or remote server ID)\" class=\"mt-1 block w-full border border-gray-300 rounded-md px-3 py-2\"><p class=\"text-xs text-gray-400 mt-1\">Kosongkan untuk deploy ke Docker host lokal (\"local\"), atau masukkan ID server remote dari Settings &rarr; Servers.</p></div><div class=\"flex gap-2\"><button type=\"submit\" class=\"bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700\">Create Application</button> <a href=\"/projects\" class=\"bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300\">Cancel</a></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
