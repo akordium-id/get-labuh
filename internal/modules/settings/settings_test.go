@@ -80,3 +80,47 @@ func TestSettingsModule_CRUD(t *stdtesting.T) {
 	assert.Equal(t, "Cloudflare R2 Primary", list[0].Name)
 	assert.True(t, list[0].IsDefault)
 }
+
+func TestSettingsHandler_Cleanup(t *stdtesting.T) {
+	db, err := database.Connect("file::memory:?cache=shared")
+	require.NoError(t, err)
+	require.NoError(t, database.RunAllMigrations(db))
+	t.Cleanup(func() { _ = db.Close() })
+
+	mod := settings.New(db, t.TempDir())
+
+	r := chi.NewRouter()
+	mod.RegisterRoutes(r)
+
+	// 1. Test POST /settings/cleanup (save configuration)
+	form := url.Values{}
+	form.Set("docker_cleanup_enabled", "true")
+	form.Set("docker_cleanup_schedule", "0 2 * * *")
+
+	req := httptest.NewRequest(http.MethodPost, "/settings/cleanup", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusFound, w.Code)
+
+	enabled, err := mod.SettingRepo.Get(context.Background(), "docker_cleanup_enabled")
+	require.NoError(t, err)
+	assert.Equal(t, "true", enabled)
+
+	schedule, err := mod.SettingRepo.Get(context.Background(), "docker_cleanup_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, "0 2 * * *", schedule)
+
+	// 2. Test GET /settings/cleanup
+	reqGet := httptest.NewRequest(http.MethodGet, "/settings/cleanup", nil)
+	wGet := httptest.NewRecorder()
+	r.ServeHTTP(wGet, reqGet)
+	assert.Equal(t, http.StatusOK, wGet.Code)
+
+	// 3. Test POST /settings/cleanup/run (trigger manual prune)
+	reqRun := httptest.NewRequest(http.MethodPost, "/settings/cleanup/run", nil)
+	wRun := httptest.NewRecorder()
+	r.ServeHTTP(wRun, reqRun)
+	assert.Equal(t, http.StatusFound, wRun.Code)
+}
+

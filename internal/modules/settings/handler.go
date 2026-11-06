@@ -35,10 +35,11 @@ func SetToast(w http.ResponseWriter, message string, toastType ToastType) {
 }
 
 type Handler struct {
-	settingRepo *SettingRepo
-	auditRepo   *AuditLogRepo
-	storageRepo *StorageDestinationRepo
-	backupPath  string
+	settingRepo      *SettingRepo
+	auditRepo        *AuditLogRepo
+	storageRepo      *StorageDestinationRepo
+	backupPath       string
+	cleanupScheduler *CleanupScheduler
 }
 
 func NewHandler(
@@ -58,6 +59,10 @@ func NewHandler(
 		storageRepo: storageRepo,
 		backupPath:  backupPath,
 	}
+}
+
+func (h *Handler) SetCleanupScheduler(s *CleanupScheduler) {
+	h.cleanupScheduler = s
 }
 
 // Caddy & Mode handlers
@@ -357,4 +362,64 @@ func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("HX-Redirect", "/settings/backup")
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) GetCleanup(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	enabled, _ := h.settingRepo.Get(ctx, "docker_cleanup_enabled")
+	if enabled == "" {
+		enabled = "false"
+	}
+	schedule, _ := h.settingRepo.Get(ctx, "docker_cleanup_schedule")
+	if schedule == "" {
+		schedule = "0 2 * * *"
+	}
+	lastRun, _ := h.settingRepo.Get(ctx, "docker_cleanup_last_run")
+	if lastRun == "" {
+		lastRun = "-"
+	}
+	lastReclaimed, _ := h.settingRepo.Get(ctx, "docker_cleanup_last_reclaimed")
+	if lastReclaimed == "" {
+		lastReclaimed = "0 B"
+	}
+
+	templ.Handler(layouts.AppLayout(pagesettings.CleanupPage(enabled == "true", schedule, lastRun, lastReclaimed))).ServeHTTP(w, r)
+}
+
+func (h *Handler) UpdateCleanupSettings(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	ctx := r.Context()
+	enabled := "false"
+	if r.FormValue("docker_cleanup_enabled") == "true" || r.FormValue("docker_cleanup_enabled") == "on" {
+		enabled = "true"
+	}
+	schedule := strings.TrimSpace(r.FormValue("docker_cleanup_schedule"))
+	if schedule == "" {
+		schedule = "0 2 * * *"
+	}
+
+	_ = h.settingRepo.Set(ctx, "docker_cleanup_enabled", enabled)
+	_ = h.settingRepo.Set(ctx, "docker_cleanup_schedule", schedule)
+
+	SetToast(w, "Docker cleanup settings saved successfully", ToastSuccess)
+	http.Redirect(w, r, "/settings/cleanup", http.StatusFound)
+}
+
+func (h *Handler) RunCleanupNow(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if h.cleanupScheduler != nil {
+		report, err := h.cleanupScheduler.RunCleanup(ctx)
+		if err != nil {
+			slog.Error("manual cleanup failed", "err", err)
+			SetToast(w, "Failed to run Docker cleanup: "+err.Error(), ToastError)
+		} else {
+			SetToast(w, fmt.Sprintf("Cleanup finished: freed %s", report.SpaceFormatted), ToastSuccess)
+		}
+	} else {
+		SetToast(w, "Cleanup scheduler is not initialized", ToastError)
+	}
+	http.Redirect(w, r, "/settings/cleanup", http.StatusFound)
 }

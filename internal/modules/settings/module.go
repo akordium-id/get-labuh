@@ -8,35 +8,43 @@ import (
 )
 
 type Module struct {
-	SettingRepo *SettingRepo
-	AuditRepo   *AuditLogRepo
-	StorageRepo *StorageDestinationRepo
-	Handler     *Handler
+	SettingRepo      *SettingRepo
+	AuditRepo        *AuditLogRepo
+	StorageRepo      *StorageDestinationRepo
+	CleanupScheduler *CleanupScheduler
+	Handler          *Handler
 }
 
 func New(db *sql.DB, backupPath string) *Module {
 	settingRepo := NewSettingRepo(db)
 	auditRepo := NewAuditLogRepo(db)
 	storageRepo := NewStorageDestinationRepo(db)
+	cleanupScheduler := NewCleanupScheduler(nil, settingRepo, auditRepo)
 	handler := NewHandler(settingRepo, auditRepo, storageRepo, backupPath)
+	handler.SetCleanupScheduler(cleanupScheduler)
 
 	_ = settingRepo.InitializeDefaults(context.Background())
 
 	return &Module{
-		SettingRepo: settingRepo,
-		AuditRepo:   auditRepo,
-		StorageRepo: storageRepo,
-		Handler:     handler,
+		SettingRepo:      settingRepo,
+		AuditRepo:        auditRepo,
+		StorageRepo:      storageRepo,
+		CleanupScheduler: cleanupScheduler,
+		Handler:          handler,
 	}
 }
 
-// RegisterRoutes mendaftarkan seluruh endpoint settings (Caddy, mode, audit logs, storage destinations, backup)
+// RegisterRoutes mendaftarkan seluruh endpoint settings (Caddy, mode, audit logs, storage destinations, backup, cleanup)
 func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/settings/mode", m.Handler.SwitchMode)
 
 	r.Get("/settings/caddy", m.Handler.Caddy)
 	r.Post("/settings/caddy", m.Handler.UpdateCaddy)
 	r.Post("/settings/caddy/test", m.Handler.TestCaddy)
+
+	r.Get("/settings/cleanup", m.Handler.GetCleanup)
+	r.Post("/settings/cleanup", m.Handler.UpdateCleanupSettings)
+	r.Post("/settings/cleanup/run", m.Handler.RunCleanupNow)
 
 	r.Get("/settings/audit-logs", m.Handler.AuditLogsPage)
 
