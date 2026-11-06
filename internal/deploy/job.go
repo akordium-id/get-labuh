@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/akordium-id/get-labuh/internal/caddy"
@@ -361,6 +362,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	var healthcheckPath = "/"
 	var healthcheckTimeout = 30 * time.Second
 	var routeOpts caddy.RouteOptions
+	var preDeploymentCommand, postDeploymentCommand string
 
 	if p.appRepo != nil {
 		app, err := p.appRepo.GetByID(job.ApplicationID)
@@ -384,6 +386,12 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 			if app.BasicAuthUser != nil && *app.BasicAuthUser != "" && app.BasicAuthPassword != nil && *app.BasicAuthPassword != "" {
 				routeOpts.BasicAuthUser = *app.BasicAuthUser
 				routeOpts.BasicAuthPassword = *app.BasicAuthPassword
+			}
+			if app.PreDeploymentCommand != nil {
+				preDeploymentCommand = strings.TrimSpace(*app.PreDeploymentCommand)
+			}
+			if app.PostDeploymentCommand != nil {
+				postDeploymentCommand = strings.TrimSpace(*app.PostDeploymentCommand)
 			}
 			resLimits = docker.ContainerResourceLimits{
 				CPULimit:          app.CPULimit,
@@ -417,6 +425,24 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		return &DeployError{Step: "deploy", Cause: err, Output: errMsg}
 	}
 
+	// Pre-deployment lifecycle hook: dieksekusi di dalam container kandidat sebelum healthcheck gate
+	if preDeploymentCommand != "" {
+		writeLog(activeLogWriter, fmt.Sprintf("Running pre-deployment command: %s", preDeploymentCommand))
+		updateStep("pre_deploy", models.DeployStatusDeploying, "")
+		cmdCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		execErr := targetDockerClient.ExecStream(cmdCtx, candidateContainerID, []string{"sh", "-c", preDeploymentCommand}, nil, activeLogWriter)
+		cancel()
+		if execErr != nil {
+			errMsg := fmt.Sprintf("Pre-deployment command failed: %v. Rolling back...", execErr)
+			writeLog(activeLogWriter, errMsg)
+			_ = targetDockerClient.StopContainer(ctx, candidateContainerID, 5)
+			_ = targetDockerClient.RemoveContainer(ctx, candidateContainerID)
+			updateStep("pre_deploy", models.DeployStatusFailed, errMsg)
+			return &DeployError{Step: "pre_deploy", Cause: execErr, Output: errMsg}
+		}
+		writeLog(activeLogWriter, "Pre-deployment command completed successfully.")
+	}
+
 	writeLog(activeLogWriter, fmt.Sprintf("Candidate container started (ID: %s). Running healthcheck gate (%s, timeout %v)...", candidateContainerID, healthcheckPath, healthcheckTimeout))
 	updateStep("healthcheck", models.DeployStatusDeploying, "")
 
@@ -445,6 +471,20 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	// Update DB record to point to the new running container
 	if p.appRepo != nil {
 		_ = p.appRepo.UpdateContainerAndStatus(job.ApplicationID, candidateContainerID, models.AppStatusRunning)
+	}
+
+	// Post-deployment lifecycle hook: dieksekusi setelah container baru live (non-fatal warning jika gagal)
+	if postDeploymentCommand != "" {
+		writeLog(activeLogWriter, fmt.Sprintf("Running post-deployment command: %s", postDeploymentCommand))
+		updateStep("post_deploy", models.DeployStatusDeploying, "")
+		cmdCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		execErr := targetDockerClient.ExecStream(cmdCtx, candidateContainerID, []string{"sh", "-c", postDeploymentCommand}, nil, activeLogWriter)
+		cancel()
+		if execErr != nil {
+			writeLog(activeLogWriter, fmt.Sprintf("[WARNING] Post-deployment command failed: %v (non-fatal)", execErr))
+		} else {
+			writeLog(activeLogWriter, "Post-deployment command completed successfully.")
+		}
 	}
 
 	// Zero-Downtime Cleanup: Stop and remove old container only after candidate is healthy and live

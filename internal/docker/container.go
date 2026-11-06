@@ -465,8 +465,13 @@ func (c *Client) ExecStream(ctx context.Context, containerID string, cmd []strin
 	}
 	defer attachResp.Close()
 
+	if stdout == nil {
+		stdout = io.Discard
+	}
+
 	var stderrBuf bytes.Buffer
-	_, err = stdcopy.StdCopy(stdout, &stderrBuf, attachResp.Reader)
+	errWriter := io.MultiWriter(stdout, &stderrBuf)
+	_, err = stdcopy.StdCopy(stdout, errWriter, attachResp.Reader)
 	if err != nil {
 		return fmt.Errorf("failed during exec stream copy: %w", err)
 	}
