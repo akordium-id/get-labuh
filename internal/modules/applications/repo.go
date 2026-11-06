@@ -88,12 +88,14 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateApplica
 	app.PreviewTemplateDomain = input.PreviewTemplateDomain
 	app.PRPreviewsEnabled = input.PRPreviewsEnabled
 	app.GitToken = input.GitToken
+	app.PreDeploymentCommand = input.PreDeploymentCommand
+	app.PostDeploymentCommand = input.PostDeploymentCommand
 
 	_, err := r.db.ExecContext(
 		ctx,
-		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, parent_app_id, pr_number, is_preview, preview_template_domain, pr_previews_enabled, git_token, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, input.CPULimit, input.MemoryLimit, input.MemoryReservation, app.HealthcheckPath, app.HealthcheckTimeout, app.BasicAuthUser, app.BasicAuthPassword, app.ServerID, app.ParentAppID, app.PRNumber, app.IsPreview, app.PreviewTemplateDomain, app.PRPreviewsEnabled, app.GitToken, app.CreatedAt, app.UpdatedAt,
+		`INSERT INTO applications (id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, parent_app_id, pr_number, is_preview, preview_template_domain, pr_previews_enabled, git_token, pre_deployment_command, post_deployment_command, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		app.ID, app.EnvironmentID, app.Name, app.Slug, app.SourceType, app.RepositoryURL, app.Branch, app.BuildPath, app.DockerfilePath, app.DockerImage, app.CustomDomain, app.AppPort, app.ContainerName, app.Status, app.WebhookSecret, input.CPULimit, input.MemoryLimit, input.MemoryReservation, app.HealthcheckPath, app.HealthcheckTimeout, app.BasicAuthUser, app.BasicAuthPassword, app.ServerID, app.ParentAppID, app.PRNumber, app.IsPreview, app.PreviewTemplateDomain, app.PRPreviewsEnabled, app.GitToken, app.PreDeploymentCommand, app.PostDeploymentCommand, app.CreatedAt, app.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -110,7 +112,7 @@ func (r *Repo) Create(input models.CreateApplicationInput) (*models.Application,
 	return r.CreateWithContext(context.Background(), input)
 }
 
-const applicationColumns = `id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, parent_app_id, pr_number, is_preview, preview_template_domain, pr_previews_enabled, git_token, created_at, updated_at`
+const applicationColumns = `id, environment_id, name, slug, source_type, repository_url, branch, build_path, dockerfile_path, docker_image, custom_domain, app_port, container_id, container_name, status, webhook_secret, cpu_limit, memory_limit, memory_reservation, healthcheck_path, healthcheck_timeout, basic_auth_user, basic_auth_password, server_id, parent_app_id, pr_number, is_preview, preview_template_domain, pr_previews_enabled, git_token, pre_deployment_command, post_deployment_command, created_at, updated_at`
 
 func scanApplication(scanner interface{ Scan(dest ...any) error }, app *models.Application) error {
 	return scanner.Scan(
@@ -120,7 +122,7 @@ func scanApplication(scanner interface{ Scan(dest ...any) error }, app *models.A
 		&app.WebhookSecret, &app.CPULimit, &app.MemoryLimit, &app.MemoryReservation,
 		&app.HealthcheckPath, &app.HealthcheckTimeout, &app.BasicAuthUser, &app.BasicAuthPassword,
 		&app.ServerID, &app.ParentAppID, &app.PRNumber, &app.IsPreview, &app.PreviewTemplateDomain,
-		&app.PRPreviewsEnabled, &app.GitToken, &app.CreatedAt, &app.UpdatedAt,
+		&app.PRPreviewsEnabled, &app.GitToken, &app.PreDeploymentCommand, &app.PostDeploymentCommand, &app.CreatedAt, &app.UpdatedAt,
 	)
 }
 

@@ -54,6 +54,8 @@ type Application struct {
 	PreviewTemplateDomain *string
 	PRPreviewsEnabled     bool
 	GitToken              *string
+	PreDeploymentCommand  *string
+	PostDeploymentCommand *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
@@ -85,6 +87,8 @@ type CreateApplicationInput struct {
 	PreviewTemplateDomain *string
 	PRPreviewsEnabled     bool
 	GitToken              *string
+	PreDeploymentCommand  *string
+	PostDeploymentCommand *string
 }
 
 type AppEnvVar struct {

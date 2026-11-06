@@ -656,3 +656,24 @@ func TestApplications_PRPreviews_GitBot(t *stdtesting.T) {
 	assert.Contains(t, capturedComments[0], "Building & Deploying...")
 }
 
+func TestApplicationLifecycleFields(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+	ctx := context.Background()
+
+	preCmd := "php artisan migrate --force"
+	postCmd := "php artisan optimize:clear"
+
+	app, err := mod.Repo.CreateWithContext(ctx, models.CreateApplicationInput{
+		EnvironmentID:         "env-1",
+		Name:                  "Lifecycle App",
+		Slug:                  "lifecycle-app",
+		SourceType:            models.SourceTypeDockerImage,
+		PreDeploymentCommand:  &preCmd,
+		PostDeploymentCommand: &postCmd,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, app.PreDeploymentCommand)
+	assert.Equal(t, "php artisan migrate --force", *app.PreDeploymentCommand)
+	require.NotNil(t, app.PostDeploymentCommand)
+	assert.Equal(t, "php artisan optimize:clear", *app.PostDeploymentCommand)
+}

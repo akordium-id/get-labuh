@@ -7,7 +7,9 @@ const (
 	DeployStepBuild       DeployStep = "build"
 	DeployStepPush        DeployStep = "push"
 	DeployStepDeploy      DeployStep = "deploy"
+	DeployStepPreDeploy   DeployStep = "pre_deploy"
 	DeployStepHealthcheck DeployStep = "healthcheck"
+	DeployStepPostDeploy  DeployStep = "post_deploy"
 	DeployStepCleanup     DeployStep = "cleanup"
 	DeployStepDone        DeployStep = "done"
 )
