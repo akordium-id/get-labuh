@@ -2,6 +2,7 @@ package applications
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -395,6 +396,49 @@ func (h *Handler) CreateEnvVar(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("HX-Redirect", "/applications/"+appID)
 	w.WriteHeader(http.StatusOK)
+}
+
+// BulkCreateEnvVars mem-parsing teks .env mentah dan melakukan upsert ke variabel lingkungan aplikasi.
+func (h *Handler) BulkCreateEnvVars(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	if appID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	rawEnv := r.FormValue("raw_env")
+	forceSecret := r.FormValue("force_secret") == "on" || r.FormValue("force_secret") == "true"
+
+	parsedVars := ParseEnvContent(rawEnv, forceSecret)
+	if len(parsedVars) == 0 {
+		setToast(w, "Tidak ada variabel yang ditemukan di format .env", "error")
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Redirect", "/applications/"+appID+"#env")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, "/applications/"+appID+"#env", http.StatusFound)
+		return
+	}
+
+	count, err := h.envVarRepo.UpsertBulkWithContext(r.Context(), appID, parsedVars)
+	if err != nil {
+		http.Error(w, "Failed to import environment variables: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, fmt.Sprintf("%d environment variables berhasil diimpor & disimpan", count), "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+appID+"#env")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID+"#env", http.StatusFound)
 }
 
 // DeleteEnvVar menghapus variabel lingkungan aplikasi.

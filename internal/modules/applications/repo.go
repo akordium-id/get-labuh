@@ -668,6 +668,65 @@ func (r *EnvVarRepo) Create(input models.CreateAppEnvVarInput) (*models.AppEnvVa
 	return r.CreateWithContext(context.Background(), input)
 }
 
+// UpsertBulkWithContext memasukkan atau memperbarui beberapa environment variables sekaligus dalam satu transaksi.
+func (r *EnvVarRepo) UpsertBulkWithContext(ctx context.Context, appID string, vars []models.CreateAppEnvVarInput) (int, error) {
+	if len(vars) == 0 {
+		return 0, nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO app_env_vars (id, application_id, key, value, is_secret, is_encrypted, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(application_id, key) DO UPDATE SET
+			value = excluded.value,
+			is_secret = excluded.is_secret,
+			is_encrypted = excluded.is_encrypted,
+			updated_at = excluded.updated_at
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	count := 0
+	for _, v := range vars {
+		val := v.Value
+		isEncrypted := v.IsSecret && encryption.IsInitialized()
+		if isEncrypted {
+			encrypted, encErr := encryption.Encrypt(val)
+			if encErr != nil {
+				return 0, encErr
+			}
+			val = encryption.EncryptedValue(encrypted)
+		}
+
+		id := uuid.New().String()
+		_, err := stmt.ExecContext(ctx, id, appID, v.Key, val, v.IsSecret, isEncrypted, now, now)
+		if err != nil {
+			return 0, err
+		}
+		count++
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (r *EnvVarRepo) UpsertBulk(appID string, vars []models.CreateAppEnvVarInput) (int, error) {
+	return r.UpsertBulkWithContext(context.Background(), appID, vars)
+}
+
+
 // GetByIDWithContext mengambil variabel lingkungan berdasarkan ID dengan context.
 func (r *EnvVarRepo) GetByIDWithContext(ctx context.Context, id string) (*models.AppEnvVar, error) {
 	envVar := &models.AppEnvVar{}

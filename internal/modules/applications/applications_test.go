@@ -201,6 +201,59 @@ func TestEnvVarRepo_CRUD(t *stdtesting.T) {
 	assert.Empty(t, vars)
 }
 
+func TestEnvVarRepo_UpsertBulk(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+	ctx := context.Background()
+
+	app, err := mod.Repo.CreateWithContext(ctx, models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Bulk Env App",
+		Slug:          "bulk-env-app",
+		SourceType:    models.SourceTypeDockerImage,
+	})
+	require.NoError(t, err)
+
+	// Seed existing vars
+	_, err = mod.EnvVarRepo.CreateWithContext(ctx, models.CreateAppEnvVarInput{
+		ApplicationID: app.ID,
+		Key:           "INITIAL_KEY",
+		Value:         "val1",
+	})
+	require.NoError(t, err)
+
+	_, err = mod.EnvVarRepo.CreateWithContext(ctx, models.CreateAppEnvVarInput{
+		ApplicationID: app.ID,
+		Key:           "TO_OVERWRITE",
+		Value:         "old_val",
+	})
+	require.NoError(t, err)
+
+	// Perform Bulk Upsert
+	bulkInputs := []models.CreateAppEnvVarInput{
+		{Key: "TO_OVERWRITE", Value: "new_val", IsSecret: false},
+		{Key: "NEW_KEY", Value: "val2", IsSecret: true},
+	}
+
+	count, err := mod.EnvVarRepo.UpsertBulkWithContext(ctx, app.ID, bulkInputs)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	vars, err := mod.EnvVarRepo.GetByApplicationIDWithContext(ctx, app.ID)
+	require.NoError(t, err)
+	assert.Len(t, vars, 3)
+
+	varMap := make(map[string]*models.AppEnvVar)
+	for _, v := range vars {
+		varMap[v.Key] = v
+	}
+
+	assert.Equal(t, "val1", varMap["INITIAL_KEY"].Value)
+	assert.Equal(t, "new_val", varMap["TO_OVERWRITE"].Value)
+	assert.Equal(t, "val2", varMap["NEW_KEY"].Value)
+	assert.True(t, varMap["NEW_KEY"].IsSecret)
+}
+
+
 func TestApplicationsHandler_ResourceLimits(t *stdtesting.T) {
 	mod, _, _ := setupTestModule(t)
 
@@ -749,4 +802,37 @@ func TestApplicationsHandler_UpdateLifecycleCommands(t *stdtesting.T) {
 	require.NotNil(t, updated.PostDeploymentCommand)
 	assert.Equal(t, "php artisan optimize:clear", *updated.PostDeploymentCommand)
 }
+
+func TestApplicationsHandler_BulkCreateEnvVars(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Bulk Env App Test",
+		Slug:          "bulk-env-app-test",
+		SourceType:    models.SourceTypeDockerImage,
+	})
+	require.NoError(t, err)
+
+	form := url.Values{}
+	form.Set("raw_env", "DATABASE_URL=postgres://localhost:5432/mydb\nAPP_DEBUG=true\nAPI_KEY=xyz123")
+
+	req := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/env-vars/bulk", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", app.ID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	mod.Handler.BulkCreateEnvVars(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/applications/"+app.ID+"#env", rec.Header().Get("Location"))
+
+	vars, err := mod.EnvVarRepo.GetByApplicationIDWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	assert.Len(t, vars, 3)
+}
+
 

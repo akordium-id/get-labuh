@@ -362,13 +362,43 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 		</div>
 
 		<!-- TAB 2: ENVIRONMENT VARIABLES -->
-		<div x-show="tab === 'env'" class="space-y-6">
+		<div x-show="tab === 'env'" x-data="{ showBulk: false }" class="space-y-6">
 			<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
 				<div class="flex justify-between items-center mb-4">
 					<div>
 						<h2 class="text-base font-bold text-gray-900">Environment Variables</h2>
 						<p class="text-xs text-gray-500 mt-0.5">Variabel environment otomatis diinjeksi ke dalam container kandidat dan dienkripsi di database.</p>
 					</div>
+					<div>
+						<button type="button" @click="showBulk = !showBulk" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 shadow-xs transition-colors">
+							<svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+							<span x-text="showBulk ? 'Tutup Bulk Editor' : 'Bulk Import / Paste .env'"></span>
+						</button>
+					</div>
+				</div>
+
+				<!-- Bulk Import .env Section (Collapsible via Alpine) -->
+				<div x-show="showBulk" x-transition class="mb-5 p-4 bg-gray-900 text-gray-100 rounded-lg border border-gray-800 shadow-inner">
+					<div class="flex justify-between items-center mb-2">
+						<span class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+							<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20"></path></svg>
+							Paste .env File Content (Upsert / Merge)
+						</span>
+						<span class="text-[11px] text-gray-400">Format: KEY=VALUE (komentar # dan export didukung)</span>
+					</div>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/env-vars/bulk") } method="post" class="space-y-3">
+						<textarea name="raw_env" rows="6" placeholder={ "# Paste isi file .env di sini\nAPP_NAME=\"My App\"\nDATABASE_URL=postgres://user:pass@host:5432/db\nAPI_SECRET=my-secret-key" } class="w-full bg-gray-950 border border-gray-700 rounded-md p-3 text-xs font-mono text-emerald-400 placeholder-gray-600 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500" required></textarea>
+						<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-1">
+							<label class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+								<input type="checkbox" name="force_secret" class="rounded border-gray-700 bg-gray-800 text-blue-500 focus:ring-blue-500"/>
+								<span>Tandai semua sebagai Secret (Masked &amp; Enkripsi)</span>
+								<span class="text-[10px] text-gray-400">(Secara default, key sensitif seperti PASS, SECRET, TOKEN, KEY otomatis terdeteksi)</span>
+							</label>
+							<button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-md transition-colors whitespace-nowrap">
+								Import &amp; Merge Variables
+							</button>
+						</div>
+					</form>
 				</div>
 
 				<!-- Form Add Env Var -->

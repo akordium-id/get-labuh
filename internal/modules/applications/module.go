@@ -92,6 +92,7 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/applications/{id}/restart", m.Handler.Restart)
 	r.Post("/applications/{id}/deploy", m.Handler.Deploy)
 	r.Post("/applications/{id}/env-vars", m.Handler.CreateEnvVar)
+	r.Post("/applications/{id}/env-vars/bulk", m.Handler.BulkCreateEnvVars)
 	r.Post("/applications/{id}/env-vars/{var_id}/delete", m.Handler.DeleteEnvVar)
 	r.Post("/applications/{id}/domain", m.Handler.SetDomain)
 	r.Post("/applications/{id}/domain/remove", m.Handler.RemoveDomain)
