@@ -54,9 +54,14 @@ templ Sidebar(currentMode ...string) {
 				   :class="window.location.pathname === '/templates' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
 					Templates
 				</a>
+				<a href="/settings/cleanup"
+				   class="block px-4 py-2 rounded text-sm transition-colors"
+				   :class="window.location.pathname === '/settings/cleanup' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
+					Docker Cleanup
+				</a>
 				<a href="/settings/api-keys"
 				   class="block px-4 py-2 rounded text-sm transition-colors"
-				   :class="window.location.pathname.startsWith('/settings') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
+				   :class="window.location.pathname.startsWith('/settings') && window.location.pathname !== '/settings/cleanup' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
 					Settings
 				</a>
 			}

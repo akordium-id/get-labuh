@@ -1,0 +1,104 @@
+package settings
+
+templ CleanupPage(enabled bool, schedule string, lastRun string, lastReclaimed string) {
+	<div>
+		<div class="flex justify-between items-center mb-6">
+			<div>
+				<h1 class="text-3xl font-bold text-gray-900">Docker Disk Cleanup</h1>
+				<p class="text-sm text-gray-500 mt-1">Automated cleanup for dangling images, build cache, and stopped containers to prevent disk exhaustion.</p>
+			</div>
+			<div>
+				<form action="/settings/cleanup/run" method="post" class="inline">
+					<button type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg shadow-sm transition-colors text-sm">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+						</svg>
+						Run Cleanup Now
+					</button>
+				</form>
+			</div>
+		</div>
+
+		<!-- Status & Stats Card -->
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<div class="flex items-center gap-3 mb-2">
+					<div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+					</div>
+					<h2 class="text-base font-semibold text-gray-900">Last Cleanup Run</h2>
+				</div>
+				<p class="text-2xl font-bold text-gray-900 font-mono">{ lastRun }</p>
+				<p class="text-xs text-gray-500 mt-1">Waktu terakhir proses pembersihan Docker dijalankan.</p>
+			</div>
+
+			<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+				<div class="flex items-center gap-3 mb-2">
+					<div class="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16m-5 4h.01"></path>
+						</svg>
+					</div>
+					<h2 class="text-base font-semibold text-gray-900">Last Reclaimed Space</h2>
+				</div>
+				<p class="text-2xl font-bold text-emerald-600 font-mono">{ lastReclaimed }</p>
+				<p class="text-xs text-gray-500 mt-1">Kapasitas disk yang berhasil dibebaskan pada proses terakhir.</p>
+			</div>
+		</div>
+
+		<!-- Schedule & Configuration Card -->
+		<div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+			<h2 class="text-lg font-bold text-gray-900 mb-2">Automated Schedule</h2>
+			<p class="text-sm text-gray-500 mb-6">Konfigurasi jadwal pembersihan berkala. Tagged rollback images (5 versi terakhir per aplikasi) tetap dilindungi.</p>
+
+			<form action="/settings/cleanup" method="post" class="space-y-6">
+				<div>
+					<label class="inline-flex items-center gap-3 cursor-pointer">
+						<input type="checkbox" name="docker_cleanup_enabled" value="true" checked?={ enabled } class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"/>
+						<div>
+							<span class="text-sm font-medium text-gray-900">Enable Automated Docker Cleanup</span>
+							<p class="text-xs text-gray-500">Jalankan pembersihan dangling images, build cache, dan stopped containers sesuai jadwal.</p>
+						</div>
+					</label>
+				</div>
+
+				<div class="max-w-md space-y-2">
+					<label class="block text-sm font-medium text-gray-700">Cron Schedule Expression</label>
+					<div class="flex gap-2">
+						<input type="text" name="docker_cleanup_schedule" value={ schedule } placeholder="0 2 * * *" class="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"/>
+					</div>
+					<p class="text-xs text-gray-500">
+						Format standar cron 5-kolom atau preset:
+						<code class="bg-gray-100 text-indigo-700 px-1 py-0.5 rounded font-mono">0 2 * * *</code> (Setiap jam 02:00 malam),
+						<code class="bg-gray-100 text-indigo-700 px-1 py-0.5 rounded font-mono">{ "@" }daily</code>, atau
+						<code class="bg-gray-100 text-indigo-700 px-1 py-0.5 rounded font-mono">{ "@" }weekly</code>.
+					</p>
+				</div>
+
+				<div class="pt-4 border-t border-gray-100 flex items-center justify-end">
+					<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors">
+						Save Cleanup Settings
+					</button>
+				</div>
+			</form>
+		</div>
+
+		<!-- Safety Note Callout -->
+		<div class="rounded-lg bg-amber-50 border border-amber-200 p-4">
+			<div class="flex items-start gap-3">
+				<svg class="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+				</svg>
+				<div class="text-sm text-amber-800">
+					<p class="font-semibold mb-1">Proteksi Rollback Deployment</p>
+					<p class="text-xs text-amber-700 leading-relaxed">
+						Proses pembersihan hanya menghapus <strong>dangling images</strong> (tanpa tag nama/versi), build cache kadaluarsa, dan stopped containers.
+						Image rollback aktif untuk 5 deployment terakhir tiap aplikasi tetap tersimpan aman di Docker host.
+					</p>
+				</div>
+			</div>
+		</div>
+	</div>
+}
