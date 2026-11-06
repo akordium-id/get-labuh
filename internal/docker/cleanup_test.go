@@ -49,3 +49,4 @@ func TestPruneSystem_LiveOrMock(t *testing.T) {
 	require.NotNil(t, report)
 	assert.NotEmpty(t, report.SpaceFormatted)
 }
+

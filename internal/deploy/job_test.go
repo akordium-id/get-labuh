@@ -237,4 +237,3 @@ func TestPipeline_PostDeployCommand_Failure(t *testing.T) {
 	require.NotNil(t, updatedDeploy.Step)
 	assert.Equal(t, "done", *updatedDeploy.Step)
 }
-

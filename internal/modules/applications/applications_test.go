@@ -253,7 +253,6 @@ func TestEnvVarRepo_UpsertBulk(t *stdtesting.T) {
 	assert.True(t, varMap["NEW_KEY"].IsSecret)
 }
 
-
 func TestApplicationsHandler_ResourceLimits(t *stdtesting.T) {
 	mod, _, _ := setupTestModule(t)
 
@@ -834,5 +833,3 @@ func TestApplicationsHandler_BulkCreateEnvVars(t *stdtesting.T) {
 	require.NoError(t, err)
 	assert.Len(t, vars, 3)
 }
-
-

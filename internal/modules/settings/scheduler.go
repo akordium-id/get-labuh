@@ -169,3 +169,4 @@ func (s *CleanupScheduler) RunCleanup(ctx context.Context) (*docker.PruneReport,
 	slog.Info("cleanup scheduler: docker cleanup completed", "space_reclaimed", report.SpaceFormatted)
 	return report, nil
 }
+

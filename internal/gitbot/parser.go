@@ -15,9 +15,9 @@ func ParseRepo(rawURL string) (provider, ownerOrPath, repoName string, err error
 
 	var host, path string
 
-	if strings.HasPrefix(rawURL, "git@") {
+	if after, ok := strings.CutPrefix(rawURL, "git@"); ok {
 		// Contoh: git@github.com:akordium-id/get-labuh.git
-		parts := strings.SplitN(strings.TrimPrefix(rawURL, "git@"), ":", 2)
+		parts := strings.SplitN(after, ":", 2)
 		if len(parts) != 2 {
 			return "", "", "", fmt.Errorf("invalid ssh repository url: %s", rawURL)
 		}

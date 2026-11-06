@@ -235,3 +235,4 @@ Run: `go build -o /dev/null ./cmd/labuh`
 Expected: 0 errors.
 
 - [ ] **Step 3: Save personal-memory checkpoint**
+

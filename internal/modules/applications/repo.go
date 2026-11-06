@@ -726,7 +726,6 @@ func (r *EnvVarRepo) UpsertBulk(appID string, vars []models.CreateAppEnvVarInput
 	return r.UpsertBulkWithContext(context.Background(), appID, vars)
 }
 
-
 // GetByIDWithContext mengambil variabel lingkungan berdasarkan ID dengan context.
 func (r *EnvVarRepo) GetByIDWithContext(ctx context.Context, id string) (*models.AppEnvVar, error) {
 	envVar := &models.AppEnvVar{}

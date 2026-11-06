@@ -171,3 +171,4 @@ func DefaultPruneOptions() PruneOptions {
    - Test `POST /settings/cleanup/run` (manual trigger).
 4. **Full Suite Verification**:
    - `go test ./...` dan `go build ./cmd/labuh`.
+

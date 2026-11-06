@@ -313,5 +313,3 @@ func (w *DeployWorker) dispatchPRPreviewComment(app *models.Application, appRepo
 		}
 	}()
 }
-
-

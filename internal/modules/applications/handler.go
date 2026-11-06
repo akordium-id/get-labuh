@@ -1059,4 +1059,3 @@ func (h *Handler) UpdateLifecycleCommands(w http.ResponseWriter, r *http.Request
 	}
 	http.Redirect(w, r, "/applications/"+id+"#advanced", http.StatusFound)
 }
-

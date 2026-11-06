@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	Marker         = "<!-- labuh-pr-preview -->"
-	StatusBuilding = "building"
-	StatusLive     = "live"
-	StatusFailed   = "failed"
+	Marker          = "<!-- labuh-pr-preview -->"
+	StatusBuilding  = "building"
+	StatusLive      = "live"
+	StatusFailed    = "failed"
 	StatusDestroyed = "destroyed"
 )
 
