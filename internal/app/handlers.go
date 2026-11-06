@@ -117,6 +117,11 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		applicationsMod.CronScheduler.Start()
 	}
 
+	if settingsMod.CleanupScheduler != nil {
+		settingsMod.CleanupScheduler.SetDockerClient(dockerClient)
+		settingsMod.CleanupScheduler.Start()
+	}
+
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
