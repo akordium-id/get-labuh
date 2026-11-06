@@ -713,3 +713,40 @@ func TestUpdateLifecycleCommands(t *stdtesting.T) {
 	assert.Nil(t, updated2.PreDeploymentCommand)
 	assert.Nil(t, updated2.PostDeploymentCommand)
 }
+
+func TestApplicationsHandler_UpdateLifecycleCommands(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Lifecycle App 3",
+		Slug:          "lifecycle-app-3",
+		SourceType:    models.SourceTypeDockerImage,
+	})
+	require.NoError(t, err)
+
+	form := url.Values{}
+	form.Set("pre_deployment_command", "php artisan migrate --force")
+	form.Set("post_deployment_command", "php artisan optimize:clear")
+
+	req := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/lifecycle-commands", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", app.ID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	mod.Handler.UpdateLifecycleCommands(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/applications/"+app.ID+"#advanced", rec.Header().Get("Location"))
+
+	updated, err := mod.Repo.GetByIDWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated.PreDeploymentCommand)
+	assert.Equal(t, "php artisan migrate --force", *updated.PreDeploymentCommand)
+	require.NotNil(t, updated.PostDeploymentCommand)
+	assert.Equal(t, "php artisan optimize:clear", *updated.PostDeploymentCommand)
+}
+

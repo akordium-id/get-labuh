@@ -111,6 +111,9 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	// Application PR Previews
 	r.Post("/applications/{id}/pr-previews", m.Handler.UpdatePRPreviewsConfig)
 	r.Post("/applications/{id}/previews/{preview_id}/teardown", m.Handler.TeardownPRPreview)
+
+	// Application Lifecycle Hooks
+	r.Post("/applications/{id}/lifecycle-commands", m.Handler.UpdateLifecycleCommands)
 }
 
 // RegisterPublicRoutes mendaftarkan rute publik webhook.

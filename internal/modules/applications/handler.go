@@ -971,3 +971,48 @@ func (h *Handler) TeardownPRPreview(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Redirect", "/applications/"+parentID+"#previews")
 	w.WriteHeader(http.StatusOK)
 }
+
+// UpdateLifecycleCommands memperbarui pre dan post deployment commands aplikasi.
+func (h *Handler) UpdateLifecycleCommands(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.appRepo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	preCmd := strings.TrimSpace(r.FormValue("pre_deployment_command"))
+	postCmd := strings.TrimSpace(r.FormValue("post_deployment_command"))
+
+	var preCmdPtr, postCmdPtr *string
+	if preCmd != "" {
+		preCmdPtr = &preCmd
+	}
+	if postCmd != "" {
+		postCmdPtr = &postCmd
+	}
+
+	if err := h.appRepo.UpdateLifecycleCommandsWithContext(r.Context(), id, preCmdPtr, postCmdPtr); err != nil {
+		http.Error(w, "Failed to update lifecycle commands: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Konfigurasi lifecycle commands berhasil disimpan", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+id+"#advanced")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+id+"#advanced", http.StatusFound)
+}
+
