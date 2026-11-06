@@ -677,3 +677,39 @@ func TestApplicationLifecycleFields(t *stdtesting.T) {
 	require.NotNil(t, app.PostDeploymentCommand)
 	assert.Equal(t, "php artisan optimize:clear", *app.PostDeploymentCommand)
 }
+
+func TestUpdateLifecycleCommands(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+	ctx := context.Background()
+
+	app, err := mod.Repo.CreateWithContext(ctx, models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Lifecycle App 2",
+		Slug:          "lifecycle-app-2",
+		SourceType:    models.SourceTypeDockerImage,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, app.PreDeploymentCommand)
+	assert.Nil(t, app.PostDeploymentCommand)
+
+	newPre := "npm run prisma:migrate"
+	newPost := "npm run cache:warm"
+	err = mod.Repo.UpdateLifecycleCommands(ctx, app.ID, &newPre, &newPost)
+	require.NoError(t, err)
+
+	updated, err := mod.Repo.GetByIDWithContext(ctx, app.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated.PreDeploymentCommand)
+	assert.Equal(t, newPre, *updated.PreDeploymentCommand)
+	require.NotNil(t, updated.PostDeploymentCommand)
+	assert.Equal(t, newPost, *updated.PostDeploymentCommand)
+
+	// Test reset to nil
+	err = mod.Repo.UpdateLifecycleCommands(ctx, app.ID, nil, nil)
+	require.NoError(t, err)
+
+	updated2, err := mod.Repo.GetByIDWithContext(ctx, app.ID)
+	require.NoError(t, err)
+	assert.Nil(t, updated2.PreDeploymentCommand)
+	assert.Nil(t, updated2.PostDeploymentCommand)
+}

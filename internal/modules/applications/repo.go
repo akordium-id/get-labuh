@@ -516,6 +516,20 @@ func (r *Repo) UpdateGitToken(id string, gitToken *string) error {
 	return r.UpdateGitTokenWithContext(context.Background(), id, gitToken)
 }
 
+// UpdateLifecycleCommandsWithContext memperbarui pre dan post deployment command aplikasi.
+func (r *Repo) UpdateLifecycleCommandsWithContext(ctx context.Context, id string, preCmd, postCmd *string) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE applications SET pre_deployment_command = ?, post_deployment_command = ?, updated_at = ? WHERE id = ?`,
+		preCmd, postCmd, time.Now(), id,
+	)
+	return err
+}
+
+func (r *Repo) UpdateLifecycleCommands(ctx context.Context, id string, preCmd, postCmd *string) error {
+	return r.UpdateLifecycleCommandsWithContext(ctx, id, preCmd, postCmd)
+}
+
 // GetByParentAndPR mengambil aplikasi preview berdasarkan parent ID dan nomor PR.
 func (r *Repo) GetByParentAndPRWithContext(ctx context.Context, parentID string, prNumber int) (*models.Application, error) {
 	app := &models.Application{}
