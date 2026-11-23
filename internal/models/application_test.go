@@ -65,3 +65,28 @@ func TestCreateApplicationInput(t *stdtesting.T) {
 	assert.Equal(t, SourceTypeDockerfile, input.SourceType)
 	assert.Equal(t, 3000, input.AppPort)
 }
+
+func TestAppVolumeModel(t *stdtesting.T) {
+	vol := AppVolume{
+		ID:            "vol-1",
+		ApplicationID: "app-1",
+		Name:          "uploads",
+		VolumeType:    VolumeTypeNamed,
+		MountPath:     "/app/storage",
+		IsReadOnly:    false,
+	}
+	assert.Equal(t, VolumeTypeNamed, vol.VolumeType)
+	assert.Equal(t, "/app/storage", vol.MountPath)
+
+	fileMount := AppFileMount{
+		ID:            "fm-1",
+		ApplicationID: "app-1",
+		MountPath:     "/etc/nginx/nginx.conf",
+		Content:       "events {}",
+		FileMode:      "0644",
+		IsReadOnly:    true,
+	}
+	assert.Equal(t, "/etc/nginx/nginx.conf", fileMount.MountPath)
+	assert.True(t, fileMount.IsReadOnly)
+}
+

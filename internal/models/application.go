@@ -148,3 +148,51 @@ type CreateDeploymentInput struct {
 	Step          *string
 	Output        *string
 }
+
+type VolumeType string
+
+const (
+	VolumeTypeNamed VolumeType = "named"
+	VolumeTypeBind  VolumeType = "bind"
+)
+
+type AppVolume struct {
+	ID            string     `json:"id"`
+	ApplicationID string     `json:"application_id"`
+	Name          string     `json:"name"`
+	VolumeType    VolumeType `json:"volume_type"`
+	HostPath      *string    `json:"host_path"`
+	MountPath     string     `json:"mount_path"`
+	IsReadOnly    bool       `json:"is_read_only"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+type CreateAppVolumeInput struct {
+	ApplicationID string     `json:"application_id"`
+	Name          string     `json:"name"`
+	VolumeType    VolumeType `json:"volume_type"`
+	HostPath      *string    `json:"host_path"`
+	MountPath     string     `json:"mount_path"`
+	IsReadOnly    bool       `json:"is_read_only"`
+}
+
+type AppFileMount struct {
+	ID            string    `json:"id"`
+	ApplicationID string    `json:"application_id"`
+	MountPath     string    `json:"mount_path"`
+	Content       string    `json:"content"`
+	FileMode      string    `json:"file_mode"`
+	IsReadOnly    bool      `json:"is_read_only"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type CreateAppFileMountInput struct {
+	ApplicationID string `json:"application_id"`
+	MountPath     string `json:"mount_path"`
+	Content       string `json:"content"`
+	FileMode      string `json:"file_mode"`
+	IsReadOnly    bool   `json:"is_read_only"`
+}
+
