@@ -20,11 +20,11 @@ Implementation plan for Sub-Project 3 (Opsi A) in `get-labuh`.
 - Modify: `internal/models/notification.go`
 - Create: `internal/models/notification_channel_test.go`
 
-- [ ] **Step 1: Write model test**
-- [ ] **Step 2: Create SQL migration `031`**
-- [ ] **Step 3: Update `models.NotificationChannel`**
-- [ ] **Step 4: Verify test passes**
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Write model test**
+- [x] **Step 2: Create SQL migration `031`**
+- [x] **Step 3: Update `models.NotificationChannel`**
+- [x] **Step 4: Verify test passes**
+- [x] **Step 5: Commit**
 
 ---
 
@@ -35,11 +35,11 @@ Implementation plan for Sub-Project 3 (Opsi A) in `get-labuh`.
 - Modify: `internal/modules/notifications/notifier.go`
 - Create: `internal/modules/notifications/webhook_notifier_test.go`
 
-- [ ] **Step 1: Write webhook notifier tests with mock HTTP server**
-- [ ] **Step 2: Update `repo.go` for new columns and `server_alert` event**
-- [ ] **Step 3: Implement `sendWebhook` in `notifier.go`**
-- [ ] **Step 4: Verify tests pass**
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Write webhook notifier tests with mock HTTP server**
+- [x] **Step 2: Update `repo.go` for new columns and `server_alert` event**
+- [x] **Step 3: Implement `sendWebhook` in `notifier.go`**
+- [x] **Step 4: Verify tests pass**
+- [x] **Step 5: Commit**
 
 ---
 
@@ -49,10 +49,10 @@ Implementation plan for Sub-Project 3 (Opsi A) in `get-labuh`.
 - Create: `internal/observability/host.go`
 - Create: `internal/observability/host_test.go`
 
-- [ ] **Step 1: Write host metrics test**
-- [ ] **Step 2: Implement `GetHostStats()` with `Statfs`, `/proc/meminfo`, `/proc/loadavg`**
-- [ ] **Step 3: Verify tests pass**
-- [ ] **Step 4: Commit**
+- [x] **Step 1: Write host metrics test**
+- [x] **Step 2: Implement `GetHostStats()` with `Statfs`, `/proc/meminfo`, `/proc/loadavg`**
+- [x] **Step 3: Verify tests pass**
+- [x] **Step 4: Commit**
 
 ---
 
@@ -62,10 +62,10 @@ Implementation plan for Sub-Project 3 (Opsi A) in `get-labuh`.
 - Create: `internal/observability/host_monitor.go`
 - Create: `internal/observability/host_monitor_test.go`
 
-- [ ] **Step 1: Write host monitor state machine & cooldown tests**
-- [ ] **Step 2: Implement `HostMonitor` daemon**
-- [ ] **Step 3: Verify tests pass**
-- [ ] **Step 4: Commit**
+- [x] **Step 1: Write host monitor state machine & cooldown tests**
+- [x] **Step 2: Implement `HostMonitor` daemon**
+- [x] **Step 3: Verify tests pass**
+- [x] **Step 4: Commit**
 
 ---
 
@@ -77,11 +77,11 @@ Implementation plan for Sub-Project 3 (Opsi A) in `get-labuh`.
 - Modify: `internal/app/handlers.go`
 - Create: `internal/modules/settings/monitoring_handler_test.go`
 
-- [ ] **Step 1: Write settings monitoring handler test**
-- [ ] **Step 2: Implement monitoring settings handlers & routes**
-- [ ] **Step 3: Wire `HostMonitor` in `internal/app/handlers.go`**
-- [ ] **Step 4: Verify tests pass**
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Write settings monitoring handler test**
+- [x] **Step 2: Implement monitoring settings handlers & routes**
+- [x] **Step 3: Wire `HostMonitor` in `internal/app/handlers.go`**
+- [x] **Step 4: Verify tests pass**
+- [x] **Step 5: Commit**
 
 ---
 
@@ -92,10 +92,10 @@ Implementation plan for Sub-Project 3 (Opsi A) in `get-labuh`.
 - Modify: `internal/web/pages/settings/notifications.templ`
 - Generate: `templ generate`
 
-- [ ] **Step 1: Create `monitoring.templ` with realtime gauges and threshold form**
-- [ ] **Step 2: Update `notifications.templ` with Generic Webhook & Server Alert toggle**
-- [ ] **Step 3: Run `templ generate` and verify build**
-- [ ] **Step 4: Commit**
+- [x] **Step 1: Create `monitoring.templ` with realtime gauges and threshold form**
+- [x] **Step 2: Update `notifications.templ` with Generic Webhook & Server Alert toggle**
+- [x] **Step 3: Run `templ generate` and verify build**
+- [x] **Step 4: Commit**
 
 ---
 
@@ -104,6 +104,6 @@ Implementation plan for Sub-Project 3 (Opsi A) in `get-labuh`.
 **Files:**
 - Create: `internal/testing/observability_alert_test.go`
 
-- [ ] **Step 1: Write integration test covering alert triggering, webhook dispatch, and resolved status**
-- [ ] **Step 2: Run full regression suite `go test -v ./...`**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Write integration test covering alert triggering, webhook dispatch, and resolved status**
+- [x] **Step 2: Run full regression suite `go test -v ./...`**
+- [x] **Step 3: Commit**
