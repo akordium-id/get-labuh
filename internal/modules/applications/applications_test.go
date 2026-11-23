@@ -833,3 +833,65 @@ func TestApplicationsHandler_BulkCreateEnvVars(t *stdtesting.T) {
 	require.NoError(t, err)
 	assert.Len(t, vars, 3)
 }
+
+func TestVolumeHandlers(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+	r := chi.NewRouter()
+	mod.RegisterRoutes(r)
+
+	// Create app first
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "Storage Handler App",
+		SourceType:    models.SourceTypeDockerImage,
+		AppPort:       8080,
+	})
+	require.NoError(t, err)
+
+	// 1. Create Volume (Named)
+	form := url.Values{}
+	form.Set("name", "uploads")
+	form.Set("volume_type", "named")
+	form.Set("mount_path", "/app/uploads")
+	req := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "/applications/"+app.ID+"#storage", rec.Header().Get("HX-Redirect"))
+
+	vols, err := mod.Repo.GetVolumesByAppID(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.Len(t, vols, 1)
+
+	// 2. Create Volume with Forbidden Host Path -> should fail 400
+	formBad := url.Values{}
+	formBad.Set("name", "bad-bind")
+	formBad.Set("volume_type", "bind")
+	formBad.Set("host_path", "/etc/shadow")
+	formBad.Set("mount_path", "/app/etc")
+	reqBad := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(formBad.Encode()))
+	reqBad.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recBad := httptest.NewRecorder()
+	r.ServeHTTP(recBad, reqBad)
+	assert.Equal(t, http.StatusBadRequest, recBad.Code)
+
+	// 3. Create File Mount
+	formFM := url.Values{}
+	formFM.Set("mount_path", "/etc/nginx/nginx.conf")
+	formFM.Set("content", "events {}")
+	formFM.Set("file_mode", "0644")
+	formFM.Set("is_read_only", "true")
+	reqFM := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/file-mounts", strings.NewReader(formFM.Encode()))
+	reqFM.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqFM.Header.Set("HX-Request", "true")
+	recFM := httptest.NewRecorder()
+	r.ServeHTTP(recFM, reqFM)
+	assert.Equal(t, http.StatusOK, recFM.Code)
+
+	fms, err := mod.Repo.GetFileMountsByAppID(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.Len(t, fms, 1)
+}
+

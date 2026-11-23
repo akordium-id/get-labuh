@@ -1059,3 +1059,200 @@ func (h *Handler) UpdateLifecycleCommands(w http.ResponseWriter, r *http.Request
 	}
 	http.Redirect(w, r, "/applications/"+id+"#advanced", http.StatusFound)
 }
+
+// CreateVolume menambahkan konfigurasi persistent volume untuk aplikasi.
+func (h *Handler) CreateVolume(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	if appID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	volType := strings.TrimSpace(r.FormValue("volume_type"))
+	hostPath := strings.TrimSpace(r.FormValue("host_path"))
+	mountPath := strings.TrimSpace(r.FormValue("mount_path"))
+	isReadOnly := r.FormValue("is_read_only") == "true" || r.FormValue("is_read_only") == "1" || r.FormValue("is_read_only") == "on"
+
+	if name == "" || mountPath == "" {
+		http.Error(w, "Name and mount path are required", http.StatusBadRequest)
+		return
+	}
+
+	if !strings.HasPrefix(mountPath, "/") {
+		http.Error(w, "Mount path must be absolute (start with /)", http.StatusBadRequest)
+		return
+	}
+
+	if volType == "" {
+		volType = string(models.VolumeTypeNamed)
+	}
+
+	var hostPathPtr *string
+	if volType == string(models.VolumeTypeBind) {
+		if hostPath == "" {
+			http.Error(w, "Host path is required for bind volume", http.StatusBadRequest)
+			return
+		}
+		if err := docker.ValidateHostPathSecurity(hostPath); err != nil {
+			http.Error(w, "Invalid host path: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		hostPathPtr = &hostPath
+	}
+
+	_, err := h.appRepo.CreateVolume(r.Context(), models.CreateAppVolumeInput{
+		ApplicationID: appID,
+		Name:          name,
+		VolumeType:    models.VolumeType(volType),
+		HostPath:      hostPathPtr,
+		MountPath:     mountPath,
+		IsReadOnly:    isReadOnly,
+	})
+	if err != nil {
+		http.Error(w, "Failed to create volume: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Persistent volume berhasil ditambahkan", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+appID+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID+"#storage", http.StatusFound)
+}
+
+// DeleteVolume menghapus persistent volume dari aplikasi.
+func (h *Handler) DeleteVolume(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	volID := chi.URLParam(r, "vol_id")
+	if appID == "" || volID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.appRepo.DeleteVolume(r.Context(), volID); err != nil {
+		http.Error(w, "Failed to delete volume: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Persistent volume berhasil dihapus", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+appID+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID+"#storage", http.StatusFound)
+}
+
+// CreateFileMount menambahkan konfigurasi single file mount untuk aplikasi.
+func (h *Handler) CreateFileMount(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	if appID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	mountPath := strings.TrimSpace(r.FormValue("mount_path"))
+	content := r.FormValue("content")
+	fileMode := strings.TrimSpace(r.FormValue("file_mode"))
+	isReadOnly := r.FormValue("is_read_only") == "true" || r.FormValue("is_read_only") == "1" || r.FormValue("is_read_only") == "on"
+
+	if mountPath == "" {
+		http.Error(w, "Mount path is required", http.StatusBadRequest)
+		return
+	}
+	if !strings.HasPrefix(mountPath, "/") {
+		http.Error(w, "Mount path must be absolute (start with /)", http.StatusBadRequest)
+		return
+	}
+
+	if fileMode == "" {
+		fileMode = "0644"
+	}
+
+	_, err := h.appRepo.CreateFileMount(r.Context(), models.CreateAppFileMountInput{
+		ApplicationID: appID,
+		MountPath:     mountPath,
+		Content:       content,
+		FileMode:      fileMode,
+		IsReadOnly:    isReadOnly,
+	})
+	if err != nil {
+		http.Error(w, "Failed to create file mount: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "File mount berhasil ditambahkan", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+appID+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID+"#storage", http.StatusFound)
+}
+
+// UpdateFileMount memperbarui isi konten file mount.
+func (h *Handler) UpdateFileMount(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	fileID := chi.URLParam(r, "file_id")
+	if appID == "" || fileID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	content := r.FormValue("content")
+
+	if err := h.appRepo.UpdateFileMount(r.Context(), fileID, content); err != nil {
+		http.Error(w, "Failed to update file mount: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "File mount berhasil diperbarui", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+appID+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID+"#storage", http.StatusFound)
+}
+
+// DeleteFileMount menghapus konfigurasi file mount.
+func (h *Handler) DeleteFileMount(w http.ResponseWriter, r *http.Request) {
+	appID := chi.URLParam(r, "id")
+	fileID := chi.URLParam(r, "file_id")
+	if appID == "" || fileID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.appRepo.DeleteFileMount(r.Context(), fileID); err != nil {
+		http.Error(w, "Failed to delete file mount: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "File mount berhasil dihapus", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+appID+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID+"#storage", http.StatusFound)
+}
+

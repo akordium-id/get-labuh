@@ -115,6 +115,13 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 
 	// Application Lifecycle Hooks
 	r.Post("/applications/{id}/lifecycle-commands", m.Handler.UpdateLifecycleCommands)
+
+	// Application Persistent Volumes & File Mounts
+	r.Post("/applications/{id}/volumes", m.Handler.CreateVolume)
+	r.Post("/applications/{id}/volumes/{vol_id}/delete", m.Handler.DeleteVolume)
+	r.Post("/applications/{id}/file-mounts", m.Handler.CreateFileMount)
+	r.Post("/applications/{id}/file-mounts/{file_id}/update", m.Handler.UpdateFileMount)
+	r.Post("/applications/{id}/file-mounts/{file_id}/delete", m.Handler.DeleteFileMount)
 }
 
 // RegisterPublicRoutes mendaftarkan rute publik webhook.
