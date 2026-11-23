@@ -54,6 +54,7 @@ type Application struct {
 	PreviewTemplateDomain *string
 	PRPreviewsEnabled     bool
 	GitToken              *string
+	DockerRegistryID      *string
 	PreDeploymentCommand  *string
 	PostDeploymentCommand *string
 	CreatedAt             time.Time
@@ -87,6 +88,7 @@ type CreateApplicationInput struct {
 	PreviewTemplateDomain *string
 	PRPreviewsEnabled     bool
 	GitToken              *string
+	DockerRegistryID      *string
 	PreDeploymentCommand  *string
 	PostDeploymentCommand *string
 }

@@ -23,6 +23,8 @@ type DeploymentJob struct {
 	DockerfilePath string
 	BuildPath      string
 	DockerImage    string
+	DockerRegistryID *string
+	CommitHash     string
 	AppPort        int
 	EnvVars        []AppEnvVar
 	LogPath        string
