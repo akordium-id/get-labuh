@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	stdtesting "testing"
 	"time"
 
@@ -661,7 +662,10 @@ func TestApplications_PRPreviews(t *stdtesting.T) {
 func TestApplications_PRPreviews_GitBot(t *stdtesting.T) {
 	mod, _, _ := setupTestModule(t)
 
-	var capturedComments []string
+	var (
+		mu               sync.Mutex
+		capturedComments []string
+	)
 	gitServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer app_secret_git_token", r.Header.Get("Authorization"))
 		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/comments") {
@@ -672,7 +676,9 @@ func TestApplications_PRPreviews_GitBot(t *stdtesting.T) {
 		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/comments") {
 			var body map[string]string
 			_ = json.NewDecoder(r.Body).Decode(&body)
+			mu.Lock()
 			capturedComments = append(capturedComments, body["body"])
+			mu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": 1, "body": body["body"]})
@@ -731,11 +737,17 @@ func TestApplications_PRPreviews_GitBot(t *stdtesting.T) {
 	assert.Equal(t, http.StatusOK, recOpen.Code)
 
 	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
 		return len(capturedComments) == 1
 	}, 1*time.Second, 10*time.Millisecond)
 
-	assert.Contains(t, capturedComments[0], gitbot.Marker)
-	assert.Contains(t, capturedComments[0], "Building & Deploying...")
+	mu.Lock()
+	comment := capturedComments[0]
+	mu.Unlock()
+
+	assert.Contains(t, comment, gitbot.Marker)
+	assert.Contains(t, comment, "Building & Deploying...")
 }
 
 func TestApplicationLifecycleFields(t *stdtesting.T) {
