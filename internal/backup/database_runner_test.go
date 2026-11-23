@@ -115,3 +115,49 @@ func TestDatabaseBackupRepo_RetentionPruning(t *stdtesting.T) {
 	require.NoError(t, err)
 	assert.Len(t, pruneList, 2)
 }
+
+func TestGetRestoreCommand(t *stdtesting.T) {
+	// 1. Postgres
+	pg := &models.DatabaseService{
+		Engine:       models.DatabaseEnginePostgres,
+		Username:     "postgres",
+		Password:     "secretpass",
+		DatabaseName: "production",
+	}
+	cmd, envs, err := getRestoreCommand(pg)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"psql", "-U", "postgres", "-d", "production"}, cmd)
+	assert.Equal(t, []string{"PGPASSWORD=secretpass"}, envs)
+
+	// 2. MySQL
+	my := &models.DatabaseService{
+		Engine:       models.DatabaseEngineMySQL,
+		Username:     "root",
+		Password:     "dbpass",
+		DatabaseName: "shop",
+	}
+	cmd, envs, err = getRestoreCommand(my)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"mysql", "-uroot", "-pdbpass", "shop"}, cmd)
+	assert.Nil(t, envs)
+
+	// 3. Mongo
+	mg := &models.DatabaseService{
+		Engine:       models.DatabaseEngineMongoDB,
+		Username:     "admin",
+		Password:     "mongopass",
+		DatabaseName: "analytics",
+	}
+	cmd, _, err = getRestoreCommand(mg)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"mongorestore", "--username", "admin", "--password", "mongopass", "--authenticationDatabase", "admin", "--db", "analytics", "--archive", "--drop"}, cmd)
+
+	// 4. Redis
+	rd := &models.DatabaseService{
+		Engine:   models.DatabaseEngineRedis,
+		Password: "redispassword",
+	}
+	cmd, _, err = getRestoreCommand(rd)
+	require.NoError(t, err)
+	assert.Contains(t, cmd[2], "/data/dump.rdb")
+}

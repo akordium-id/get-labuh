@@ -1,9 +1,11 @@
 package backup
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -278,5 +280,121 @@ func getDumpCommand(db *models.DatabaseService) ([]string, []string, error) {
 
 	default:
 		return nil, nil, fmt.Errorf("unsupported database engine for backup: %s", db.Engine)
+	}
+}
+
+// RestoreBackup mengeksekusi streaming dekompresi data backup langsung ke stdin container database target.
+func (r *DatabaseBackupRunner) RestoreBackup(ctx context.Context, backupID string, targetDB *models.DatabaseService) error {
+	if targetDB == nil {
+		return fmt.Errorf("target database is nil")
+	}
+	if targetDB.ContainerID == nil || *targetDB.ContainerID == "" {
+		return fmt.Errorf("target database container is not running (no container ID)")
+	}
+
+	backupRecord, err := r.backupRepo.GetByID(backupID)
+	if err != nil {
+		return fmt.Errorf("backup record not found: %w", err)
+	}
+
+	// 1. Dapatkan reader file backup (lokal atau streaming dari S3)
+	localPath := filepath.Join(r.localBaseDir, backupRecord.DatabaseID, backupRecord.Filename)
+	var rawReader io.ReadCloser
+
+	if f, err := os.Open(localPath); err == nil {
+		rawReader = f
+	} else if backupRecord.S3Key != nil && backupRecord.StorageDestinationID != nil {
+		dest, err := r.storageRepo.GetByID(*backupRecord.StorageDestinationID)
+		if err != nil {
+			return fmt.Errorf("storage destination not found: %w", err)
+		}
+		s3Client, err := NewS3ClientFromDestination(dest)
+		if err != nil {
+			return fmt.Errorf("failed to init S3 client for restore: %w", err)
+		}
+		s3Stream, err := s3Client.GetObject(ctx, *backupRecord.S3Key)
+		if err != nil {
+			return fmt.Errorf("failed to download backup from S3: %w", err)
+		}
+		rawReader = s3Stream
+	} else {
+		return fmt.Errorf("backup file %s not found on disk or S3", backupRecord.Filename)
+	}
+	defer rawReader.Close()
+
+	// 2. Dekompresi stream gzip on the fly
+	gzReader, err := gzip.NewReader(rawReader)
+	if err != nil {
+		return fmt.Errorf("failed to initialize gzip reader for restore: %w", err)
+	}
+	defer gzReader.Close()
+
+	// 3. Siapkan command restore sesuai engine target
+	cmd, envs, err := getRestoreCommand(targetDB)
+	if err != nil {
+		return err
+	}
+
+	// 4. Eksekusi streaming stdin ke dalam target container
+	var stdoutBuf bytes.Buffer
+	execErr := r.dockerClient.ExecStreamWithStdin(ctx, *targetDB.ContainerID, cmd, envs, gzReader, &stdoutBuf)
+	if execErr != nil {
+		if r.notifier != nil {
+			r.notifier.Dispatch(models.NotificationEvent{
+				Title:       fmt.Sprintf("Restore Database Gagal: %s", targetDB.Name),
+				Description: fmt.Sprintf("Gagal me-restore backup %s ke database %s: %v", backupRecord.Filename, targetDB.Name, execErr),
+				Status:      "failed",
+				EventType:   "restore_failed",
+			})
+		}
+		return fmt.Errorf("restore execution failed: %w", execErr)
+	}
+
+	if r.notifier != nil {
+		r.notifier.Dispatch(models.NotificationEvent{
+			Title:       fmt.Sprintf("Restore Database Sukses: %s", targetDB.Name),
+			Description: fmt.Sprintf("Berhasil me-restore snapshot %s ke database %s.", backupRecord.Filename, targetDB.Name),
+			Status:      "success",
+			EventType:   "restore_success",
+		})
+	}
+
+	return nil
+}
+
+func getRestoreCommand(db *models.DatabaseService) ([]string, []string, error) {
+	switch db.Engine {
+	case models.DatabaseEnginePostgres:
+		cmd := []string{"psql", "-U", db.Username, "-d", db.DatabaseName}
+		envs := []string{"PGPASSWORD=" + db.Password}
+		return cmd, envs, nil
+
+	case models.DatabaseEngineMySQL:
+		cmd := []string{"mysql", "-u" + db.Username, "-p" + db.Password, db.DatabaseName}
+		return cmd, nil, nil
+
+	case models.DatabaseEngineMongoDB:
+		cmd := []string{
+			"mongorestore",
+			"--username", db.Username,
+			"--password", db.Password,
+			"--authenticationDatabase", "admin",
+			"--db", db.DatabaseName,
+			"--archive",
+			"--drop",
+		}
+		return cmd, nil, nil
+
+	case models.DatabaseEngineRedis:
+		// Tulis file /data/dump.rdb dan trigger shutdown nosave agar auto-restart dan load snapshot
+		cmd := []string{
+			"sh",
+			"-c",
+			"cat > /data/dump.rdb && (redis-cli -a " + db.Password + " shutdown nosave || true)",
+		}
+		return cmd, nil, nil
+
+	default:
+		return nil, nil, fmt.Errorf("unsupported database engine for restore: %s", db.Engine)
 	}
 }

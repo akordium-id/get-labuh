@@ -114,6 +114,35 @@ func (s *S3Client) PutObject(ctx context.Context, key string, data io.Reader, si
 	return nil
 }
 
+func (s *S3Client) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	reqURL, err := s.buildURL(key)
+	if err != nil {
+		return nil, err
+	}
+
+	payloadHash := sha256Hex(nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	s.signRequest(req, now, payloadHash)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("S3 GetObject request failed: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("S3 GetObject failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return resp.Body, nil
+}
+
 func (s *S3Client) DeleteObject(ctx context.Context, key string) error {
 	reqURL, err := s.buildURL(key)
 	if err != nil {
