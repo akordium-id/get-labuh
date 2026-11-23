@@ -22,6 +22,10 @@ func main() {
 		runRunnerMode(ctx, os.Args[1:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		runMCPMode(ctx, os.Args[2:])
+		return
+	}
 
 	cfg := app.LoadConfig()
 

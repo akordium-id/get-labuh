@@ -43,6 +43,11 @@ func SetupRoutes(c *Container) http.Handler {
 	)
 	r.Mount("/api/v1", apiRouter)
 
+	// MCP Server (SSE & HTTP Message Transport with API Key Auth)
+	if c.MCPServer != nil && c.APIKeyAuthMiddleware != nil {
+		c.MCPServer.MountHTTP(r, c.APIKeyAuthMiddleware.Middleware)
+	}
+
 	c.AuthMod.RegisterPublicRoutes(r)
 
 	r.Group(func(r chi.Router) {

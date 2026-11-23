@@ -14,6 +14,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
+	"github.com/akordium-id/get-labuh/internal/mcp"
 	"github.com/akordium-id/get-labuh/internal/models"
 	applicationsmod "github.com/akordium-id/get-labuh/internal/modules/applications"
 	authmod "github.com/akordium-id/get-labuh/internal/modules/auth"
@@ -59,6 +60,7 @@ type Container struct {
 
 	DeployWorker    *worker.DeployWorker
 	BackupScheduler *backup.BackupScheduler
+	MCPServer       *mcp.MCPServer
 }
 
 // BuildContainer melakukan wiring dependency injection untuk seluruh repository, service, worker, dan handler.
@@ -167,6 +169,18 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	apiAppHandler.SetDeployWorker(deployWorker)
 	apiAppHandler.SetEnvVarRepo(envVarRepo)
 
+	mcpServer := mcp.NewServer(mcp.ServerDeps{
+		AppRepo:       appRepo,
+		DeployRepo:    deployRepo,
+		SharedEnvRepo: sharedEnvRepo,
+		AppEnvRepo:    envVarRepo,
+		DatabaseRepo:  databaseRepo,
+		DeployWorker:  deployWorker,
+		DockerPool:    dockerPool,
+		DockerClient:  dockerClient,
+		EnvResolver:   envResolver,
+	})
+
 	return &Container{
 		AuthMod:               authMod,
 		AuthMiddleware:        authMiddleware,
@@ -195,5 +209,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		DeployWorker:          deployWorker,
 		BackupScheduler:       backupScheduler,
 		HostMonitor:           hostMonitor,
+		MCPServer:             mcpServer,
 	}, nil
 }
