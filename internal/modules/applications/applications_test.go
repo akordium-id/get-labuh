@@ -1011,3 +1011,98 @@ func TestVolumeHandlers(t *stdtesting.T) {
 	assert.Equal(t, http.StatusBadRequest, recFMDup.Code)
 }
 
+type mockVolumeBackupRunner struct {
+	calledBackup  bool
+	calledRestore bool
+	backupID      string
+	appID         string
+}
+
+func (m *mockVolumeBackupRunner) RunBackup(ctx context.Context, appID string) (*models.AppBackup, error) {
+	m.calledBackup = true
+	m.appID = appID
+	return &models.AppBackup{
+		ID:            "mock-b1",
+		ApplicationID: appID,
+		Filename:      "app-volume-test.tar.gz",
+		Status:        "completed",
+	}, nil
+}
+
+func (m *mockVolumeBackupRunner) RestoreAppVolume(ctx context.Context, backupID string) error {
+	m.calledRestore = true
+	m.backupID = backupID
+	return nil
+}
+
+func TestAppVolumeBackupHandlers(t *stdtesting.T) {
+	mod, _, _ := setupTestModule(t)
+	r := chi.NewRouter()
+	mod.RegisterRoutes(r)
+
+	app, err := mod.Repo.CreateWithContext(context.Background(), models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "App Volume Backup Test",
+		SourceType:    models.SourceTypeDockerImage,
+		AppPort:       8080,
+	})
+	require.NoError(t, err)
+
+	runner := &mockVolumeBackupRunner{}
+	mod.Handler.SetVolumeBackupRunner(runner)
+
+	// 1. Update Backup Config
+	formCfg := url.Values{}
+	formCfg.Set("enabled", "true")
+	formCfg.Set("cron_expression", "0 3 * * *")
+	formCfg.Set("retention_count", "7")
+	reqCfg := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/backups/config", strings.NewReader(formCfg.Encode()))
+	reqCfg.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqCfg.Header.Set("HX-Request", "true")
+	recCfg := httptest.NewRecorder()
+	r.ServeHTTP(recCfg, reqCfg)
+	assert.Equal(t, http.StatusOK, recCfg.Code)
+
+	cfg, err := mod.Repo.GetBackupConfigWithContext(context.Background(), app.ID)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.Enabled)
+	assert.Equal(t, 7, cfg.RetentionCount)
+
+	// 2. Trigger Manual Volume Backup
+	reqCreate := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/backups/create", nil)
+	reqCreate.Header.Set("HX-Request", "true")
+	recCreate := httptest.NewRecorder()
+	r.ServeHTTP(recCreate, reqCreate)
+	assert.Equal(t, http.StatusOK, recCreate.Code)
+	assert.True(t, runner.calledBackup)
+	assert.Equal(t, app.ID, runner.appID)
+
+	// 3. Create dummy backup record for restore & delete test
+	bRecord, err := mod.Repo.CreateBackupWithContext(context.Background(), models.CreateAppBackupInput{
+		ApplicationID: app.ID,
+		Filename:      "test-snap.tar.gz",
+		Status:        "completed",
+	})
+	require.NoError(t, err)
+
+	// 4. Restore Volume Backup
+	reqRestore := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/backups/"+bRecord.ID+"/restore", nil)
+	reqRestore.Header.Set("HX-Request", "true")
+	recRestore := httptest.NewRecorder()
+	r.ServeHTTP(recRestore, reqRestore)
+	assert.Equal(t, http.StatusOK, recRestore.Code)
+	assert.True(t, runner.calledRestore)
+	assert.Equal(t, bRecord.ID, runner.backupID)
+
+	// 5. Delete Volume Backup
+	reqDelete := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/backups/"+bRecord.ID+"/delete", nil)
+	reqDelete.Header.Set("HX-Request", "true")
+	recDelete := httptest.NewRecorder()
+	r.ServeHTTP(recDelete, reqDelete)
+	assert.Equal(t, http.StatusOK, recDelete.Code)
+
+	_, err = mod.Repo.GetBackupByIDWithContext(context.Background(), bRecord.ID)
+	assert.Error(t, err)
+}
+

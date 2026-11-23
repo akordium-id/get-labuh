@@ -1,10 +1,13 @@
 package applications
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -24,17 +27,23 @@ import (
 // Handler menangani operasi HTTP untuk domain Applications.
 var volumeNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
+type VolumeBackupRunner interface {
+	RunBackup(ctx context.Context, appID string) (*models.AppBackup, error)
+	RestoreAppVolume(ctx context.Context, backupID string) error
+}
+
 type Handler struct {
-	appRepo       *Repo
-	envVarRepo    *EnvVarRepo
-	envRepo       EnvironmentProvider
-	deployRepo    DeploymentCreator
-	settingRepo   SettingProvider
-	caddyClient   *caddy.Client
-	dockerClient  *docker.Client
-	deployWorker  DeployEnqueuer
-	cronRepo      *CronJobRepo
-	cronScheduler *CronScheduler
+	appRepo            *Repo
+	envVarRepo         *EnvVarRepo
+	envRepo            EnvironmentProvider
+	deployRepo         DeploymentCreator
+	settingRepo        SettingProvider
+	caddyClient        *caddy.Client
+	dockerClient       *docker.Client
+	deployWorker       DeployEnqueuer
+	cronRepo           *CronJobRepo
+	cronScheduler      *CronScheduler
+	volumeBackupRunner VolumeBackupRunner
 }
 
 // NewHandler membuat instance baru Handler applications.
@@ -1340,5 +1349,184 @@ func (h *Handler) DeleteFileMount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/applications/"+appID+"#storage", http.StatusFound)
+}
+
+// SetVolumeBackupRunner menyetel volume backup runner dependency.
+func (h *Handler) SetVolumeBackupRunner(runner VolumeBackupRunner) {
+	h.volumeBackupRunner = runner
+}
+
+// UpdateBackupConfig menyimpan konfigurasi backup volume aplikasi.
+func (h *Handler) UpdateBackupConfig(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	enabled := r.FormValue("enabled") == "true" || r.FormValue("enabled") == "1" || r.FormValue("enabled") == "on"
+	cronExp := strings.TrimSpace(r.FormValue("cron_expression"))
+	if cronExp == "" {
+		cronExp = "0 3 * * *"
+	}
+	retentionStr := r.FormValue("retention_count")
+	retention := 7
+	if parsed, err := strconv.Atoi(retentionStr); err == nil && parsed > 0 {
+		retention = parsed
+	}
+
+	var storageDestIDPtr *string
+	destID := strings.TrimSpace(r.FormValue("storage_destination_id"))
+	if destID != "" {
+		storageDestIDPtr = &destID
+	}
+
+	var customPrefixPtr *string
+	prefix := strings.TrimSpace(r.FormValue("custom_prefix"))
+	if prefix != "" {
+		customPrefixPtr = &prefix
+	}
+
+	err := h.appRepo.UpsertBackupConfigWithContext(r.Context(), models.UpdateAppBackupConfigInput{
+		ApplicationID:        id,
+		StorageDestinationID: storageDestIDPtr,
+		Enabled:              enabled,
+		CronExpression:       cronExp,
+		RetentionCount:       retention,
+		CustomPrefix:         customPrefixPtr,
+	})
+	if err != nil {
+		http.Error(w, "Failed to update backup config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Konfigurasi backup volume berhasil disimpan", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+id+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+id+"#storage", http.StatusFound)
+}
+
+// CreateVolumeBackup memicu backup snapshot volume aplikasi.
+func (h *Handler) CreateVolumeBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.volumeBackupRunner == nil {
+		http.Error(w, "Volume backup runner not configured", http.StatusInternalServerError)
+		return
+	}
+
+	_, err := h.volumeBackupRunner.RunBackup(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Backup volume failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Backup volume aplikasi berhasil dibuat", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+id+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+id+"#storage", http.StatusFound)
+}
+
+// DownloadVolumeBackup mengunduh file snapshot backup volume (.tar.gz).
+func (h *Handler) DownloadVolumeBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	backupID := chi.URLParam(r, "backup_id")
+	if id == "" || backupID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	bRecord, err := h.appRepo.GetBackupByIDWithContext(r.Context(), backupID)
+	if err != nil {
+		http.Error(w, "Backup not found", http.StatusNotFound)
+		return
+	}
+
+	baseDir := "/var/lib/labuh/backups/apps"
+	localPath := filepath.Join(baseDir, id, bRecord.Filename)
+	f, err := os.Open(localPath)
+	if err != nil {
+		localPath = filepath.Join("./.labuh/backups/apps", id, bRecord.Filename)
+		f, err = os.Open(localPath)
+	}
+	if err != nil {
+		http.Error(w, "Backup file not found on server", http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", bRecord.Filename))
+	w.Header().Set("Content-Type", "application/gzip")
+	http.ServeContent(w, r, bRecord.Filename, bRecord.CreatedAt, f)
+}
+
+// RestoreVolumeBackup mengeksekusi Safe Restore volume aplikasi.
+func (h *Handler) RestoreVolumeBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	backupID := chi.URLParam(r, "backup_id")
+	if id == "" || backupID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if h.volumeBackupRunner == nil {
+		http.Error(w, "Volume backup runner not configured", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.volumeBackupRunner.RestoreAppVolume(r.Context(), backupID); err != nil {
+		http.Error(w, "Failed to restore volume: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	setToast(w, "Volume aplikasi berhasil di-restore dari snapshot", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+id+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+id+"#storage", http.StatusFound)
+}
+
+// DeleteVolumeBackup menghapus snapshot volume aplikasi (lokal & S3).
+func (h *Handler) DeleteVolumeBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	backupID := chi.URLParam(r, "backup_id")
+	if id == "" || backupID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	bRecord, err := h.appRepo.GetBackupByIDWithContext(r.Context(), backupID)
+	if err == nil {
+		localPath := filepath.Join("/var/lib/labuh/backups/apps", id, bRecord.Filename)
+		_ = os.Remove(localPath)
+		_ = os.Remove(filepath.Join("./.labuh/backups/apps", id, bRecord.Filename))
+
+		_ = h.appRepo.DeleteBackupWithContext(r.Context(), backupID)
+	}
+
+	setToast(w, "Backup volume berhasil dihapus", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+id+"#storage")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+id+"#storage", http.StatusFound)
 }
 

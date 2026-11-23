@@ -74,6 +74,11 @@ func (m *Module) SetDockerClient(c *docker.Client) {
 	}
 }
 
+// SetVolumeBackupRunner menyetel runner backup volume aplikasi.
+func (m *Module) SetVolumeBackupRunner(r VolumeBackupRunner) {
+	m.Handler.SetVolumeBackupRunner(r)
+}
+
 // SetCaddyClient menyetel caddy client.
 func (m *Module) SetCaddyClient(c *caddy.Client) {
 	m.Handler.SetCaddyClient(c)
@@ -122,6 +127,13 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/applications/{id}/file-mounts", m.Handler.CreateFileMount)
 	r.Post("/applications/{id}/file-mounts/{file_id}/update", m.Handler.UpdateFileMount)
 	r.Post("/applications/{id}/file-mounts/{file_id}/delete", m.Handler.DeleteFileMount)
+
+	// Application Volume Backups & Safe Restore
+	r.Post("/applications/{id}/backups/config", m.Handler.UpdateBackupConfig)
+	r.Post("/applications/{id}/backups/create", m.Handler.CreateVolumeBackup)
+	r.Get("/applications/{id}/backups/{backup_id}/download", m.Handler.DownloadVolumeBackup)
+	r.Post("/applications/{id}/backups/{backup_id}/restore", m.Handler.RestoreVolumeBackup)
+	r.Post("/applications/{id}/backups/{backup_id}/delete", m.Handler.DeleteVolumeBackup)
 }
 
 // RegisterPublicRoutes mendaftarkan rute publik webhook.
