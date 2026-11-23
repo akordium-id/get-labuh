@@ -28,6 +28,11 @@ func New(db *sql.DB, userProvider UserProvider) *Module {
 	}
 }
 
+// SetSharedEnvRepo menyetel shared env var repository pada Handler.
+func (m *Module) SetSharedEnvRepo(r SharedEnvProvider) {
+	m.Handler.SetSharedEnvRepo(r)
+}
+
 // RegisterRoutes mendaftarkan rute Chi untuk project list, project create, deploy keys, dan teams.
 func (m *Module) RegisterRoutes(r chi.Router) {
 	// Projects
@@ -41,6 +46,12 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Get("/projects/{id}/deploy-keys", m.Handler.DeployKeysList)
 	r.Post("/projects/{id}/deploy-keys", m.Handler.DeployKeysCreate)
 	r.Post("/deploy-keys/{id}/delete", m.Handler.DeployKeysDelete)
+
+	// Project Shared Environment Variables
+	r.Get("/projects/{id}/env", m.Handler.ProjectSharedEnvGet)
+	r.Post("/projects/{id}/env", m.Handler.ProjectSharedEnvSet)
+	r.Post("/projects/{id}/env/bulk", m.Handler.ProjectSharedEnvBulk)
+	r.Post("/projects/{id}/env/delete", m.Handler.ProjectSharedEnvDelete)
 
 	// Teams (UI & Actions)
 	r.Get("/settings/teams", m.Handler.TeamsList)

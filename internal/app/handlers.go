@@ -148,6 +148,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	serversHandler.SetDockerPool(dockerPool)
 
 	sharedEnvRepo := repo.NewSharedEnvVarRepo(db)
+	projectsMod.SetSharedEnvRepo(sharedEnvRepo)
 	envResolver := deploy.NewEnvResolver(sharedEnvRepo, envVarRepo, db)
 
 	deployWorker := worker.NewDeployWorker(10)

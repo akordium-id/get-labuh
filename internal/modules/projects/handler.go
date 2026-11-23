@@ -1,6 +1,7 @@
 package projects
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ed25519"
@@ -27,12 +28,21 @@ type UserProvider interface {
 	GetAll() ([]*models.User, error)
 }
 
+// SharedEnvProvider mendefinisikan antarmuka manipulasi variabel lingkungan bersama.
+type SharedEnvProvider interface {
+	ListByScope(ctx context.Context, scope models.SharedEnvVarScope, scopeID string) ([]*models.SharedEnvVar, error)
+	Set(ctx context.Context, item *models.SharedEnvVar) error
+	BulkUpsert(ctx context.Context, scope models.SharedEnvVarScope, scopeID string, items []*models.SharedEnvVar) error
+	DeleteByKey(ctx context.Context, scope models.SharedEnvVarScope, scopeID, key string) error
+}
+
 // Handler mengelola HTTP request untuk domain projects, deploy keys, dan teams.
 type Handler struct {
 	projectRepo   *ProjectRepo
 	deployKeyRepo *DeployKeyRepo
 	teamRepo      *TeamRepo
 	userProvider  UserProvider
+	sharedEnvRepo SharedEnvProvider
 }
 
 func NewHandler(projectRepo *ProjectRepo, deployKeyRepo *DeployKeyRepo, teamRepo *TeamRepo, userProvider UserProvider) *Handler {
@@ -42,6 +52,11 @@ func NewHandler(projectRepo *ProjectRepo, deployKeyRepo *DeployKeyRepo, teamRepo
 		teamRepo:      teamRepo,
 		userProvider:  userProvider,
 	}
+}
+
+// SetSharedEnvRepo menyetel dependency shared env repository.
+func (h *Handler) SetSharedEnvRepo(r SharedEnvProvider) {
+	h.sharedEnvRepo = r
 }
 
 // --- Projects Handlers ---
@@ -165,6 +180,147 @@ func (h *Handler) ProjectsDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ProjectsCreatePage(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(layouts.AppLayout(projects.ProjectCreatePage())).ServeHTTP(w, r)
+}
+
+func (h *Handler) ProjectSharedEnvGet(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 2 {
+			projectID = parts[1]
+		}
+	}
+	if projectID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	project, err := h.projectRepo.GetByIDWithContext(ctx, projectID)
+	if err != nil || project == nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	var vars []*models.SharedEnvVar
+	if h.sharedEnvRepo != nil {
+		v, err := h.sharedEnvRepo.ListByScope(ctx, models.ScopeProject, projectID)
+		if err == nil {
+			vars = v
+		}
+	}
+
+	templ.Handler(layouts.AppLayout(projects.ProjectEnvPage(project, vars))).ServeHTTP(w, r)
+}
+
+func (h *Handler) ProjectSharedEnvSet(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 2 {
+			projectID = parts[1]
+		}
+	}
+	if projectID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	key := strings.TrimSpace(r.FormValue("key"))
+	value := r.FormValue("value")
+	isSecret := r.FormValue("is_secret") == "true" || r.FormValue("is_secret") == "on"
+
+	if key != "" && h.sharedEnvRepo != nil {
+		_ = h.sharedEnvRepo.Set(ctx, &models.SharedEnvVar{
+			Scope:    models.ScopeProject,
+			ScopeID:  projectID,
+			Key:      key,
+			Value:    value,
+			IsSecret: isSecret,
+		})
+	}
+
+	http.Redirect(w, r, "/projects/"+projectID+"/env", http.StatusSeeOther)
+}
+
+func (h *Handler) ProjectSharedEnvBulk(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 2 {
+			projectID = parts[1]
+		}
+	}
+	if projectID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	content := r.FormValue("env_content")
+	lines := strings.Split(content, "\n")
+	var items []*models.SharedEnvVar
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			if k != "" {
+				items = append(items, &models.SharedEnvVar{
+					Key:   k,
+					Value: v,
+				})
+			}
+		}
+	}
+
+	if len(items) > 0 && h.sharedEnvRepo != nil {
+		_ = h.sharedEnvRepo.BulkUpsert(ctx, models.ScopeProject, projectID, items)
+	}
+
+	http.Redirect(w, r, "/projects/"+projectID+"/env", http.StatusSeeOther)
+}
+
+func (h *Handler) ProjectSharedEnvDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 2 {
+			projectID = parts[1]
+		}
+	}
+	if projectID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	key := strings.TrimSpace(r.FormValue("key"))
+	if key != "" && h.sharedEnvRepo != nil {
+		_ = h.sharedEnvRepo.DeleteByKey(ctx, models.ScopeProject, projectID, key)
+	}
+
+	http.Redirect(w, r, "/projects/"+projectID+"/env", http.StatusSeeOther)
 }
 
 // --- Deploy Keys Handlers ---
