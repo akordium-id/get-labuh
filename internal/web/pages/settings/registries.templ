@@ -1,6 +1,10 @@
 package settings
 
-import "github.com/akordium-id/get-labuh/internal/models"
+import (
+	"strconv"
+
+	"github.com/akordium-id/get-labuh/internal/models"
+)
 
 templ RegistriesPage(registries []*models.DockerRegistry) {
 	<div>
@@ -20,7 +24,7 @@ templ RegistriesPage(registries []*models.DockerRegistry) {
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 			<!-- Registry List -->
 			<div class="lg:col-span-2 space-y-4">
-				<h2 class="text-xl font-bold text-gray-900">Tersedia ({ string(rune('0' + len(registries))) })</h2>
+				<h2 class="text-xl font-bold text-gray-900">Tersedia ({ strconv.Itoa(len(registries)) })</h2>
 				if len(registries) == 0 {
 					<div class="bg-white rounded-lg shadow border border-dashed border-gray-300 p-8 text-center">
 						<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

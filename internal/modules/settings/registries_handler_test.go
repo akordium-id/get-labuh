@@ -59,8 +59,8 @@ func TestRegistriesHandler(t *stdtesting.T) {
 	reqTest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	wTest := httptest.NewRecorder()
 	r.ServeHTTP(wTest, reqTest)
-	// Even without live docker daemon, should handle gracefully
-	assert.True(t, wTest.Code == http.StatusOK || wTest.Code == http.StatusBadRequest)
+	// Without live docker daemon, handler gracefully returns 503 Service Unavailable or 400 Bad Request
+	assert.True(t, wTest.Code == http.StatusOK || wTest.Code == http.StatusBadRequest || wTest.Code == http.StatusServiceUnavailable)
 
 	// 3. Test POST /settings/registries/{id}/delete
 	reqDel := httptest.NewRequest(http.MethodPost, "/settings/registries/"+list[0].ID+"/delete", nil)

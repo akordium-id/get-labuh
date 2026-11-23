@@ -623,7 +623,11 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	// Zero-Downtime Cleanup: Drain in-flight connections on old container, then stop and remove
 	if oldContainerID != "" && oldContainerID != candidateContainerID {
 		writeLog(activeLogWriter, fmt.Sprintf("Draining in-flight connections on previous container (%s) for 5s...", oldContainerID))
-		time.Sleep(5 * time.Second)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
 		writeLog(activeLogWriter, fmt.Sprintf("Stopping previous container (%s)...", oldContainerID))
 		_ = targetDockerClient.StopContainer(ctx, oldContainerID, 15)
 		_ = targetDockerClient.RemoveContainer(ctx, oldContainerID)

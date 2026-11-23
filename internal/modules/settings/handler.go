@@ -543,19 +543,24 @@ func (h *Handler) TestRegistryConnection(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if h.dockerClient != nil {
-		auth := &docker.RegistryAuth{
-			Username:      username,
-			Password:      password,
-			ServerAddress: serverAddress,
-			Email:         email,
-		}
-		if err := h.dockerClient.VerifyRegistryAuth(r.Context(), auth); err != nil {
-			SetToast(w, "Registry authentication failed: "+err.Error(), ToastError)
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(fmt.Sprintf(`<div class="text-rose-600 text-xs font-semibold">Gagal: %v</div>`, err)))
-			return
-		}
+	if h.dockerClient == nil {
+		SetToast(w, "Docker daemon client is not available", ToastError)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`<div class="text-rose-600 text-xs font-semibold">Gagal: Docker daemon client tidak tersedia</div>`))
+		return
+	}
+
+	auth := &docker.RegistryAuth{
+		Username:      username,
+		Password:      password,
+		ServerAddress: serverAddress,
+		Email:         email,
+	}
+	if err := h.dockerClient.VerifyRegistryAuth(r.Context(), auth); err != nil {
+		SetToast(w, "Registry authentication failed: "+err.Error(), ToastError)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(fmt.Sprintf(`<div class="text-rose-600 text-xs font-semibold">Gagal: %v</div>`, err)))
+		return
 	}
 
 	SetToast(w, "Koneksi ke Docker Registry berhasil!", ToastSuccess)
