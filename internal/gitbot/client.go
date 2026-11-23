@@ -276,3 +276,103 @@ func (c *Client) PostOrUpdateGitLabNote(ctx context.Context, repoURL string, mrI
 
 	return nil
 }
+
+// SetGitHubCommitStatus mengirim status deployment (pending, success, failure) ke commit SHA pada GitHub.
+func (c *Client) SetGitHubCommitStatus(ctx context.Context, repoURL, commitSHA, token, state, targetURL, description, contextName string) error {
+	if token == "" || commitSHA == "" {
+		return nil
+	}
+
+	_, owner, repo, err := ParseRepo(repoURL)
+	if err != nil {
+		return err
+	}
+
+	if contextName == "" {
+		contextName = "labuh/deploy"
+	}
+
+	statusURL := fmt.Sprintf("%s/repos/%s/%s/statuses/%s", c.githubBaseURL, owner, repo, commitSHA)
+	payload := map[string]string{
+		"state":       state,
+		"target_url":  targetURL,
+		"description": description,
+		"context":     contextName,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, statusURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		resBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("github commit status error %d: %s", resp.StatusCode, string(resBody))
+	}
+
+	return nil
+}
+
+// SetGitLabCommitStatus mengirim status pipeline (pending, running, success, failed, canceled) ke commit SHA pada GitLab.
+func (c *Client) SetGitLabCommitStatus(ctx context.Context, repoURL, commitSHA, token, state, targetURL, description, contextName string) error {
+	if token == "" || commitSHA == "" {
+		return nil
+	}
+
+	_, ownerOrPath, repo, err := ParseRepo(repoURL)
+	if err != nil {
+		return err
+	}
+
+	if contextName == "" {
+		contextName = "labuh/deploy"
+	}
+
+	// Normalisasi state untuk GitLab
+	switch state {
+	case "failure", "error":
+		state = "failed"
+	}
+
+	projectPath := fmt.Sprintf("%s/%s", ownerOrPath, repo)
+	encodedPath := url.PathEscape(projectPath)
+
+	statusURL := fmt.Sprintf("%s/api/v4/projects/%s/statuses/%s", c.gitlabBaseURL, encodedPath, commitSHA)
+	payload := map[string]string{
+		"state":       state,
+		"target_url":  targetURL,
+		"description": description,
+		"name":        contextName,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, statusURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("PRIVATE-TOKEN", token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		resBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("gitlab commit status error %d: %s", resp.StatusCode, string(resBody))
+	}
+
+	return nil
+}

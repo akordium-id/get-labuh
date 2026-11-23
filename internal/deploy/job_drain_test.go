@@ -13,6 +13,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/deploy"
 	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/gitbot"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
@@ -69,4 +70,8 @@ func TestPipeline_SetRegistryRepo(t *testing.T) {
 
 	assert.Equal(t, "reg-1", *job.DockerRegistryID)
 	assert.Equal(t, "a1b2c3d4", job.CommitHash)
+
+	// SetGitBotClient test
+	gitbotClient := gitbot.NewClient()
+	pipeline.SetGitBotClient(gitbotClient)
 }

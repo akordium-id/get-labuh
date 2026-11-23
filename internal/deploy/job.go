@@ -15,6 +15,8 @@ import (
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/docker"
+	"github.com/akordium-id/get-labuh/internal/encryption"
+	"github.com/akordium-id/get-labuh/internal/gitbot"
 	"github.com/akordium-id/get-labuh/internal/logging"
 	"github.com/akordium-id/get-labuh/internal/models"
 )
@@ -60,6 +62,7 @@ type Pipeline struct {
 	appRepo      *repo.ApplicationRepo
 	deployRepo   *repo.DeploymentRepo
 	registryRepo RegistryProvider
+	gitbotClient *gitbot.Client
 }
 
 func NewPipeline(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, appRepo *repo.ApplicationRepo, deployRepo *repo.DeploymentRepo) *Pipeline {
@@ -80,6 +83,10 @@ func (p *Pipeline) SetRegistryRepo(r RegistryProvider) {
 	p.registryRepo = r
 }
 
+func (p *Pipeline) SetGitBotClient(c *gitbot.Client) {
+	p.gitbotClient = c
+}
+
 func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	logDir := filepath.Dir(job.LogPath)
 	if err := os.MkdirAll(logDir, 0755); err != nil {
@@ -94,11 +101,62 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 
 	activeLogWriter := logging.NewTeeLogWriter(logFile, job.ExtraLogWriter)
 
+	var app *models.Application
+	if p.appRepo != nil {
+		app, _ = p.appRepo.GetByID(job.ApplicationID)
+	}
+
+	reportCommitStatus := func(state, description string) {
+		if p.gitbotClient == nil || job.CommitHash == "" {
+			return
+		}
+		repoURL := job.RepositoryURL
+		if repoURL == "" && app != nil && app.RepositoryURL != nil {
+			repoURL = *app.RepositoryURL
+		}
+		if repoURL == "" {
+			return
+		}
+
+		var token string
+		if app != nil && app.GitToken != nil && *app.GitToken != "" {
+			if decrypted, err := encryption.Decrypt(*app.GitToken); err == nil && decrypted != "" {
+				token = decrypted
+			} else {
+				token = *app.GitToken
+			}
+		}
+		if token == "" && p.settingRepo != nil {
+			if strings.Contains(repoURL, "gitlab") {
+				token, _ = p.settingRepo.Get("gitlab_bot_token")
+			} else {
+				token, _ = p.settingRepo.Get("github_bot_token")
+			}
+		}
+		if token == "" {
+			return
+		}
+
+		targetURL := ""
+		if job.CustomDomain != nil && *job.CustomDomain != "" {
+			targetURL = fmt.Sprintf("https://%s", *job.CustomDomain)
+		} else if app != nil && app.CustomDomain != nil && *app.CustomDomain != "" {
+			targetURL = fmt.Sprintf("https://%s", *app.CustomDomain)
+		}
+
+		if strings.Contains(repoURL, "gitlab") {
+			_ = p.gitbotClient.SetGitLabCommitStatus(ctx, repoURL, job.CommitHash, token, state, targetURL, description, "labuh/deploy")
+		} else {
+			_ = p.gitbotClient.SetGitHubCommitStatus(ctx, repoURL, job.CommitHash, token, state, targetURL, description, "labuh/deploy")
+		}
+	}
+
 	updateStep := func(step string, status models.DeployStatus, errMsg string) {
 		if p.deployRepo != nil {
 			_ = p.deployRepo.UpdateStep(job.DeploymentID, step)
 			if errMsg != "" {
 				_ = p.deployRepo.UpdateStatusWithError(job.DeploymentID, status, errMsg)
+				reportCommitStatus("failure", "Deployment failed: "+errMsg)
 			} else {
 				_ = p.deployRepo.UpdateStatus(job.DeploymentID, status)
 			}
@@ -116,6 +174,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	if p.deployRepo != nil {
 		_ = p.deployRepo.MarkStarted(job.DeploymentID)
 	}
+	reportCommitStatus("pending", "Deployment pipeline in progress...")
 
 	targetDockerClient := p.dockerClient
 	if p.dockerPool != nil && job.ServerID != nil && *job.ServerID != "" && *job.ServerID != "local" {
@@ -129,11 +188,6 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		}
 		targetDockerClient = cli
 		writeLog(activeLogWriter, "Successfully connected to remote Docker daemon via SSH tunnel.")
-	}
-
-	var app *models.Application
-	if p.appRepo != nil {
-		app, _ = p.appRepo.GetByID(job.ApplicationID)
 	}
 
 	var imageName string
@@ -577,6 +631,7 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	}
 
 	writeLog(activeLogWriter, "Zero-downtime deployment completed successfully!")
+	reportCommitStatus("success", "Deployment live and healthy!")
 	updateStep("done", models.DeployStatusSuccess, "")
 	if p.deployRepo != nil {
 		if imageName != "" {
