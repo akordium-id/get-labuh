@@ -363,9 +363,11 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	var healthcheckTimeout = 30 * time.Second
 	var routeOpts caddy.RouteOptions
 	var preDeploymentCommand, postDeploymentCommand string
+	var app *models.Application
 
 	if p.appRepo != nil {
-		app, err := p.appRepo.GetByID(job.ApplicationID)
+		var err error
+		app, err = p.appRepo.GetByID(job.ApplicationID)
 		if err == nil && app != nil {
 			appSlug = app.Slug
 			if app.CustomDomain != nil && *app.CustomDomain != "" {
@@ -413,11 +415,54 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		})
 	}
 
+	var volumeBindings []docker.VolumeBinding
+	if p.appRepo != nil {
+		appVols, vErr := p.appRepo.GetVolumesByAppID(ctx, job.ApplicationID)
+		if vErr == nil {
+			for _, v := range appVols {
+				if v.VolumeType == models.VolumeTypeNamed {
+					volName := fmt.Sprintf("labuh-vol-app-%s-%s-%s", "prod", appSlug, v.Name)
+					if app != nil && app.IsPreview && app.PRNumber != nil {
+						volName = fmt.Sprintf("labuh-vol-app-%s-%s-pr-%d-%s", "prod", appSlug, *app.PRNumber, v.Name)
+					}
+					_ = targetDockerClient.EnsureVolume(ctx, volName)
+					volumeBindings = append(volumeBindings, docker.VolumeBinding{
+						Source:     volName,
+						Target:     v.MountPath,
+						IsReadOnly: v.IsReadOnly,
+					})
+				} else if v.VolumeType == models.VolumeTypeBind && v.HostPath != nil {
+					if secErr := docker.ValidateHostPathSecurity(*v.HostPath); secErr == nil {
+						_ = os.MkdirAll(*v.HostPath, 0755)
+						volumeBindings = append(volumeBindings, docker.VolumeBinding{
+							Source:     *v.HostPath,
+							Target:     v.MountPath,
+							IsReadOnly: v.IsReadOnly,
+						})
+					} else {
+						writeLog(activeLogWriter, fmt.Sprintf("Warning: host path %s rejected by security check: %v", *v.HostPath, secErr))
+					}
+				}
+			}
+		}
+
+		appFiles, fErr := p.appRepo.GetFileMountsByAppID(ctx, job.ApplicationID)
+		if fErr == nil && len(appFiles) > 0 {
+			fileBindings, prepareErr := docker.PrepareFileMounts("", job.ApplicationID, appFiles)
+			if prepareErr == nil {
+				volumeBindings = append(volumeBindings, fileBindings...)
+			} else {
+				writeLog(activeLogWriter, fmt.Sprintf("Warning: failed to prepare file mounts: %v", prepareErr))
+			}
+		}
+	}
+
 	// Blue-Green container naming: generate candidate container name with timestamp
 	candidateName := fmt.Sprintf("%s-%d", targetDockerClient.GenerateContainerName("prod", appSlug, job.ApplicationID), time.Now().Unix())
 	writeLog(activeLogWriter, fmt.Sprintf("Launching new candidate container (%s)...", candidateName))
 
-	candidateContainerID, err := targetDockerClient.RunContainerWithCustomName(ctx, job.ApplicationID, candidateName, imageName, appPort, dockerEnvVars, resLimits)
+	candidateContainerID, err := targetDockerClient.RunContainerWithVolumes(ctx, job.ApplicationID, candidateName, imageName, appPort, dockerEnvVars, volumeBindings, resLimits)
+
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to run candidate container: %v", err)
 		writeLog(activeLogWriter, errMsg)

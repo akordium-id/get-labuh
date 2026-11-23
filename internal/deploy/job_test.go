@@ -237,3 +237,73 @@ func TestPipeline_PostDeployCommand_Failure(t *testing.T) {
 	require.NotNil(t, updatedDeploy.Step)
 	assert.Equal(t, "done", *updatedDeploy.Step)
 }
+
+func TestPipeline_Volumes_Integration(t *testing.T) {
+	db, err := database.Connect("file::memory:?cache=shared")
+	require.NoError(t, err)
+	defer db.Close()
+	require.NoError(t, database.RunAllMigrations(db))
+
+	appRepo := repo.NewApplicationRepo(db)
+	deployRepo := repo.NewDeploymentRepo(db)
+	settingRepo := repo.NewSettingRepo(db)
+	dockerClient, err := docker.NewClient()
+	require.NoError(t, err)
+	caddyClient := caddy.NewClient("http://localhost:2019", "")
+	pipeline := NewPipeline(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
+
+	domain := "volapp.example.com"
+	app, err := appRepo.Create(models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "App With Volumes",
+		Slug:          "app-with-volumes",
+		SourceType:    models.SourceTypeDockerImage,
+		DockerImage:   &domain,
+		CustomDomain:  &domain,
+		AppPort:       80,
+	})
+	require.NoError(t, err)
+
+	// Add volume and file mount
+	_, err = appRepo.CreateVolume(context.Background(), models.CreateAppVolumeInput{
+		ApplicationID: app.ID,
+		Name:          "uploads",
+		VolumeType:    models.VolumeTypeNamed,
+		MountPath:     "/app/uploads",
+		IsReadOnly:    false,
+	})
+	require.NoError(t, err)
+
+	_, err = appRepo.CreateFileMount(context.Background(), models.CreateAppFileMountInput{
+		ApplicationID: app.ID,
+		MountPath:     "/app/config.json",
+		Content:       `{"env":"production"}`,
+		FileMode:      "0644",
+		IsReadOnly:    true,
+	})
+	require.NoError(t, err)
+
+	logPath := "/tmp/labuh-test-logs/deploy-vol.log"
+	deployment, err := deployRepo.Create(models.CreateDeploymentInput{
+		ApplicationID: app.ID,
+		LogPath:       &logPath,
+	})
+	require.NoError(t, err)
+
+	job := DeploymentJob{
+		DeploymentID:  deployment.ID,
+		ApplicationID: app.ID,
+		SourceType:    string(models.SourceTypeDockerImage),
+		DockerImage:   "nginx:alpine",
+		AppPort:       80,
+		LogPath:       logPath,
+	}
+
+	err = pipeline.Execute(context.Background(), job)
+	assert.NoError(t, err)
+
+	updatedDeploy, err := deployRepo.GetByID(deployment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.DeployStatusSuccess, updatedDeploy.Status)
+}
+
