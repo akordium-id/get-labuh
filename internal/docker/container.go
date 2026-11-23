@@ -535,7 +535,18 @@ func (c *Client) ExecStreamWithStdin(
 	}
 
 	var stderrBuf bytes.Buffer
-	errWriter := io.MultiWriter(stdout, &stderrBuf)
+	errWriter := &stderrBuf
+
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			attachResp.Close()
+		case <-done:
+		}
+	}()
 
 	// Stream stdin ke connection jika ada
 	if stdin != nil {

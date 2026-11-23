@@ -114,6 +114,9 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	appVolumeBackupRunner.SetNotifier(notificationsMod.Notifier, projectRepo)
 	applicationsMod.SetVolumeBackupRunner(appVolumeBackupRunner)
 	applicationsMod.SetStorageProvider(settingsMod.StorageRepo)
+	applicationsMod.SetS3ClientFactory(func(dest *models.StorageDestination) (applicationsmod.S3Deleter, error) {
+		return backup.NewS3ClientFromDestination(dest)
+	})
 
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
 	backupScheduler.Start()

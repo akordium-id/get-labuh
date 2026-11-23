@@ -218,5 +218,11 @@ func TestIntegration_DatabaseAndAppVolumeRestoreFlow(t *stdtesting.T) {
 	assert.Equal(t, http.StatusOK, recAppRestore.Code)
 	assert.Equal(t, appBackupRecord.ID, volRunner.lastRestoreID)
 
+	// Safe Restore IDOR Protection: reject restore if backup belongs to another application
+	reqAppIDOR := httptest.NewRequest(http.MethodPost, "/applications/other-app-id/backups/"+appBackupRecord.ID+"/restore", nil)
+	recAppIDOR := httptest.NewRecorder()
+	appRouter.ServeHTTP(recAppIDOR, reqAppIDOR)
+	assert.Equal(t, http.StatusBadRequest, recAppIDOR.Code)
+
 	_ = projectsMod // ensure referenced
 }

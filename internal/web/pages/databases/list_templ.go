@@ -914,14 +914,14 @@ func DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "\" class=\"mt-4 space-y-4\"><div class=\"bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800 flex items-start gap-2.5\"><span class=\"text-amber-600 font-bold text-base leading-none\">⚠️</span><div><strong class=\"font-semibold block mb-0.5\">Peringatan Operasi Kritis</strong> <span>File snapshot: <span class=\"font-mono font-bold text-gray-900\" x-text=\"selectedBackupFile\"></span></span></div></div><div class=\"space-y-3\"><label class=\"block text-xs font-bold text-gray-700 uppercase tracking-wider\">Pilih Metode Restore</label> <label class=\"flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition-colors\" :class=\"restoreMode === 'in_place' ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200'\"><input type=\"radio\" name=\"restore_mode\" value=\"in_place\" x-model=\"restoreMode\" class=\"mt-0.5 text-emerald-600 focus:ring-emerald-500\"><div><span class=\"font-bold text-xs text-gray-900 block\">In-Place Restore (Timpa Database Ini)</span> <span class=\"text-[11px] text-gray-500 block mt-0.5\">Mengalirkan dump langsung ke container database aktif. Data saat ini akan digantikan dengan isi snapshot.</span></div></label> <label class=\"flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition-colors\" :class=\"restoreMode === 'new_database' ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200'\"><input type=\"radio\" name=\"restore_mode\" value=\"new_database\" x-model=\"restoreMode\" class=\"mt-0.5 text-emerald-600 focus:ring-emerald-500\"><div><span class=\"font-bold text-xs text-gray-900 block\">Restore to New Database (Buat Database Baru)</span> <span class=\"text-[11px] text-gray-500 block mt-0.5\">Membuat container database terpisah dari snapshot tanpa mengganggu instance aktif saat ini.</span></div></label></div><div x-show=\"restoreMode === 'new_database'\" class=\"pt-1\"><label class=\"block text-xs font-semibold text-gray-700 mb-1\">Nama Database Baru</label> <input type=\"text\" name=\"new_database_name\" x-model=\"newDbName\" placeholder=\"my-database-restored\" class=\"w-full text-xs rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 font-mono\"></div><div class=\"pt-3 border-t border-gray-100 flex items-center justify-end gap-2\"><button type=\"button\" @click=\"restoreModalOpen = false\" :disabled=\"isRestoring\" class=\"px-3.5 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 rounded-lg\">Batal</button> <button type=\"submit\" :disabled=\"isRestoring\" class=\"px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 disabled:opacity-75\"><span x-show=\"isRestoring\" class=\"inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-3.5 w-3.5 mr-1\"></span> <span x-text=\"isRestoring ? 'Sedang Me-restore Data...' : 'Mulai Restore'\"></span></button></div></form></div></div></div></div></div><!-- TAB 3: Monitoring & Resource Limits --><div x-show=\"tab === 'resources'\" x-cloak class=\"space-y-6\"><div class=\"grid grid-cols-1 lg:grid-cols-2 gap-6\"><!-- Live Metrics --><div><h2 class=\"text-base font-semibold text-gray-900 mb-2\">Live Resource Metrics</h2><p class=\"text-xs text-gray-500 mb-4\">Pemantauan real-time CPU & Memori container database.</p><div id=\"metrics-card\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "\" class=\"mt-4 space-y-4\"><input type=\"hidden\" name=\"X-CSRF-Token\" :value=\"document.cookie.match(/csrf_token=([^;]+)/)?.[1] || ''\"><div class=\"bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800 flex items-start gap-2.5\"><span class=\"text-amber-600 font-bold text-base leading-none\">⚠️</span><div><strong class=\"font-semibold block mb-0.5\">Peringatan Operasi Kritis</strong> <span>File snapshot: <span class=\"font-mono font-bold text-gray-900\" x-text=\"selectedBackupFile\"></span></span></div></div><div class=\"space-y-3\"><label class=\"block text-xs font-bold text-gray-700 uppercase tracking-wider\">Pilih Metode Restore</label> <label class=\"flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition-colors\" :class=\"restoreMode === 'in_place' ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200'\"><input type=\"radio\" name=\"restore_mode\" value=\"in_place\" x-model=\"restoreMode\" class=\"mt-0.5 text-emerald-600 focus:ring-emerald-500\"><div><span class=\"font-bold text-xs text-gray-900 block\">In-Place Restore (Timpa Database Ini)</span> <span class=\"text-[11px] text-gray-500 block mt-0.5\">Mengalirkan dump langsung ke container database aktif. Data saat ini akan digantikan dengan isi snapshot.</span></div></label> <label class=\"flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition-colors\" :class=\"restoreMode === 'new_database' ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200'\"><input type=\"radio\" name=\"restore_mode\" value=\"new_database\" x-model=\"restoreMode\" class=\"mt-0.5 text-emerald-600 focus:ring-emerald-500\"><div><span class=\"font-bold text-xs text-gray-900 block\">Restore to New Database (Buat Database Baru)</span> <span class=\"text-[11px] text-gray-500 block mt-0.5\">Membuat container database terpisah dari snapshot tanpa mengganggu instance aktif saat ini.</span></div></label></div><div x-show=\"restoreMode === 'new_database'\" class=\"pt-1\"><label class=\"block text-xs font-semibold text-gray-700 mb-1\">Nama Database Baru</label> <input type=\"text\" name=\"new_database_name\" x-model=\"newDbName\" placeholder=\"my-database-restored\" class=\"w-full text-xs rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 font-mono\"></div><div class=\"pt-3 border-t border-gray-100 flex items-center justify-end gap-2\"><button type=\"button\" @click=\"restoreModalOpen = false\" :disabled=\"isRestoring\" class=\"px-3.5 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 rounded-lg\">Batal</button> <button type=\"submit\" :disabled=\"isRestoring\" class=\"px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 disabled:opacity-75\"><span x-show=\"isRestoring\" class=\"inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-3.5 w-3.5 mr-1\"></span> <span x-text=\"isRestoring ? 'Sedang Me-restore Data...' : 'Mulai Restore'\"></span></button></div></form></div></div></div></div></div><!-- TAB 3: Monitoring & Resource Limits --><div x-show=\"tab === 'resources'\" x-cloak class=\"space-y-6\"><div class=\"grid grid-cols-1 lg:grid-cols-2 gap-6\"><!-- Live Metrics --><div><h2 class=\"text-base font-semibold text-gray-900 mb-2\">Live Resource Metrics</h2><p class=\"text-xs text-gray-500 mb-4\">Pemantauan real-time CPU & Memori container database.</p><div id=\"metrics-card\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/stats")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 481, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 482, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 		if templ_7745c5c3_Err != nil {
@@ -942,7 +942,7 @@ func DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/databases/" + dbService.ID + "/resources")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 495, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 496, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 		if templ_7745c5c3_Err != nil {
@@ -955,7 +955,7 @@ func DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.
 		var templ_7745c5c3_Var50 string
 		templ_7745c5c3_Var50, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatCPULimit(dbService.CPULimit)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 499, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 500, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 		if templ_7745c5c3_Err != nil {
@@ -968,7 +968,7 @@ func DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.
 		var templ_7745c5c3_Var51 string
 		templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatMemLimit(dbService.MemoryLimit)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 506, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 507, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
 		if templ_7745c5c3_Err != nil {
@@ -981,7 +981,7 @@ func DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models.
 		var templ_7745c5c3_Var52 string
 		templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(formatMemLimit(dbService.MemoryReservation)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 513, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/databases/list.templ`, Line: 514, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
 		if templ_7745c5c3_Err != nil {

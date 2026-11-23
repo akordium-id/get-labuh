@@ -417,6 +417,7 @@ templ DatabaseDetailPage(dbService *models.DatabaseService, backupConfig *models
 							      method="post"
 							      @submit={ fmt.Sprintf("$el.action = '/databases/%s/backups/' + selectedBackupId + '/restore'; isRestoring = true", dbService.ID) }
 							      class="mt-4 space-y-4">
+								<input type="hidden" name="X-CSRF-Token" :value="document.cookie.match(/csrf_token=([^;]+)/)?.[1] || ''"/>
 								<div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800 flex items-start gap-2.5">
 									<span class="text-amber-600 font-bold text-base leading-none">⚠️</span>
 									<div>

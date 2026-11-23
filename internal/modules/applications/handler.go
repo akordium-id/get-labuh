@@ -34,7 +34,14 @@ type VolumeBackupRunner interface {
 
 type StorageProvider interface {
 	List(ctx context.Context) ([]*models.StorageDestination, error)
+	GetByID(ctx context.Context, id string) (*models.StorageDestination, error)
 }
+
+type S3Deleter interface {
+	DeleteObject(ctx context.Context, key string) error
+}
+
+type S3ClientFactory func(dest *models.StorageDestination) (S3Deleter, error)
 
 type Handler struct {
 	appRepo            *Repo
@@ -49,6 +56,7 @@ type Handler struct {
 	cronScheduler      *CronScheduler
 	volumeBackupRunner VolumeBackupRunner
 	storageRepo        StorageProvider
+	s3ClientFactory    S3ClientFactory
 }
 
 // NewHandler membuat instance baru Handler applications.
@@ -1372,6 +1380,11 @@ func (h *Handler) SetStorageProvider(s StorageProvider) {
 	h.storageRepo = s
 }
 
+// SetS3ClientFactory menyetel S3 client factory dependency.
+func (h *Handler) SetS3ClientFactory(f S3ClientFactory) {
+	h.s3ClientFactory = f
+}
+
 // UpdateBackupConfig menyimpan konfigurasi backup volume aplikasi.
 func (h *Handler) UpdateBackupConfig(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -1472,6 +1485,14 @@ func (h *Handler) DownloadVolumeBackup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Backup not found", http.StatusNotFound)
 		return
 	}
+	if bRecord.ApplicationID != id {
+		http.Error(w, "Backup does not belong to this application", http.StatusBadRequest)
+		return
+	}
+	if filepath.Base(bRecord.Filename) != bRecord.Filename {
+		http.Error(w, "Invalid backup filename", http.StatusBadRequest)
+		return
+	}
 
 	baseDir := "/var/lib/labuh/backups/apps"
 	localPath := filepath.Join(baseDir, id, bRecord.Filename)
@@ -1497,6 +1518,16 @@ func (h *Handler) RestoreVolumeBackup(w http.ResponseWriter, r *http.Request) {
 	backupID := chi.URLParam(r, "backup_id")
 	if id == "" || backupID == "" {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	bRecord, err := h.appRepo.GetBackupByIDWithContext(r.Context(), backupID)
+	if err != nil {
+		http.Error(w, "Backup not found", http.StatusNotFound)
+		return
+	}
+	if bRecord.ApplicationID != id {
+		http.Error(w, "Backup does not belong to this application", http.StatusBadRequest)
 		return
 	}
 
@@ -1530,9 +1561,22 @@ func (h *Handler) DeleteVolumeBackup(w http.ResponseWriter, r *http.Request) {
 
 	bRecord, err := h.appRepo.GetBackupByIDWithContext(r.Context(), backupID)
 	if err == nil {
+		if bRecord.ApplicationID != id {
+			http.Error(w, "Backup does not belong to this application", http.StatusBadRequest)
+			return
+		}
+
 		localPath := filepath.Join("/var/lib/labuh/backups/apps", id, bRecord.Filename)
 		_ = os.Remove(localPath)
 		_ = os.Remove(filepath.Join("./.labuh/backups/apps", id, bRecord.Filename))
+
+		if bRecord.S3Key != nil && h.storageRepo != nil && bRecord.StorageDestinationID != nil && h.s3ClientFactory != nil {
+			if dest, dErr := h.storageRepo.GetByID(r.Context(), *bRecord.StorageDestinationID); dErr == nil && dest != nil {
+				if s3Client, sErr := h.s3ClientFactory(dest); sErr == nil {
+					_ = s3Client.DeleteObject(r.Context(), *bRecord.S3Key)
+				}
+			}
+		}
 
 		_ = h.appRepo.DeleteBackupWithContext(r.Context(), backupID)
 	}

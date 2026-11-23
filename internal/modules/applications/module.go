@@ -84,6 +84,11 @@ func (m *Module) SetStorageProvider(s StorageProvider) {
 	m.Handler.SetStorageProvider(s)
 }
 
+// SetS3ClientFactory menyetel S3 client factory.
+func (m *Module) SetS3ClientFactory(f S3ClientFactory) {
+	m.Handler.SetS3ClientFactory(f)
+}
+
 // SetCaddyClient menyetel caddy client.
 func (m *Module) SetCaddyClient(c *caddy.Client) {
 	m.Handler.SetCaddyClient(c)

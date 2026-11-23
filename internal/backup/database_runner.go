@@ -365,7 +365,7 @@ func (r *DatabaseBackupRunner) RestoreBackup(ctx context.Context, backupID strin
 func getRestoreCommand(db *models.DatabaseService) ([]string, []string, error) {
 	switch db.Engine {
 	case models.DatabaseEnginePostgres:
-		cmd := []string{"psql", "-U", db.Username, "-d", db.DatabaseName}
+		cmd := []string{"psql", "-v", "ON_ERROR_STOP=1", "-U", db.Username, "-d", db.DatabaseName}
 		envs := []string{"PGPASSWORD=" + db.Password}
 		return cmd, envs, nil
 
@@ -387,12 +387,17 @@ func getRestoreCommand(db *models.DatabaseService) ([]string, []string, error) {
 
 	case models.DatabaseEngineRedis:
 		// Tulis file /data/dump.rdb dan trigger shutdown nosave agar auto-restart dan load snapshot
+		// Gunakan REDISCLI_AUTH env var untuk mencegah shell command injection
 		cmd := []string{
 			"sh",
 			"-c",
-			"cat > /data/dump.rdb && (redis-cli -a " + db.Password + " shutdown nosave || true)",
+			`cat > /data/dump.rdb && (if [ -n "$REDISCLI_AUTH" ]; then redis-cli shutdown nosave; else redis-cli shutdown nosave; fi || true)`,
 		}
-		return cmd, nil, nil
+		var envs []string
+		if db.Password != "" {
+			envs = []string{"REDISCLI_AUTH=" + db.Password}
+		}
+		return cmd, envs, nil
 
 	default:
 		return nil, nil, fmt.Errorf("unsupported database engine for restore: %s", db.Engine)

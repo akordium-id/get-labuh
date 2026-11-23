@@ -126,7 +126,7 @@ func TestGetRestoreCommand(t *stdtesting.T) {
 	}
 	cmd, envs, err := getRestoreCommand(pg)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"psql", "-U", "postgres", "-d", "production"}, cmd)
+	assert.Equal(t, []string{"psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "production"}, cmd)
 	assert.Equal(t, []string{"PGPASSWORD=secretpass"}, envs)
 
 	// 2. MySQL
@@ -152,12 +152,14 @@ func TestGetRestoreCommand(t *stdtesting.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"mongorestore", "--username", "admin", "--password", "mongopass", "--authenticationDatabase", "admin", "--db", "analytics", "--archive", "--drop"}, cmd)
 
-	// 4. Redis
+	// 4. Redis - Safe from Command Injection
 	rd := &models.DatabaseService{
 		Engine:   models.DatabaseEngineRedis,
-		Password: "redispassword",
+		Password: `evil"; rm -rf /; echo "pwned`,
 	}
-	cmd, _, err = getRestoreCommand(rd)
+	cmd, envs, err = getRestoreCommand(rd)
 	require.NoError(t, err)
 	assert.Contains(t, cmd[2], "/data/dump.rdb")
+	assert.NotContains(t, cmd[2], "evil") // Password should not be interpolated in command string
+	assert.Equal(t, []string{`REDISCLI_AUTH=evil"; rm -rf /; echo "pwned`}, envs)
 }

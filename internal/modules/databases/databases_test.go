@@ -175,6 +175,22 @@ func TestDatabaseRestoreHandler(t *stdtesting.T) {
 	runner := &mockBackupRunner{}
 	h.SetBackupDependencies(mod.BackupRepo, nil, runner, nil)
 
+	err = mod.BackupRepo.CreateBackup(&models.DatabaseBackup{
+		ID:         "b1",
+		DatabaseID: dbService.ID,
+		Filename:   "b1.sql.gz",
+		Status:     "completed",
+	})
+	require.NoError(t, err)
+
+	err = mod.BackupRepo.CreateBackup(&models.DatabaseBackup{
+		ID:         "b2",
+		DatabaseID: dbService.ID,
+		Filename:   "b2.sql.gz",
+		Status:     "completed",
+	})
+	require.NoError(t, err)
+
 	// 1. Test In-place Restore
 	formInPlace := url.Values{}
 	formInPlace.Set("mode", "in_place")

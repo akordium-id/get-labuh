@@ -467,6 +467,18 @@ func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.backupRepo != nil {
+		bRecord, bErr := h.backupRepo.GetByIDWithContext(r.Context(), backupID)
+		if bErr != nil {
+			http.Error(w, "Backup record not found", http.StatusNotFound)
+			return
+		}
+		if bRecord.DatabaseID != currentDB.ID {
+			http.Error(w, "Backup does not belong to this database", http.StatusBadRequest)
+			return
+		}
+	}
+
 	targetDB := currentDB
 
 	if mode == "new_database" {
@@ -484,6 +496,7 @@ func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 			Name:          newName,
 			Slug:          newSlug,
 			Engine:        currentDB.Engine,
+			Version:       currentDB.Version,
 			Username:      currentDB.Username,
 			Password:      currentDB.Password,
 			DatabaseName:  currentDB.DatabaseName,
@@ -495,39 +508,54 @@ func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if h.dockerClient != nil {
-			envVars := []struct{ Key, Value string }{
-				{Key: "POSTGRES_USER", Value: createdDB.Username},
-				{Key: "POSTGRES_PASSWORD", Value: createdDB.Password},
-				{Key: "POSTGRES_DB", Value: createdDB.DatabaseName},
-				{Key: "MYSQL_ROOT_PASSWORD", Value: createdDB.Password},
-				{Key: "MYSQL_DATABASE", Value: createdDB.DatabaseName},
-				{Key: "MONGO_INITDB_ROOT_USERNAME", Value: createdDB.Username},
-				{Key: "MONGO_INITDB_ROOT_PASSWORD", Value: createdDB.Password},
+			envSlug := "prod"
+			if h.envRepo != nil {
+				if env, envErr := h.envRepo.GetEnvironmentByID(createdDB.EnvironmentID); envErr == nil && env != nil {
+					envSlug = env.Slug
+				}
 			}
-			volName := fmt.Sprintf("labuh-vol-db-%s-%s", "prod", createdDB.Slug)
-			_ = h.dockerClient.EnsureVolume(r.Context(), volName)
-			targetDir := "/var/lib/postgresql/data"
-			switch createdDB.Engine {
-			case models.DatabaseEngineMySQL:
-				targetDir = "/var/lib/mysql"
-			case models.DatabaseEngineMongoDB:
-				targetDir = "/data/db"
-			case models.DatabaseEngineRedis:
-				targetDir = "/data"
+
+			imageName := GetDatabaseImage(createdDB.Engine, createdDB.Version)
+			_ = h.dockerClient.PullImage(r.Context(), imageName)
+
+			envVars := GetDatabaseEnvVars(createdDB.Engine, createdDB.Username, createdDB.Password, createdDB.DatabaseName)
+			volumeName := fmt.Sprintf("labuh-vol-%s-%s", envSlug, createdDB.Slug)
+			containerName := fmt.Sprintf("labuh-db-%s-%s", envSlug, createdDB.Slug)
+
+			limits := docker.ContainerResourceLimits{
+				CPULimit:          createdDB.CPULimit,
+				MemoryLimit:       createdDB.MemoryLimit,
+				MemoryReservation: createdDB.MemoryReservation,
 			}
-			bindings := []docker.VolumeBinding{
-				{Source: volName, Target: targetDir, IsReadOnly: false},
+
+			cID, rErr := h.dockerClient.RunDatabaseContainer(r.Context(), envSlug, createdDB.Slug, imageName, envVars, nil, volumeName, limits)
+			if rErr != nil {
+				_ = h.dbRepo.UpdateStatusWithContext(r.Context(), createdDB.ID, models.DatabaseStatusFailed)
+				http.Error(w, "Failed to run new database container: "+rErr.Error(), http.StatusInternalServerError)
+				return
 			}
-			containerName := fmt.Sprintf("labuh-db-prod-%s", createdDB.Slug)
-			imageName := string(createdDB.Engine) + ":latest"
-			if createdDB.Version != "" {
-				imageName = string(createdDB.Engine) + ":" + createdDB.Version
+
+			connStr := GenerateConnectionString(createdDB.Engine, createdDB.Username, createdDB.Password, containerName, createdDB.Port, createdDB.DatabaseName)
+			_ = h.dbRepo.UpdateContainerAndStatusWithContext(r.Context(), createdDB.ID, cID, models.DatabaseStatusRunning)
+			_ = h.dbRepo.UpdateConnectionStringWithContext(r.Context(), createdDB.ID, connStr)
+			createdDB.ContainerID = &cID
+
+			// Polling readiness max 30s
+			ready := false
+			for i := 0; i < 30; i++ {
+				time.Sleep(1 * time.Second)
+				insp, err := h.dockerClient.InspectContainer(r.Context(), cID)
+				if err == nil && insp.State != nil && insp.State.Running {
+					if insp.State.Health == nil || insp.State.Health.Status == "healthy" || i >= 10 {
+						ready = true
+						break
+					}
+				}
 			}
-			cID, rErr := h.dockerClient.RunContainerWithVolumes(r.Context(), createdDB.ID, containerName, imageName, createdDB.Port, envVars, bindings, docker.ContainerResourceLimits{})
-			if rErr == nil {
-				_ = h.dbRepo.UpdateContainerAndStatusWithContext(r.Context(), createdDB.ID, cID, models.DatabaseStatusRunning)
-				createdDB.ContainerID = &cID
-				time.Sleep(2 * time.Second)
+			if !ready {
+				_ = h.dbRepo.UpdateStatusWithContext(r.Context(), createdDB.ID, models.DatabaseStatusFailed)
+				http.Error(w, "New database container did not become ready in time", http.StatusInternalServerError)
+				return
 			}
 		}
 
@@ -535,6 +563,9 @@ func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.backupRunner.RestoreBackup(r.Context(), backupID, targetDB); err != nil {
+		if mode == "new_database" {
+			_ = h.dbRepo.UpdateStatusWithContext(r.Context(), targetDB.ID, models.DatabaseStatusFailed)
+		}
 		http.Error(w, "Failed to restore backup: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

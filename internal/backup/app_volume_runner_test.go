@@ -2,6 +2,8 @@ package backup
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 	stdtesting "testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,4 +53,27 @@ func TestAppVolumeRunner_RestoreNotFound(t *stdtesting.T) {
 	ctx := context.Background()
 	err = runner.RestoreAppVolume(ctx, "non-existent-backup-id")
 	assert.Error(t, err)
+}
+
+func TestAppVolumeRunner_TarPathCalculation(t *stdtesting.T) {
+	calcPath := func(mp, hdrName string) string {
+		parentDir := strings.TrimPrefix(filepath.Dir(filepath.Clean(mp)), "/")
+		var entryName string
+		if parentDir == "." || parentDir == "" {
+			entryName = strings.TrimPrefix(hdrName, "./")
+		} else {
+			entryName = parentDir + "/" + strings.TrimPrefix(hdrName, "./")
+		}
+		return filepath.Clean(entryName)
+	}
+
+	// 1. Directory mount /app/uploads
+	assert.Equal(t, "app/uploads/file.png", calcPath("/app/uploads", "uploads/file.png"))
+	assert.Equal(t, "app/uploads/sub/image.jpg", calcPath("/app/uploads", "uploads/sub/image.jpg"))
+
+	// 2. Single file mount /etc/nginx/nginx.conf
+	assert.Equal(t, "etc/nginx/nginx.conf", calcPath("/etc/nginx/nginx.conf", "nginx.conf"))
+
+	// 3. Root-level directory /data
+	assert.Equal(t, "data/dump.rdb", calcPath("/data", "data/dump.rdb"))
 }

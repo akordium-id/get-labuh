@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -143,6 +144,8 @@ func (r *AppVolumeBackupRunner) RunBackup(ctx context.Context, appID string) (*m
 	}
 
 	var archiveErr error
+	archivedFilesCount := 0
+
 	for _, mp := range mountPaths {
 		if r.dockerClient == nil {
 			archiveErr = fmt.Errorf("docker client not available")
@@ -163,11 +166,18 @@ func (r *AppVolumeBackupRunner) RunBackup(ctx context.Context, appID string) (*m
 				slog.Warn("tar stream read error", "error", tErr)
 				break
 			}
-			cleanHdrName := strings.TrimPrefix(filepath.Clean(mp), "/") + "/" + strings.TrimPrefix(hdr.Name, "./")
-			hdr.Name = filepath.Clean(cleanHdrName)
+			parentDir := strings.TrimPrefix(filepath.Dir(filepath.Clean(mp)), "/")
+			var entryName string
+			if parentDir == "." || parentDir == "" {
+				entryName = strings.TrimPrefix(hdr.Name, "./")
+			} else {
+				entryName = parentDir + "/" + strings.TrimPrefix(hdr.Name, "./")
+			}
+			hdr.Name = filepath.Clean(entryName)
 			if err := tw.WriteHeader(hdr); err != nil {
 				continue
 			}
+			archivedFilesCount++
 			if hdr.Size > 0 {
 				_, _ = io.Copy(tw, subTr)
 			}
@@ -178,6 +188,21 @@ func (r *AppVolumeBackupRunner) RunBackup(ctx context.Context, appID string) (*m
 	_ = tw.Close()
 	_ = gw.Close()
 	_ = outFile.Close()
+
+	if archivedFilesCount == 0 {
+		_ = os.Remove(localFilePath)
+		errMsg := "no volume data could be archived from container"
+		_ = r.appRepo.UpdateBackupStatusWithContext(ctx, backupRecord.ID, "failed", 0, nil, &errMsg)
+		if r.notifier != nil {
+			r.notifier.Dispatch(models.NotificationEvent{
+				Title:       fmt.Sprintf("Backup Volume Gagal: %s", app.Name),
+				Description: fmt.Sprintf("Gagal membuat snapshot volume untuk %s: tidak ada data volume/file mount yang ditemukan.", app.Name),
+				Status:      "failed",
+				EventType:   "backup_failed",
+			})
+		}
+		return nil, errors.New(errMsg)
+	}
 
 	fileInfo, err := os.Stat(localFilePath)
 	if err != nil || fileInfo.Size() == 0 {
@@ -202,7 +227,9 @@ func (r *AppVolumeBackupRunner) RunBackup(ctx context.Context, appID string) (*m
 			s3Key := fmt.Sprintf("%s/%s/%s", prefix, app.Slug, filename)
 			f, oErr := os.Open(localFilePath)
 			if oErr == nil {
-				if uErr := s3Client.PutObject(ctx, s3Key, f, fileSize, "application/gzip"); uErr == nil {
+				if uErr := s3Client.PutObject(ctx, s3Key, f, fileSize, "application/gzip"); uErr != nil {
+					slog.Error("failed to upload app volume backup to S3", "s3_key", s3Key, "error", uErr)
+				} else {
 					s3KeyPtr = &s3Key
 				}
 				_ = f.Close()
@@ -287,9 +314,16 @@ func (r *AppVolumeBackupRunner) RestoreAppVolume(ctx context.Context, backupID s
 
 	// Safe Restore: Stop container sementara
 	_ = r.dockerClient.StopContainer(ctx, *app.ContainerID, 10)
-	// Garansi pemulihan: Container selalu dinyalakan kembali
+	// Garansi pemulihan: Container selalu dinyalakan kembali menggunakan detached context agar tidak gagal saat caller context canceled/timeout
 	defer func() {
-		_ = r.dockerClient.StartContainer(ctx, *app.ContainerID)
+		restartCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		if startErr := r.dockerClient.StartContainer(restartCtx, *app.ContainerID); startErr != nil {
+			slog.Error("CRITICAL: failed to restart container after volume restore",
+				"app_id", app.ID,
+				"container_id", *app.ContainerID,
+				"error", startErr)
+		}
 	}()
 
 	gzReader, err := gzip.NewReader(rawReader)
