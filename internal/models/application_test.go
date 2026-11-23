@@ -90,3 +90,32 @@ func TestAppVolumeModel(t *stdtesting.T) {
 	assert.True(t, fileMount.IsReadOnly)
 }
 
+func TestAppBackupModels(t *stdtesting.T) {
+	cfg := AppBackupConfig{
+		ID:             "cfg-1",
+		ApplicationID:  "app-1",
+		Enabled:        true,
+		CronExpression: "0 3 * * *",
+		RetentionCount: 7,
+	}
+	assert.Equal(t, "cfg-1", cfg.ID)
+	assert.Equal(t, "app-1", cfg.ApplicationID)
+	assert.True(t, cfg.Enabled)
+	assert.Equal(t, "0 3 * * *", cfg.CronExpression)
+	assert.Equal(t, 7, cfg.RetentionCount)
+
+	backup := AppBackup{
+		ID:            "backup-1",
+		ApplicationID: "app-1",
+		Filename:      "app-volume-test-20261123.tar.gz",
+		FileSize:      1024,
+		StorageType:   "s3",
+		Status:        "completed",
+	}
+	assert.Equal(t, "backup-1", backup.ID)
+	assert.Equal(t, "app-volume-test-20261123.tar.gz", backup.Filename)
+	assert.Equal(t, int64(1024), backup.FileSize)
+	assert.Equal(t, "s3", backup.StorageType)
+	assert.Equal(t, "completed", backup.Status)
+}
+

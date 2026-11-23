@@ -196,3 +196,48 @@ type CreateAppFileMountInput struct {
 	IsReadOnly    bool   `json:"is_read_only"`
 }
 
+type AppBackupConfig struct {
+	ID                   string    `json:"id"`
+	ApplicationID        string    `json:"application_id"`
+	StorageDestinationID *string   `json:"storage_destination_id,omitempty"`
+	Enabled              bool      `json:"enabled"`
+	CronExpression       string    `json:"cron_expression"`
+	RetentionCount       int       `json:"retention_count"`
+	CustomPrefix         *string   `json:"custom_prefix,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+type UpdateAppBackupConfigInput struct {
+	ApplicationID        string  `json:"application_id"`
+	StorageDestinationID *string `json:"storage_destination_id,omitempty"`
+	Enabled              bool    `json:"enabled"`
+	CronExpression       string  `json:"cron_expression"`
+	RetentionCount       int     `json:"retention_count"`
+	CustomPrefix         *string `json:"custom_prefix,omitempty"`
+}
+
+type AppBackup struct {
+	ID                   string    `json:"id"`
+	ApplicationID        string    `json:"application_id"`
+	StorageDestinationID *string   `json:"storage_destination_id,omitempty"`
+	Filename             string    `json:"filename"`
+	FileSize             int64     `json:"file_size"`
+	StorageType          string    `json:"storage_type"`
+	S3Key                *string   `json:"s3_key,omitempty"`
+	Status               string    `json:"status"` // "pending", "completed", "failed"
+	ErrorMessage         *string   `json:"error_message,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+}
+
+type CreateAppBackupInput struct {
+	ApplicationID        string  `json:"application_id"`
+	StorageDestinationID *string `json:"storage_destination_id,omitempty"`
+	Filename             string  `json:"filename"`
+	FileSize             int64   `json:"file_size"`
+	StorageType          string  `json:"storage_type"`
+	S3Key                *string `json:"s3_key,omitempty"`
+	Status               string  `json:"status"`
+	ErrorMessage         *string `json:"error_message,omitempty"`
+}
+
