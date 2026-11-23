@@ -32,6 +32,7 @@ type DeployWorker struct {
 	envRepo       *repo.ProjectRepo
 	gitbotClient  *gitbot.Client
 	registryRepo  deploy.RegistryProvider
+	envResolver   *deploy.EnvResolver
 	stopOnce      sync.Once
 }
 
@@ -55,6 +56,11 @@ func (w *DeployWorker) SetGitBotClient(c *gitbot.Client) {
 // SetRegistryRepo menyetel provider registry docker untuk autentikasi image private.
 func (w *DeployWorker) SetRegistryRepo(r deploy.RegistryProvider) {
 	w.registryRepo = r
+}
+
+// SetEnvResolver menyetel resolver variabel lingkungan hierarkis (App > Project > Team).
+func (w *DeployWorker) SetEnvResolver(r *deploy.EnvResolver) {
+	w.envResolver = r
 }
 
 func (w *DeployWorker) SetNotifier(n EventNotifier, envRepo *repo.ProjectRepo) {
@@ -101,6 +107,15 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 					}
 					w.semaphore <- struct{}{}
 					jobCtx, cancel := context.WithTimeout(w.ctx, 30*time.Minute)
+					finalEnvVars := job.EnvVars
+					if w.envResolver != nil {
+						if targetApp, getErr := appRepo.GetByIDWithContext(jobCtx, job.ApplicationID); getErr == nil && targetApp != nil {
+							if resolved, resErr := w.envResolver.ResolveForApplication(jobCtx, targetApp); resErr == nil && len(resolved) > 0 {
+								finalEnvVars = resolved
+							}
+						}
+					}
+
 					deployJob := deploy.DeploymentJob{
 						DeploymentID:     job.DeploymentID,
 						ApplicationID:    job.ApplicationID,
@@ -113,7 +128,7 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 						DockerRegistryID: job.DockerRegistryID,
 						CommitHash:       job.CommitHash,
 						AppPort:          job.AppPort,
-						EnvVars:          job.EnvVars,
+						EnvVars:          finalEnvVars,
 						LogPath:          job.LogPath,
 						Priority:         job.Priority,
 						ServerID:         job.ServerID,
@@ -244,6 +259,23 @@ func BuildDeploymentJob(app *models.Application, deploymentID string, envVars []
 		Priority:       1,
 		ServerID:       app.ServerID,
 	}
+}
+
+// BuildDeploymentJobWithResolver membuat DeploymentJob dengan melakukan resolusi hierarkis variabel lingkungan.
+func BuildDeploymentJobWithResolver(ctx context.Context, app *models.Application, deploymentID string, resolver *deploy.EnvResolver) (models.DeploymentJob, error) {
+	var envList []models.AppEnvVar
+	if resolver != nil && app != nil {
+		resolved, err := resolver.ResolveForApplication(ctx, app)
+		if err != nil {
+			return models.DeploymentJob{}, err
+		}
+		envList = resolved
+	}
+	job := BuildDeploymentJob(app, deploymentID, nil)
+	if len(envList) > 0 {
+		job.EnvVars = envList
+	}
+	return job, nil
 }
 
 func (w *DeployWorker) Stop() {

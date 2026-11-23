@@ -10,6 +10,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/backup"
 	"github.com/akordium-id/get-labuh/internal/caddy"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
+	"github.com/akordium-id/get-labuh/internal/deploy"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/encryption"
 	"github.com/akordium-id/get-labuh/internal/handler"
@@ -49,10 +50,12 @@ type Container struct {
 	APIProjectsHandler    *api.ProjectsHandler
 	APIDeploymentsHandler *api.DeploymentsHandler
 
-	AppRepo    *repo.ApplicationRepo
-	DeployRepo *repo.DeploymentRepo
-	AuditRepo  *repo.AuditLogRepo
-	ServerRepo *repo.ServerRepo
+	AppRepo       *repo.ApplicationRepo
+	DeployRepo    *repo.DeploymentRepo
+	AuditRepo     *repo.AuditLogRepo
+	ServerRepo    *repo.ServerRepo
+	SharedEnvRepo *repo.SharedEnvVarRepo
+	EnvResolver   *deploy.EnvResolver
 
 	DeployWorker    *worker.DeployWorker
 	BackupScheduler *backup.BackupScheduler
@@ -144,11 +147,15 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	serversHandler := handler.NewServersHandler(serverRepo)
 	serversHandler.SetDockerPool(dockerPool)
 
+	sharedEnvRepo := repo.NewSharedEnvVarRepo(db)
+	envResolver := deploy.NewEnvResolver(sharedEnvRepo, envVarRepo, db)
+
 	deployWorker := worker.NewDeployWorker(10)
 	deployWorker.SetMaxConcurrent(3)
 	deployWorker.SetWorkerCount(1)
 	deployWorker.SetNotifier(notificationsMod.Notifier, projectRepo)
 	deployWorker.SetRegistryRepo(settingsMod.RegistryRepo)
+	deployWorker.SetEnvResolver(envResolver)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo, dockerPool)
 
 	applicationsMod.SetDeployWorker(deployWorker)
@@ -182,6 +189,8 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		DeployRepo:            deployRepo,
 		AuditRepo:             auditRepo,
 		ServerRepo:            serverRepo,
+		SharedEnvRepo:         sharedEnvRepo,
+		EnvResolver:           envResolver,
 		DeployWorker:          deployWorker,
 		BackupScheduler:       backupScheduler,
 		HostMonitor:           hostMonitor,
