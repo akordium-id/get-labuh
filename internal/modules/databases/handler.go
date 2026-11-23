@@ -43,9 +43,10 @@ type S3Deleter interface {
 // S3ClientFactory func type untuk membuat S3 client dari StorageDestination
 type S3ClientFactory func(dest *models.StorageDestination) (S3Deleter, error)
 
-// BackupRunner interface untuk menjalankan database backup job
+// BackupRunner interface untuk menjalankan database backup & restore job
 type BackupRunner interface {
 	RunBackup(ctx context.Context, databaseID string) (*models.DatabaseBackup, error)
+	RestoreBackup(ctx context.Context, backupID string, targetDB *models.DatabaseService) error
 }
 
 // Handler menangani request HTTP untuk managed databases dan backup scheduling.
@@ -427,6 +428,117 @@ func (h *Handler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("HX-Redirect", "/databases/"+id)
 	w.WriteHeader(http.StatusOK)
+}
+
+// RestoreBackup menjalankan proses restore snapshot ke database aktif atau membuat database baru.
+func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	backupID := chi.URLParam(r, "backup_id")
+	if id == "" || backupID == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	mode := strings.TrimSpace(r.FormValue("mode"))
+	if mode == "" {
+		mode = "in_place"
+	}
+	if mode != "in_place" && mode != "new_database" {
+		http.Error(w, "Invalid restore mode: must be in_place or new_database", http.StatusBadRequest)
+		return
+	}
+
+	if h.backupRunner == nil {
+		http.Error(w, "Backup runner not configured", http.StatusInternalServerError)
+		return
+	}
+
+	currentDB, err := h.dbRepo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Database not found", http.StatusNotFound)
+		return
+	}
+
+	targetDB := currentDB
+
+	if mode == "new_database" {
+		newName := strings.TrimSpace(r.FormValue("new_name"))
+		if newName == "" {
+			newName = fmt.Sprintf("%s-restored", currentDB.Name)
+		}
+		newSlug := fmt.Sprintf("%s-restored-%d", currentDB.Slug, time.Now().Unix())
+
+		createdDB, err := h.dbRepo.CreateWithContext(r.Context(), models.CreateDatabaseServiceInput{
+			EnvironmentID: currentDB.EnvironmentID,
+			Name:          newName,
+			Slug:          newSlug,
+			Engine:        currentDB.Engine,
+			Username:      currentDB.Username,
+			Password:      currentDB.Password,
+			DatabaseName:  currentDB.DatabaseName,
+			Port:          currentDB.Port,
+		})
+		if err != nil {
+			http.Error(w, "Failed to create new database service: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if h.dockerClient != nil {
+			envVars := []struct{ Key, Value string }{
+				{Key: "POSTGRES_USER", Value: createdDB.Username},
+				{Key: "POSTGRES_PASSWORD", Value: createdDB.Password},
+				{Key: "POSTGRES_DB", Value: createdDB.DatabaseName},
+				{Key: "MYSQL_ROOT_PASSWORD", Value: createdDB.Password},
+				{Key: "MYSQL_DATABASE", Value: createdDB.DatabaseName},
+				{Key: "MONGO_INITDB_ROOT_USERNAME", Value: createdDB.Username},
+				{Key: "MONGO_INITDB_ROOT_PASSWORD", Value: createdDB.Password},
+			}
+			volName := fmt.Sprintf("labuh-vol-db-%s-%s", "prod", createdDB.Slug)
+			_ = h.dockerClient.EnsureVolume(r.Context(), volName)
+			targetDir := "/var/lib/postgresql/data"
+			switch createdDB.Engine {
+			case models.DatabaseEngineMySQL:
+				targetDir = "/var/lib/mysql"
+			case models.DatabaseEngineMongoDB:
+				targetDir = "/data/db"
+			case models.DatabaseEngineRedis:
+				targetDir = "/data"
+			}
+			bindings := []docker.VolumeBinding{
+				{Source: volName, Target: targetDir, IsReadOnly: false},
+			}
+			containerName := fmt.Sprintf("labuh-db-prod-%s", createdDB.Slug)
+			imageName := string(createdDB.Engine) + ":latest"
+			if createdDB.Version != "" {
+				imageName = string(createdDB.Engine) + ":" + createdDB.Version
+			}
+			cID, rErr := h.dockerClient.RunContainerWithVolumes(r.Context(), createdDB.ID, containerName, imageName, createdDB.Port, envVars, bindings, docker.ContainerResourceLimits{})
+			if rErr == nil {
+				_ = h.dbRepo.UpdateContainerAndStatusWithContext(r.Context(), createdDB.ID, cID, models.DatabaseStatusRunning)
+				createdDB.ContainerID = &cID
+				time.Sleep(2 * time.Second)
+			}
+		}
+
+		targetDB = createdDB
+	}
+
+	if err := h.backupRunner.RestoreBackup(r.Context(), backupID, targetDB); err != nil {
+		http.Error(w, "Failed to restore backup: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/databases/"+targetDB.ID)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/databases/"+targetDB.ID, http.StatusFound)
 }
 
 func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {

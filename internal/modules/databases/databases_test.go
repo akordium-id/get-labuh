@@ -143,3 +143,80 @@ func TestDatabasesHandler_UpdateResourceLimits(t *stdtesting.T) {
 	require.NotNil(t, updated.MemoryReservation)
 	assert.Equal(t, int64(512), *updated.MemoryReservation)
 }
+
+type mockBackupRunner struct {
+	calledRestore bool
+	targetDB      *models.DatabaseService
+	backupID      string
+}
+
+func (m *mockBackupRunner) RunBackup(ctx context.Context, databaseID string) (*models.DatabaseBackup, error) {
+	return nil, nil
+}
+
+func (m *mockBackupRunner) RestoreBackup(ctx context.Context, backupID string, targetDB *models.DatabaseService) error {
+	m.calledRestore = true
+	m.backupID = backupID
+	m.targetDB = targetDB
+	return nil
+}
+
+func TestDatabaseRestoreHandler(t *stdtesting.T) {
+	mod, h := setupTestModule(t)
+
+	dbService, err := mod.ServiceRepo.CreateWithContext(context.Background(), models.CreateDatabaseServiceInput{
+		EnvironmentID: "env-1",
+		Name:          "Primary Postgres",
+		Slug:          "primary-postgres",
+		Engine:        models.DatabaseEnginePostgres,
+	})
+	require.NoError(t, err)
+
+	runner := &mockBackupRunner{}
+	h.SetBackupDependencies(mod.BackupRepo, nil, runner, nil)
+
+	// 1. Test In-place Restore
+	formInPlace := url.Values{}
+	formInPlace.Set("mode", "in_place")
+
+	reqInPlace := httptest.NewRequest(http.MethodPost, "/databases/"+dbService.ID+"/backups/b1/restore", strings.NewReader(formInPlace.Encode()))
+	reqInPlace.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqInPlace.Header.Set("HX-Request", "true")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", dbService.ID)
+	rctx.URLParams.Add("backup_id", "b1")
+	reqInPlace = reqInPlace.WithContext(context.WithValue(reqInPlace.Context(), chi.RouteCtxKey, rctx))
+
+	recInPlace := httptest.NewRecorder()
+	h.RestoreBackup(recInPlace, reqInPlace)
+
+	assert.Equal(t, http.StatusOK, recInPlace.Code)
+	assert.True(t, runner.calledRestore)
+	assert.Equal(t, "b1", runner.backupID)
+	assert.Equal(t, dbService.ID, runner.targetDB.ID)
+
+	// 2. Test Restore to New Database
+	runner.calledRestore = false
+	formNew := url.Values{}
+	formNew.Set("mode", "new_database")
+	formNew.Set("new_name", "Restored Postgres")
+
+	reqNew := httptest.NewRequest(http.MethodPost, "/databases/"+dbService.ID+"/backups/b2/restore", strings.NewReader(formNew.Encode()))
+	reqNew.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqNew.Header.Set("HX-Request", "true")
+
+	rctxNew := chi.NewRouteContext()
+	rctxNew.URLParams.Add("id", dbService.ID)
+	rctxNew.URLParams.Add("backup_id", "b2")
+	reqNew = reqNew.WithContext(context.WithValue(reqNew.Context(), chi.RouteCtxKey, rctxNew))
+
+	recNew := httptest.NewRecorder()
+	h.RestoreBackup(recNew, reqNew)
+
+	assert.Equal(t, http.StatusOK, recNew.Code)
+	assert.True(t, runner.calledRestore)
+	assert.Equal(t, "b2", runner.backupID)
+	assert.NotEqual(t, dbService.ID, runner.targetDB.ID)
+	assert.Equal(t, "Restored Postgres", runner.targetDB.Name)
+}

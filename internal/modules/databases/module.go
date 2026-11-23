@@ -52,5 +52,6 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/databases/{id}/backups/config", m.Handler.UpdateBackupConfig)
 	r.Post("/databases/{id}/backups/create", m.Handler.CreateBackup)
 	r.Get("/databases/{id}/backups/{backup_id}/download", m.Handler.DownloadBackup)
+	r.Post("/databases/{id}/backups/{backup_id}/restore", m.Handler.RestoreBackup)
 	r.Post("/databases/{id}/backups/{backup_id}/delete", m.Handler.DeleteBackup)
 }
