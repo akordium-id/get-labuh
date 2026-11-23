@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -90,6 +91,19 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var webhookSecret *string
 	if webhookSecretVal != "" {
 		webhookSecret = &webhookSecretVal
+	}
+
+	if chType == models.NotificationTypeWebhook {
+		if webhookURLVal == "" || (!strings.HasPrefix(webhookURLVal, "http://") && !strings.HasPrefix(webhookURLVal, "https://")) {
+			http.Error(w, "Webhook URL must be a valid http or https URL", http.StatusBadRequest)
+			return
+		}
+	}
+	if chType == models.NotificationTypeDiscord {
+		if discordURLVal == "" || (!strings.HasPrefix(discordURLVal, "http://") && !strings.HasPrefix(discordURLVal, "https://")) {
+			http.Error(w, "Discord Webhook URL must be a valid http or https URL", http.StatusBadRequest)
+			return
+		}
 	}
 
 	input := models.CreateNotificationChannelInput{

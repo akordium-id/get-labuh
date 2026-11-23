@@ -77,13 +77,21 @@ func TestHostMonitor_Evaluate_DiskStateMachine(t *stdtesting.T) {
 	assert.Equal(t, models.EventServerAlertCritical, notifier.events[1].EventType)
 	assert.Equal(t, "failed", notifier.events[1].Status)
 
-	// 5. Disk drops back to Normal (Disk 60%) -> Resolved alert fires
+	// 5. Disk de-escalates to Warning threshold (Disk 85%) -> Warning alert fires
+	statsDeescalated := statsNormal
+	statsDeescalated.DiskUsedPercent = 85.0
+	monitor.Evaluate(ctx, statsDeescalated)
+	require.Len(t, notifier.events, 3)
+	assert.Equal(t, models.EventServerAlertWarning, notifier.events[2].EventType)
+	assert.Equal(t, "warning", notifier.events[2].Status)
+
+	// 6. Disk drops back to Normal (Disk 60%) -> Resolved alert fires
 	statsRecovered := statsNormal
 	statsRecovered.DiskUsedPercent = 60.0
 	monitor.Evaluate(ctx, statsRecovered)
-	require.Len(t, notifier.events, 3)
-	assert.Equal(t, models.EventServerAlertResolved, notifier.events[2].EventType)
-	assert.Equal(t, "success", notifier.events[2].Status)
+	require.Len(t, notifier.events, 4)
+	assert.Equal(t, models.EventServerAlertResolved, notifier.events[3].EventType)
+	assert.Equal(t, "success", notifier.events[3].Status)
 }
 
 func TestHostMonitor_Evaluate_RAMAlert(t *stdtesting.T) {
@@ -127,5 +135,10 @@ func TestHostMonitor_StartStop(t *stdtesting.T) {
 	time.Sleep(10 * time.Millisecond)
 	monitor.Stop()
 	// stopping again shouldn't panic
+	monitor.Stop()
+
+	// restarting after stop should work cleanly without panic or leaking goroutine
+	monitor.Start()
+	time.Sleep(10 * time.Millisecond)
 	monitor.Stop()
 }

@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/akordium-id/get-labuh/internal/models"
@@ -28,20 +30,25 @@ func NewNotifier(repo *Repo) *Notifier {
 // Dispatch mengirim notifikasi ke semua channel yang relevan secara asinkron
 func (n *Notifier) Dispatch(event models.NotificationEvent) {
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
-
 		channels, err := n.repo.ListActiveForEvent(event.EventType, event.ProjectID)
 		if err != nil {
 			slog.Error("failed to list channels for event", "event", event.EventType, "error", err)
 			return
 		}
 
+		var wg sync.WaitGroup
 		for _, ch := range channels {
-			if err := n.SendToChannel(ctx, ch, event); err != nil {
-				slog.Error("failed to send notification", "channel", ch.Name, "type", ch.Type, "error", err)
-			}
+			wg.Add(1)
+			go func(c *models.NotificationChannel) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := n.SendToChannel(ctx, c, event); err != nil {
+					slog.Error("failed to send notification", "channel", c.Name, "type", c.Type, "error", err)
+				}
+			}(ch)
 		}
+		wg.Wait()
 	}()
 }
 
@@ -112,7 +119,14 @@ func (n *Notifier) sendWebhook(ctx context.Context, webhookURL, webhookSecret st
 	}
 	defer resp.Body.Close()
 
+	respSnippet, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	_, _ = io.Copy(io.Discard, resp.Body)
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		snippet := strings.TrimSpace(string(respSnippet))
+		if snippet != "" {
+			return fmt.Errorf("webhook returned non-2xx status %d: %s", resp.StatusCode, snippet)
+		}
 		return fmt.Errorf("webhook returned non-2xx status: %d", resp.StatusCode)
 	}
 

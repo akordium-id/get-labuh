@@ -41,6 +41,7 @@ type HostMonitor struct {
 	ticker  *time.Ticker
 	stopCh  chan struct{}
 	running bool
+	wg      sync.WaitGroup
 	mu      sync.Mutex
 }
 
@@ -54,7 +55,6 @@ func NewHostMonitor(settingProvider SettingProvider, notifier AlertNotifier, dis
 		diskPath:         diskPath,
 		lastDiskSeverity: SeverityNormal,
 		lastRAMSeverity:  SeverityNormal,
-		stopCh:           make(chan struct{}),
 	}
 }
 
@@ -65,17 +65,22 @@ func (m *HostMonitor) Start() {
 		return
 	}
 	m.running = true
+	m.stopCh = make(chan struct{})
 	m.ticker = time.NewTicker(60 * time.Second)
+	stopCh := m.stopCh
+	ticker := m.ticker
+	m.wg.Add(1)
 	m.mu.Unlock()
 
 	slog.Info("host resource monitor daemon started")
 
 	go func() {
+		defer m.wg.Done()
 		for {
 			select {
-			case <-m.stopCh:
+			case <-stopCh:
 				return
-			case <-m.ticker.C:
+			case <-ticker.C:
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				m.CheckOnce(ctx)
 				cancel()
@@ -86,9 +91,8 @@ func (m *HostMonitor) Start() {
 
 func (m *HostMonitor) Stop() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if !m.running {
+		m.mu.Unlock()
 		return
 	}
 	m.running = false
@@ -96,6 +100,9 @@ func (m *HostMonitor) Stop() {
 		m.ticker.Stop()
 	}
 	close(m.stopCh)
+	m.mu.Unlock()
+
+	m.wg.Wait()
 	slog.Info("host resource monitor daemon stopped")
 }
 
@@ -114,9 +121,6 @@ func (m *HostMonitor) CheckOnce(ctx context.Context) {
 
 // Evaluate membandingkan stats terhadap ambang batas dan mengirim notifikasi jika diperlukan.
 func (m *HostMonitor) Evaluate(ctx context.Context, stats HostStats) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	diskWarnPct := m.getFloatSetting(ctx, "host_disk_warning_pct", 80.0)
 	diskCritPct := m.getFloatSetting(ctx, "host_disk_critical_pct", 90.0)
 	ramWarnPct := m.getFloatSetting(ctx, "host_ram_warning_pct", 90.0)
@@ -135,26 +139,6 @@ func (m *HostMonitor) Evaluate(ctx context.Context, stats HostStats) {
 		currentDiskSev = SeverityNormal
 	}
 
-	if currentDiskSev != m.lastDiskSeverity {
-		if currentDiskSev == SeverityCritical {
-			m.dispatchDiskAlert(stats, SeverityCritical)
-			m.lastDiskAlertTime = now
-		} else if currentDiskSev == SeverityWarning && m.lastDiskSeverity == SeverityNormal {
-			m.dispatchDiskAlert(stats, SeverityWarning)
-			m.lastDiskAlertTime = now
-		} else if currentDiskSev == SeverityNormal && (m.lastDiskSeverity == SeverityWarning || m.lastDiskSeverity == SeverityCritical) {
-			m.dispatchDiskResolved(stats)
-			m.lastDiskAlertTime = time.Time{}
-		}
-		m.lastDiskSeverity = currentDiskSev
-	} else if currentDiskSev != SeverityNormal {
-		// Cooldown check for persistent alerts
-		if now.Sub(m.lastDiskAlertTime) >= cooldownDuration {
-			m.dispatchDiskAlert(stats, currentDiskSev)
-			m.lastDiskAlertTime = now
-		}
-	}
-
 	// 2. Evaluate RAM
 	var currentRAMSev AlertSeverity
 	if stats.MemUsedPercent >= ramWarnPct {
@@ -163,20 +147,49 @@ func (m *HostMonitor) Evaluate(ctx context.Context, stats HostStats) {
 		currentRAMSev = SeverityNormal
 	}
 
+	var toDispatch []func()
+
+	m.mu.Lock()
+	if currentDiskSev != m.lastDiskSeverity {
+		if currentDiskSev == SeverityCritical {
+			toDispatch = append(toDispatch, func() { m.dispatchDiskAlert(stats, SeverityCritical) })
+			m.lastDiskAlertTime = now
+		} else if currentDiskSev == SeverityWarning {
+			// Menangani transisi Normal -> Warning dan de-eskalasi Critical -> Warning
+			toDispatch = append(toDispatch, func() { m.dispatchDiskAlert(stats, SeverityWarning) })
+			m.lastDiskAlertTime = now
+		} else if currentDiskSev == SeverityNormal && (m.lastDiskSeverity == SeverityWarning || m.lastDiskSeverity == SeverityCritical) {
+			toDispatch = append(toDispatch, func() { m.dispatchDiskResolved(stats) })
+			m.lastDiskAlertTime = time.Time{}
+		}
+		m.lastDiskSeverity = currentDiskSev
+	} else if currentDiskSev != SeverityNormal {
+		// Cooldown check for persistent alerts
+		if now.Sub(m.lastDiskAlertTime) >= cooldownDuration {
+			toDispatch = append(toDispatch, func() { m.dispatchDiskAlert(stats, currentDiskSev) })
+			m.lastDiskAlertTime = now
+		}
+	}
+
 	if currentRAMSev != m.lastRAMSeverity {
 		if currentRAMSev == SeverityWarning {
-			m.dispatchRAMAlert(stats)
+			toDispatch = append(toDispatch, func() { m.dispatchRAMAlert(stats) })
 			m.lastRAMAlertTime = now
 		} else if currentRAMSev == SeverityNormal && m.lastRAMSeverity == SeverityWarning {
-			m.dispatchRAMResolved(stats)
+			toDispatch = append(toDispatch, func() { m.dispatchRAMResolved(stats) })
 			m.lastRAMAlertTime = time.Time{}
 		}
 		m.lastRAMSeverity = currentRAMSev
 	} else if currentRAMSev != SeverityNormal {
 		if now.Sub(m.lastRAMAlertTime) >= cooldownDuration {
-			m.dispatchRAMAlert(stats)
+			toDispatch = append(toDispatch, func() { m.dispatchRAMAlert(stats) })
 			m.lastRAMAlertTime = now
 		}
+	}
+	m.mu.Unlock()
+
+	for _, fn := range toDispatch {
+		fn()
 	}
 }
 

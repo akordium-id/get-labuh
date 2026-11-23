@@ -64,6 +64,9 @@ func (a *App) Run(ctx context.Context) error {
 	if a.container.SettingsMod != nil && a.container.SettingsMod.CleanupScheduler != nil {
 		defer a.container.SettingsMod.CleanupScheduler.Stop()
 	}
+	if a.container.HostMonitor != nil {
+		defer a.container.HostMonitor.Stop()
+	}
 	defer a.container.DeployWorker.Stop()
 	defer func() {
 		if err := database.Close(); err != nil {

@@ -75,7 +75,35 @@ func TestMonitoringHandler(t *stdtesting.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "45", cooldown)
 
-	// 3. POST /settings/monitoring/test (Trigger manual test alert)
+	// 3. Validation failure: diskWarn >= diskCrit
+	formInvalidDisk := url.Values{
+		"host_monitoring_enabled":     {"true"},
+		"host_disk_warning_pct":       {"95"},
+		"host_disk_critical_pct":      {"80"},
+		"host_ram_warning_pct":        {"85"},
+		"host_alert_cooldown_minutes": {"30"},
+	}
+	reqBadDisk := httptest.NewRequest(http.MethodPost, "/settings/monitoring", strings.NewReader(formInvalidDisk.Encode()))
+	reqBadDisk.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	wBadDisk := httptest.NewRecorder()
+	r.ServeHTTP(wBadDisk, reqBadDisk)
+	assert.Equal(t, http.StatusBadRequest, wBadDisk.Code)
+
+	// 4. Validation failure: cooldown <= 0
+	formInvalidCooldown := url.Values{
+		"host_monitoring_enabled":     {"true"},
+		"host_disk_warning_pct":       {"75"},
+		"host_disk_critical_pct":      {"85"},
+		"host_ram_warning_pct":        {"85"},
+		"host_alert_cooldown_minutes": {"0"},
+	}
+	reqBadCooldown := httptest.NewRequest(http.MethodPost, "/settings/monitoring", strings.NewReader(formInvalidCooldown.Encode()))
+	reqBadCooldown.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	wBadCooldown := httptest.NewRecorder()
+	r.ServeHTTP(wBadCooldown, reqBadCooldown)
+	assert.Equal(t, http.StatusBadRequest, wBadCooldown.Code)
+
+	// 5. POST /settings/monitoring/test (Trigger manual test alert)
 	reqTest := httptest.NewRequest(http.MethodPost, "/settings/monitoring/test", nil)
 	wTest := httptest.NewRecorder()
 	r.ServeHTTP(wTest, reqTest)

@@ -2,6 +2,7 @@ package observability
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -74,18 +75,11 @@ func GetDiskStats(path string) (total, used, free uint64, usedPercent float64, e
 	return total, used, free, usedPercent, nil
 }
 
-// GetMemoryStats membaca statistik RAM dari /proc/meminfo dengan fallback runtime.MemStats.
+// GetMemoryStats membaca statistik RAM dari /proc/meminfo.
 func GetMemoryStats() (total, used, free uint64, usedPercent float64, err error) {
 	file, err := os.Open("/proc/meminfo")
 	if err != nil {
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		sys := m.Sys
-		alloc := m.Alloc
-		if sys > 0 {
-			return sys, alloc, sys - alloc, float64(alloc) / float64(sys) * 100.0, nil
-		}
-		return 0, 0, 0, 0, nil
+		return 0, 0, 0, 0, fmt.Errorf("failed to open /proc/meminfo: %w", err)
 	}
 	defer file.Close()
 

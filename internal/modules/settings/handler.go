@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -621,23 +622,70 @@ func (h *Handler) UpdateMonitoringSettings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	diskWarnStr := strings.TrimSpace(r.FormValue("host_disk_warning_pct"))
+	diskCritStr := strings.TrimSpace(r.FormValue("host_disk_critical_pct"))
+	ramWarnStr := strings.TrimSpace(r.FormValue("host_ram_warning_pct"))
+	cooldownStr := strings.TrimSpace(r.FormValue("host_alert_cooldown_minutes"))
+
+	diskWarn, err := strconv.ParseFloat(diskWarnStr, 64)
+	if err != nil || diskWarn <= 0 || diskWarn > 100 {
+		SetToast(w, "Ambang batas warning disk harus berupa angka antara 1 dan 100", ToastError)
+		http.Error(w, "Invalid host_disk_warning_pct", http.StatusBadRequest)
+		return
+	}
+
+	diskCrit, err := strconv.ParseFloat(diskCritStr, 64)
+	if err != nil || diskCrit <= 0 || diskCrit > 100 {
+		SetToast(w, "Ambang batas critical disk harus berupa angka antara 1 dan 100", ToastError)
+		http.Error(w, "Invalid host_disk_critical_pct", http.StatusBadRequest)
+		return
+	}
+
+	if diskWarn >= diskCrit {
+		SetToast(w, "Ambang batas warning disk harus lebih kecil dari critical disk", ToastError)
+		http.Error(w, "disk warning threshold must be lower than critical threshold", http.StatusBadRequest)
+		return
+	}
+
+	ramWarn, err := strconv.ParseFloat(ramWarnStr, 64)
+	if err != nil || ramWarn <= 0 || ramWarn > 100 {
+		SetToast(w, "Ambang batas warning RAM harus berupa angka antara 1 dan 100", ToastError)
+		http.Error(w, "Invalid host_ram_warning_pct", http.StatusBadRequest)
+		return
+	}
+
+	cooldown, err := strconv.Atoi(cooldownStr)
+	if err != nil || cooldown < 1 || cooldown > 1440 {
+		SetToast(w, "Cooldown alert harus berupa angka minimal 1 menit (maks 1440 menit)", ToastError)
+		http.Error(w, "Invalid host_alert_cooldown_minutes", http.StatusBadRequest)
+		return
+	}
+
 	enabled := "false"
 	if r.FormValue("host_monitoring_enabled") == "on" || r.FormValue("host_monitoring_enabled") == "true" {
 		enabled = "true"
 	}
-	_ = h.settingRepo.Set(r.Context(), "host_monitoring_enabled", enabled)
 
-	if diskWarn := strings.TrimSpace(r.FormValue("host_disk_warning_pct")); diskWarn != "" {
-		_ = h.settingRepo.Set(r.Context(), "host_disk_warning_pct", diskWarn)
+	ctx := r.Context()
+	if err := h.settingRepo.Set(ctx, "host_monitoring_enabled", enabled); err != nil {
+		http.Error(w, "Failed to save settings: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-	if diskCrit := strings.TrimSpace(r.FormValue("host_disk_critical_pct")); diskCrit != "" {
-		_ = h.settingRepo.Set(r.Context(), "host_disk_critical_pct", diskCrit)
+	if err := h.settingRepo.Set(ctx, "host_disk_warning_pct", fmt.Sprintf("%.0f", diskWarn)); err != nil {
+		http.Error(w, "Failed to save settings: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-	if ramWarn := strings.TrimSpace(r.FormValue("host_ram_warning_pct")); ramWarn != "" {
-		_ = h.settingRepo.Set(r.Context(), "host_ram_warning_pct", ramWarn)
+	if err := h.settingRepo.Set(ctx, "host_disk_critical_pct", fmt.Sprintf("%.0f", diskCrit)); err != nil {
+		http.Error(w, "Failed to save settings: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-	if cooldown := strings.TrimSpace(r.FormValue("host_alert_cooldown_minutes")); cooldown != "" {
-		_ = h.settingRepo.Set(r.Context(), "host_alert_cooldown_minutes", cooldown)
+	if err := h.settingRepo.Set(ctx, "host_ram_warning_pct", fmt.Sprintf("%.0f", ramWarn)); err != nil {
+		http.Error(w, "Failed to save settings: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := h.settingRepo.Set(ctx, "host_alert_cooldown_minutes", strconv.Itoa(cooldown)); err != nil {
+		http.Error(w, "Failed to save settings: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	SetToast(w, "Pengaturan host monitoring berhasil disimpan", ToastSuccess)
