@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
 	"strings"
 	"time"
@@ -209,7 +210,7 @@ func (h *Handler) ValidateYAML(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err != nil {
-		_, _ = fmt.Fprintf(w, `<div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-md">❌ %s</div>`, err.Error())
+		_, _ = fmt.Fprintf(w, `<div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-md">❌ %s</div>`, html.EscapeString(err.Error()))
 		return
 	}
 
@@ -217,7 +218,7 @@ func (h *Handler) ValidateYAML(w http.ResponseWriter, r *http.Request) {
 	for _, s := range services {
 		names = append(names, s.Name)
 	}
-	_, _ = fmt.Fprintf(w, `<div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-md">✅ Valid! Terdeteksi %d service (%s)</div>`, len(services), strings.Join(names, ", "))
+	_, _ = fmt.Fprintf(w, `<div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-md">✅ Valid! Terdeteksi %d service (%s)</div>`, len(services), html.EscapeString(strings.Join(names, ", ")))
 }
 
 func (h *Handler) Deploy(w http.ResponseWriter, r *http.Request) {
@@ -237,9 +238,16 @@ func (h *Handler) Deploy(w http.ResponseWriter, r *http.Request) {
 
 	var envVars []models.AppEnvVar
 	if h.envResolver != nil {
-		if resolved, resErr := h.envResolver.ResolveForEnvironment(r.Context(), composeApp.EnvironmentID); resErr == nil {
-			envVars = resolved
+		resolved, resErr := h.envResolver.ResolveForEnvironment(r.Context(), composeApp.EnvironmentID)
+		if resErr != nil {
+			now := time.Now()
+			errMsg := fmt.Sprintf("Gagal me-resolve environment variables: %v", resErr)
+			_ = h.composeRepo.UpdateDeploymentStatusWithContext(r.Context(), id, models.ComposeStatusFailed, &now, &errMsg)
+			w.Header().Set("HX-Redirect", "/compose-apps/"+id)
+			w.WriteHeader(http.StatusOK)
+			return
 		}
+		envVars = resolved
 	}
 
 	if h.orchestrator != nil {

@@ -17,6 +17,13 @@ import (
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
+func shortContainerID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
+
 func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -52,7 +59,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + c.ID)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 44, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 51, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
@@ -65,7 +72,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 45, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 52, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -78,7 +85,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(c.Slug)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 47, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 54, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -96,7 +103,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d service", len(c.ParsedServices)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 52, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 59, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -139,7 +146,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(string(c.Status))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 66, Col: 143}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 73, Col: 143}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -162,7 +169,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("https://" + *c.CustomDomain)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 71, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 78, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -175,7 +182,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(*c.CustomDomain)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 72, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 79, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -199,7 +206,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(c.LastDeployedAt.Format("02 Jan 2006 15:04"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 80, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 87, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -218,7 +225,7 @@ func ComposeListPage(composes []*models.ComposeApplication) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + c.ID)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 86, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 93, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {
@@ -261,7 +268,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(composeApp.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 102, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 109, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -294,7 +301,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(string(composeApp.Status))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 110, Col: 145}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 117, Col: 145}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -312,7 +319,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(composeApp.Slug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 113, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 120, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -325,7 +332,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(composeApp.ComposeFilePath)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 113, Col: 114}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 120, Col: 114}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -343,7 +350,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(composeApp.LastDeployedAt.Format(time.RFC822))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 115, Col: 109}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 122, Col: 109}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -361,7 +368,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + composeApp.ID + "/deploy")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 119, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 126, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -374,7 +381,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + composeApp.ID + "/stop")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 124, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 131, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -392,7 +399,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(*composeApp.ErrorMessage)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 138, Col: 123}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 145, Col: 123}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -410,7 +417,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(runtimes)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 150, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 157, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -438,7 +445,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(svc.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 185, Col: 26}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 192, Col: 26}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -456,7 +463,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 					var templ_7745c5c3_Var22 string
 					templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(svc.Status)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 189, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 196, Col: 27}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 					if templ_7745c5c3_Err != nil {
@@ -479,7 +486,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 					var templ_7745c5c3_Var23 string
 					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(svc.Status)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 197, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 204, Col: 27}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 					if templ_7745c5c3_Err != nil {
@@ -502,7 +509,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 					var templ_7745c5c3_Var24 string
 					templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(svc.Definition.Image)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 206, Col: 76}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 213, Col: 76}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 					if templ_7745c5c3_Err != nil {
@@ -521,7 +528,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 					var templ_7745c5c3_Var25 string
 					templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(svc.Definition.BuildPath)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 212, Col: 80}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 219, Col: 80}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 					if templ_7745c5c3_Err != nil {
@@ -540,7 +547,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 					var templ_7745c5c3_Var26 string
 					templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(svc.Definition.Ports, ", "))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 218, Col: 96}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 225, Col: 96}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 					if templ_7745c5c3_Err != nil {
@@ -557,9 +564,9 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var27 string
-					templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(svc.ContainerID[:12])
+					templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(shortContainerID(svc.ContainerID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 224, Col: 76}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 231, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 					if templ_7745c5c3_Err != nil {
@@ -578,7 +585,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(svc.Health)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 230, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 237, Col: 71}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 					if templ_7745c5c3_Err != nil {
@@ -596,7 +603,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("currentLogService = '%s'; logModalOpen = true; logContent = 'Mengambil log service...'; fetch('/compose-apps/%s/services/%s/logs').then(r => r.text()).then(t => logContent = t)", svc.Name, composeApp.ID, svc.Name)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 239, Col: 244}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 246, Col: 244}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 				if templ_7745c5c3_Err != nil {
@@ -609,7 +616,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + composeApp.ID + "/services/" + svc.Name + "/restart")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 243, Col: 109}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 250, Col: 109}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 				if templ_7745c5c3_Err != nil {
@@ -632,7 +639,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + composeApp.ID + "/yaml")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 258, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 265, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 		if templ_7745c5c3_Err != nil {
@@ -645,7 +652,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var32 string
 		templ_7745c5c3_Var32, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/compose-apps/" + composeApp.ID + "/validate").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 265, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 272, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 		if templ_7745c5c3_Err != nil {
@@ -658,7 +665,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(composeApp.RawYAML)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 279, Col: 143}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 286, Col: 143}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -676,7 +683,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(*composeApp.CustomDomain)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 301, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 308, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
@@ -689,7 +696,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain/remove")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 308, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 315, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 			if templ_7745c5c3_Err != nil {
@@ -707,7 +714,7 @@ func ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 314, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/compose/list.templ`, Line: 321, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 			if templ_7745c5c3_Err != nil {

@@ -8,6 +8,13 @@ import (
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
+func shortContainerID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
+
 templ ComposeListPage(composes []*models.ComposeApplication) {
 	<div>
 		<div class="flex justify-between items-center mb-6">
@@ -221,7 +228,7 @@ templ ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models
 									if svc.ContainerID != "" {
 										<div>
 											<span class="font-medium text-gray-500">Container ID:</span>
-											<span class="font-mono ml-1 text-gray-700">{ svc.ContainerID[:12] }</span>
+											<span class="font-mono ml-1 text-gray-700">{ shortContainerID(svc.ContainerID) }</span>
 										</div>
 									}
 									if svc.Health != "" {

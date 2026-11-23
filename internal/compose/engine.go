@@ -48,7 +48,11 @@ func NewOrchestrator(baseDir string, dockerClient DockerClient) *Orchestrator {
 func (o *Orchestrator) getEffectiveBaseDir() string {
 	err := os.MkdirAll(o.baseDir, 0755)
 	if err == nil {
-		return o.baseDir
+		testFile := filepath.Join(o.baseDir, fmt.Sprintf(".probe-write-%d", time.Now().UnixNano()))
+		if wErr := os.WriteFile(testFile, []byte("ok"), 0600); wErr == nil {
+			_ = os.Remove(testFile)
+			return o.baseDir
+		}
 	}
 	tmp := filepath.Join(os.TempDir(), "labuh-compose")
 	_ = os.MkdirAll(tmp, 0755)
@@ -96,9 +100,14 @@ func (o *Orchestrator) PrepareWorkDir(app *models.ComposeApplication, envVars []
 	// 2. Tulis .env file untuk interpolasi variabel otomatis
 	var envBuf bytes.Buffer
 	for _, ev := range envVars {
+		key := strings.TrimSpace(ev.Key)
+		if key == "" {
+			continue
+		}
 		escaped := strings.ReplaceAll(ev.Value, `\`, `\\`)
 		escaped = strings.ReplaceAll(escaped, `"`, `\"`)
-		envBuf.WriteString(fmt.Sprintf("%s=\"%s\"\n", ev.Key, escaped))
+		escaped = strings.ReplaceAll(escaped, `$`, `$$`)
+		envBuf.WriteString(fmt.Sprintf("%s=\"%s\"\n", key, escaped))
 	}
 
 	envFile := filepath.Join(workDir, ".env")
@@ -158,7 +167,7 @@ func (o *Orchestrator) RestartService(ctx context.Context, app *models.ComposeAp
 	workDir := filepath.Join(o.getEffectiveBaseDir(), app.ID)
 	projectName := GetProjectName(app)
 
-	args := []string{"compose", "-p", projectName, "-f", "docker-compose.yml", "restart", serviceName}
+	args := []string{"compose", "-p", projectName, "-f", "docker-compose.yml", "restart", "--", serviceName}
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = workDir
 
