@@ -16,6 +16,19 @@ func NewRepo(db *sql.DB) *Repo {
 	return &Repo{db: db}
 }
 
+const notificationChannelColumns = `id, project_id, type, name, enabled, discord_webhook_url, telegram_bot_token, telegram_chat_id, webhook_url, webhook_secret, on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure, on_server_alert, created_at, updated_at`
+
+func scanChannel(scanner interface{ Scan(dest ...any) error }, c *models.NotificationChannel) error {
+	return scanner.Scan(
+		&c.ID, &c.ProjectID, &c.Type, &c.Name, &c.Enabled,
+		&c.DiscordWebhookURL, &c.TelegramBotToken, &c.TelegramChatID,
+		&c.WebhookURL, &c.WebhookSecret,
+		&c.OnDeploySuccess, &c.OnDeployFailure, &c.OnBackupSuccess, &c.OnBackupFailure,
+		&c.OnServerAlert,
+		&c.CreatedAt, &c.UpdatedAt,
+	)
+}
+
 func (r *Repo) Create(input models.CreateNotificationChannelInput) (*models.NotificationChannel, error) {
 	id := uuid.New().String()
 	now := time.Now()
@@ -24,12 +37,16 @@ func (r *Repo) Create(input models.CreateNotificationChannelInput) (*models.Noti
 		`INSERT INTO notification_channels (
 			id, project_id, type, name, enabled,
 			discord_webhook_url, telegram_bot_token, telegram_chat_id,
+			webhook_url, webhook_secret,
 			on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
+			on_server_alert,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, input.ProjectID, input.Type, input.Name, input.Enabled,
 		input.DiscordWebhookURL, input.TelegramBotToken, input.TelegramChatID,
+		input.WebhookURL, input.WebhookSecret,
 		input.OnDeploySuccess, input.OnDeployFailure, input.OnBackupSuccess, input.OnBackupFailure,
+		input.OnServerAlert,
 		now, now,
 	)
 	if err != nil {
@@ -41,33 +58,15 @@ func (r *Repo) Create(input models.CreateNotificationChannelInput) (*models.Noti
 
 func (r *Repo) GetByID(id string) (*models.NotificationChannel, error) {
 	c := &models.NotificationChannel{}
-	err := r.db.QueryRow(
-		`SELECT id, project_id, type, name, enabled,
-				discord_webhook_url, telegram_bot_token, telegram_chat_id,
-				on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
-				created_at, updated_at
-		 FROM notification_channels WHERE id = ?`,
-		id,
-	).Scan(
-		&c.ID, &c.ProjectID, &c.Type, &c.Name, &c.Enabled,
-		&c.DiscordWebhookURL, &c.TelegramBotToken, &c.TelegramChatID,
-		&c.OnDeploySuccess, &c.OnDeployFailure, &c.OnBackupSuccess, &c.OnBackupFailure,
-		&c.CreatedAt, &c.UpdatedAt,
-	)
-	if err != nil {
+	row := r.db.QueryRow("SELECT "+notificationChannelColumns+" FROM notification_channels WHERE id = ?", id)
+	if err := scanChannel(row, c); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
 func (r *Repo) ListGlobal() ([]*models.NotificationChannel, error) {
-	rows, err := r.db.Query(
-		`SELECT id, project_id, type, name, enabled,
-				discord_webhook_url, telegram_bot_token, telegram_chat_id,
-				on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
-				created_at, updated_at
-		 FROM notification_channels WHERE project_id IS NULL ORDER BY created_at DESC`,
-	)
+	rows, err := r.db.Query("SELECT " + notificationChannelColumns + " FROM notification_channels WHERE project_id IS NULL ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -76,12 +75,7 @@ func (r *Repo) ListGlobal() ([]*models.NotificationChannel, error) {
 	var channels []*models.NotificationChannel
 	for rows.Next() {
 		c := &models.NotificationChannel{}
-		if err := rows.Scan(
-			&c.ID, &c.ProjectID, &c.Type, &c.Name, &c.Enabled,
-			&c.DiscordWebhookURL, &c.TelegramBotToken, &c.TelegramChatID,
-			&c.OnDeploySuccess, &c.OnDeployFailure, &c.OnBackupSuccess, &c.OnBackupFailure,
-			&c.CreatedAt, &c.UpdatedAt,
-		); err != nil {
+		if err := scanChannel(rows, c); err != nil {
 			return nil, err
 		}
 		channels = append(channels, c)
@@ -90,14 +84,7 @@ func (r *Repo) ListGlobal() ([]*models.NotificationChannel, error) {
 }
 
 func (r *Repo) ListByProjectID(projectID string) ([]*models.NotificationChannel, error) {
-	rows, err := r.db.Query(
-		`SELECT id, project_id, type, name, enabled,
-				discord_webhook_url, telegram_bot_token, telegram_chat_id,
-				on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
-				created_at, updated_at
-		 FROM notification_channels WHERE project_id = ? ORDER BY created_at DESC`,
-		projectID,
-	)
+	rows, err := r.db.Query("SELECT "+notificationChannelColumns+" FROM notification_channels WHERE project_id = ? ORDER BY created_at DESC", projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -106,12 +93,7 @@ func (r *Repo) ListByProjectID(projectID string) ([]*models.NotificationChannel,
 	var channels []*models.NotificationChannel
 	for rows.Next() {
 		c := &models.NotificationChannel{}
-		if err := rows.Scan(
-			&c.ID, &c.ProjectID, &c.Type, &c.Name, &c.Enabled,
-			&c.DiscordWebhookURL, &c.TelegramBotToken, &c.TelegramChatID,
-			&c.OnDeploySuccess, &c.OnDeployFailure, &c.OnBackupSuccess, &c.OnBackupFailure,
-			&c.CreatedAt, &c.UpdatedAt,
-		); err != nil {
+		if err := scanChannel(rows, c); err != nil {
 			return nil, err
 		}
 		channels = append(channels, c)
@@ -130,16 +112,13 @@ func (r *Repo) ListActiveForEvent(eventType string, projectID *string) ([]*model
 		eventCol = "on_backup_success = 1"
 	case "backup_failure":
 		eventCol = "on_backup_failure = 1"
+	case "server_alert", models.EventServerAlertWarning, models.EventServerAlertCritical, models.EventServerAlertResolved:
+		eventCol = "on_server_alert = 1"
 	default:
 		return nil, nil
 	}
 
-	query := `SELECT id, project_id, type, name, enabled,
-			discord_webhook_url, telegram_bot_token, telegram_chat_id,
-			on_deploy_success, on_deploy_failure, on_backup_success, on_backup_failure,
-			created_at, updated_at
-		FROM notification_channels
-		WHERE enabled = 1 AND ` + eventCol
+	query := "SELECT " + notificationChannelColumns + " FROM notification_channels WHERE enabled = 1 AND " + eventCol
 
 	var args []any
 	if projectID != nil {
@@ -158,12 +137,7 @@ func (r *Repo) ListActiveForEvent(eventType string, projectID *string) ([]*model
 	var channels []*models.NotificationChannel
 	for rows.Next() {
 		c := &models.NotificationChannel{}
-		if err := rows.Scan(
-			&c.ID, &c.ProjectID, &c.Type, &c.Name, &c.Enabled,
-			&c.DiscordWebhookURL, &c.TelegramBotToken, &c.TelegramChatID,
-			&c.OnDeploySuccess, &c.OnDeployFailure, &c.OnBackupSuccess, &c.OnBackupFailure,
-			&c.CreatedAt, &c.UpdatedAt,
-		); err != nil {
+		if err := scanChannel(rows, c); err != nil {
 			return nil, err
 		}
 		channels = append(channels, c)

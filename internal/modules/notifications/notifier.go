@@ -59,9 +59,64 @@ func (n *Notifier) SendToChannel(ctx context.Context, ch *models.NotificationCha
 		}
 		return n.sendTelegram(ctx, *ch.TelegramBotToken, *ch.TelegramChatID, event)
 
+	case models.NotificationTypeWebhook:
+		if ch.WebhookURL == nil || *ch.WebhookURL == "" {
+			return fmt.Errorf("missing webhook url")
+		}
+		secret := ""
+		if ch.WebhookSecret != nil {
+			secret = *ch.WebhookSecret
+		}
+		return n.sendWebhook(ctx, *ch.WebhookURL, secret, event)
+
 	default:
 		return fmt.Errorf("unsupported notification channel type: %s", ch.Type)
 	}
+}
+
+func (n *Notifier) sendWebhook(ctx context.Context, webhookURL, webhookSecret string, event models.NotificationEvent) error {
+	payload := map[string]any{
+		"event":       event.EventType,
+		"title":       event.Title,
+		"description": event.Description,
+		"status":      event.Status,
+		"fields":      event.Fields,
+		"project_id":  event.ProjectID,
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Labuh-Webhook-Notifier/1.0")
+
+	if webhookSecret != "" {
+		req.Header.Set("X-Webhook-Secret", webhookSecret)
+		if strings.HasPrefix(webhookSecret, "Bearer ") {
+			req.Header.Set("Authorization", webhookSecret)
+		} else {
+			req.Header.Set("Authorization", "Bearer "+webhookSecret)
+		}
+	}
+
+	resp, err := n.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("webhook returned non-2xx status: %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 func (n *Notifier) sendDiscord(ctx context.Context, webhookURL string, event models.NotificationEvent) error {
