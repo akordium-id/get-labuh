@@ -110,7 +110,7 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 					finalEnvVars := job.EnvVars
 					if w.envResolver != nil {
 						if targetApp, getErr := appRepo.GetByIDWithContext(jobCtx, job.ApplicationID); getErr == nil && targetApp != nil {
-							if resolved, resErr := w.envResolver.ResolveForApplication(jobCtx, targetApp); resErr == nil && len(resolved) > 0 {
+							if resolved, resErr := w.envResolver.ResolveForApplication(jobCtx, targetApp); resErr == nil {
 								finalEnvVars = resolved
 							}
 						}

@@ -17,6 +17,7 @@ func (s *MCPServer) registerEnvTools() {
 			mcp.WithDescription("Mendapatkan variabel lingkungan aplikasi, termasuk status pewarisan (inheritance) dari Project & Team"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("ID aplikasi")),
 			mcp.WithBoolean("include_inherited", mcp.Description("Sertakan variabel yang diwariskan dari project & team (default true)")),
+			mcp.WithBoolean("show_secrets", mcp.Description("Tampilkan nilai secret plaintext tanpa masking (default false)")),
 		),
 		s.handleGetApplicationEnv,
 	)
@@ -39,6 +40,7 @@ func (s *MCPServer) registerEnvTools() {
 			mcp.WithDescription("Melihat daftar shared environment variables di tingkat Project atau Team"),
 			mcp.WithString("scope", mcp.Required(), mcp.Description("Lingkup: 'project' atau 'team'")),
 			mcp.WithString("scope_id", mcp.Required(), mcp.Description("ID project atau ID team")),
+			mcp.WithBoolean("show_secrets", mcp.Description("Tampilkan nilai secret plaintext tanpa masking (default false)")),
 		),
 		s.handleGetSharedEnv,
 	)
@@ -67,6 +69,7 @@ func (s *MCPServer) handleGetApplicationEnv(ctx context.Context, req mcp.CallToo
 	if inc, ok := req.Params.Arguments["include_inherited"].(bool); ok {
 		includeInherited = inc
 	}
+	showSecrets, _ := req.Params.Arguments["show_secrets"].(bool)
 
 	if s.deps.AppRepo == nil {
 		return mcp.NewToolResultError("Application repository tidak tersedia"), nil
@@ -82,6 +85,16 @@ func (s *MCPServer) handleGetApplicationEnv(ctx context.Context, req mcp.CallToo
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Gagal me-resolve environment variables: %v", err)), nil
 		}
+		if !showSecrets {
+			sanitized := make([]models.ResolvedEnvVar, len(detailed))
+			for i, v := range detailed {
+				sanitized[i] = v
+				if v.IsSecret {
+					sanitized[i].Value = "••••••••"
+				}
+			}
+			detailed = sanitized
+		}
 		b, _ := json.MarshalIndent(detailed, "", "  ")
 		return mcp.NewToolResultText(string(b)), nil
 	}
@@ -90,6 +103,19 @@ func (s *MCPServer) handleGetApplicationEnv(ctx context.Context, req mcp.CallToo
 		raw, err := s.deps.AppEnvRepo.GetByApplicationIDWithContext(ctx, appID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Gagal mengambil environment variables aplikasi: %v", err)), nil
+		}
+		if !showSecrets {
+			sanitized := make([]*models.AppEnvVar, len(raw))
+			for i, v := range raw {
+				if v != nil {
+					cp := *v
+					if cp.IsSecret {
+						cp.Value = "••••••••"
+					}
+					sanitized[i] = &cp
+				}
+			}
+			raw = sanitized
 		}
 		b, _ := json.MarshalIndent(raw, "", "  ")
 		return mcp.NewToolResultText(string(b)), nil
@@ -138,6 +164,7 @@ func (s *MCPServer) handleGetSharedEnv(ctx context.Context, req mcp.CallToolRequ
 
 	scopeStr, _ := req.Params.Arguments["scope"].(string)
 	scopeID, _ := req.Params.Arguments["scope_id"].(string)
+	showSecrets, _ := req.Params.Arguments["show_secrets"].(bool)
 
 	if scopeStr != "project" && scopeStr != "team" {
 		return mcp.NewToolResultError("Argumen 'scope' harus bernilai 'project' atau 'team'"), nil
@@ -149,6 +176,20 @@ func (s *MCPServer) handleGetSharedEnv(ctx context.Context, req mcp.CallToolRequ
 	list, err := s.deps.SharedEnvRepo.ListByScope(ctx, models.SharedEnvVarScope(scopeStr), scopeID)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Gagal mengambil shared env: %v", err)), nil
+	}
+
+	if !showSecrets {
+		sanitized := make([]*models.SharedEnvVar, len(list))
+		for i, v := range list {
+			if v != nil {
+				cp := *v
+				if cp.IsSecret {
+					cp.Value = "••••••••"
+				}
+				sanitized[i] = &cp
+			}
+		}
+		list = sanitized
 	}
 
 	b, _ := json.MarshalIndent(list, "", "  ")

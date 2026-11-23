@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,19 +14,13 @@ import (
 
 // SharedEnvVarRepo mengelola penyimpanan variabel lingkungan bersama (level Project atau Team).
 type SharedEnvVarRepo struct {
-	db     *sql.DB
-	encKey string
+	db *sql.DB
 }
 
 // NewSharedEnvVarRepo membuat instance baru SharedEnvVarRepo.
-func NewSharedEnvVarRepo(db *sql.DB, encKey ...string) *SharedEnvVarRepo {
-	k := ""
-	if len(encKey) > 0 {
-		k = encKey[0]
-	}
+func NewSharedEnvVarRepo(db *sql.DB, _ ...string) *SharedEnvVarRepo {
 	return &SharedEnvVarRepo{
-		db:     db,
-		encKey: k,
+		db: db,
 	}
 }
 
@@ -106,9 +101,10 @@ func (r *SharedEnvVarRepo) ListByScope(ctx context.Context, scope models.SharedE
 
 		if item.IsEncrypted && encryption.IsInitialized() {
 			decrypted, err := encryption.Decrypt(strings.TrimPrefix(item.Value, "ENC:"))
-			if err == nil {
-				item.Value = decrypted
+			if err != nil {
+				return nil, fmt.Errorf("failed to decrypt shared env var '%s': %w", item.Key, err)
 			}
+			item.Value = decrypted
 		}
 
 		result = append(result, item)
@@ -148,9 +144,10 @@ func (r *SharedEnvVarRepo) GetByKey(ctx context.Context, scope models.SharedEnvV
 
 	if item.IsEncrypted && encryption.IsInitialized() {
 		decrypted, err := encryption.Decrypt(strings.TrimPrefix(item.Value, "ENC:"))
-		if err == nil {
-			item.Value = decrypted
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt shared env var '%s': %w", item.Key, err)
 		}
+		item.Value = decrypted
 	}
 
 	return item, nil

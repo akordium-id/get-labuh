@@ -6,13 +6,16 @@ import (
 	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/akordium-id/get-labuh/internal/models"
 )
 
 func (s *MCPServer) registerDatabaseTools() {
 	// 13. list_databases
 	s.internalServer.AddTool(
 		mcp.NewTool("list_databases",
-			mcp.WithDescription("Daftar seluruh database yang terdaftar (PostgreSQL, MySQL, Redis, MongoDB) beserta port dan status"),
+			mcp.WithDescription("Daftar database yang terdaftar (PostgreSQL, MySQL, Redis, MongoDB) beserta port dan status"),
+			mcp.WithString("environment_id", mcp.Description("Filter berdasarkan ID environment (opsional)")),
 		),
 		s.handleListDatabases,
 	)
@@ -32,13 +35,36 @@ func (s *MCPServer) handleListDatabases(ctx context.Context, req mcp.CallToolReq
 		return mcp.NewToolResultError("Database repository tidak tersedia"), nil
 	}
 
-	dbs, _, err := s.deps.DatabaseRepo.GetByEnvironmentIDPaginatedWithContext(ctx, "", 100, 0)
+	envID, _ := req.Params.Arguments["environment_id"].(string)
+	var (
+		dbs []*models.DatabaseService
+		err error
+	)
+
+	if envID != "" {
+		dbs, err = s.deps.DatabaseRepo.GetByEnvironmentIDWithContext(ctx, envID)
+	} else {
+		dbs, err = s.deps.DatabaseRepo.GetAllWithContext(ctx)
+	}
+
 	if err != nil {
-		// fallback to empty list
 		dbs = nil
 	}
 
-	b, _ := json.MarshalIndent(dbs, "", "  ")
+	var sanitized []*models.DatabaseService
+	for _, dbItem := range dbs {
+		if dbItem != nil {
+			cp := *dbItem
+			cp.Password = "••••••••"
+			if cp.ConnectionString != nil {
+				maskedConn := "••••••••"
+				cp.ConnectionString = &maskedConn
+			}
+			sanitized = append(sanitized, &cp)
+		}
+	}
+
+	b, _ := json.MarshalIndent(sanitized, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil
 }
 

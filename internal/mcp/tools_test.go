@@ -109,10 +109,47 @@ func TestMCPServer_FullToolsSuite(t *testing.T) {
 	bAlerts, _ := json.Marshal(resAlerts)
 	assert.Contains(t, string(bAlerts), "status")
 
-	// 9. Test rollback_application
+	// 9. Test rollback_application with prior successful deployment
+	imgName := "myorg/api-app:v1"
+	prevDep, err := deployRepo.CreateWithContext(ctx, models.CreateDeploymentInput{
+		ApplicationID: app.ID,
+		ImageName:     &imgName,
+	})
+	require.NoError(t, err)
+	_ = deployRepo.UpdateStatusWithContext(ctx, prevDep.ID, models.DeployStatusSuccess)
+
 	rollbackJSON := `{"jsonrpc":"2.0","id":18,"method":"tools/call","params":{"name":"rollback_application","arguments":{"id":"` + app.ID + `"}}}`
 	resRollback := mcpSrv.HandleMessage(ctx, []byte(rollbackJSON))
 	require.NotNil(t, resRollback)
 	bRollback, _ := json.Marshal(resRollback)
 	assert.Contains(t, string(bRollback), "rollback_initiated")
+
+	// 10. Test Secret Masking in Shared Env & App Env
+	setSecretEnvJSON := `{"jsonrpc":"2.0","id":19,"method":"tools/call","params":{"name":"set_shared_env","arguments":{"scope":"project","scope_id":"` + projID + `","key":"API_SECRET","value":"super-confidential-token","is_secret":true}}}`
+	resSetSecret := mcpSrv.HandleMessage(ctx, []byte(setSecretEnvJSON))
+	require.NotNil(t, resSetSecret)
+
+	// Default: show_secrets=false -> must be masked
+	getMaskedSharedJSON := `{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"get_shared_env","arguments":{"scope":"project","scope_id":"` + projID + `"}}}`
+	resMaskedShared := mcpSrv.HandleMessage(ctx, []byte(getMaskedSharedJSON))
+	bMaskedShared, _ := json.Marshal(resMaskedShared)
+	assert.Contains(t, string(bMaskedShared), "••••••••")
+	assert.NotContains(t, string(bMaskedShared), "super-confidential-token")
+
+	// Explicit show_secrets=true -> plaintext visible
+	getPlainSharedJSON := `{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"get_shared_env","arguments":{"scope":"project","scope_id":"` + projID + `","show_secrets":true}}}`
+	resPlainShared := mcpSrv.HandleMessage(ctx, []byte(getPlainSharedJSON))
+	bPlainShared, _ := json.Marshal(resPlainShared)
+	assert.Contains(t, string(bPlainShared), "super-confidential-token")
+
+	// 11. Test Secret Masking in get_application (GitToken & WebhookSecret)
+	gitTok := "github_pat_secret_abc123"
+	_, err = db.ExecContext(ctx, "UPDATE applications SET git_token = ? WHERE id = ?", gitTok, app.ID)
+	require.NoError(t, err)
+
+	getAppJSON := `{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"get_application","arguments":{"id":"` + app.ID + `"}}}`
+	resGetApp := mcpSrv.HandleMessage(ctx, []byte(getAppJSON))
+	bGetApp, _ := json.Marshal(resGetApp)
+	assert.Contains(t, string(bGetApp), "••••••••")
+	assert.NotContains(t, string(bGetApp), gitTok)
 }

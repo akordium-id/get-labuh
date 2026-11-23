@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sort"
 
 	"github.com/akordium-id/get-labuh/internal/models"
@@ -61,14 +62,15 @@ func (r *EnvResolver) ResolveDetailed(ctx context.Context, app *models.Applicati
 	// 2. Load Team Scope Variables
 	if teamID != "" && r.sharedRepo != nil {
 		teamVars, err := r.sharedRepo.ListByScope(ctx, models.ScopeTeam, teamID)
-		if err == nil {
-			for _, v := range teamVars {
-				resolvedMap[v.Key] = models.ResolvedEnvVar{
-					Key:      v.Key,
-					Value:    v.Value,
-					IsSecret: v.IsSecret,
-					Source:   "team",
-				}
+		if err != nil {
+			return nil, fmt.Errorf("gagal memuat team shared env vars: %w", err)
+		}
+		for _, v := range teamVars {
+			resolvedMap[v.Key] = models.ResolvedEnvVar{
+				Key:      v.Key,
+				Value:    v.Value,
+				IsSecret: v.IsSecret,
+				Source:   "team",
 			}
 		}
 	}
@@ -76,14 +78,15 @@ func (r *EnvResolver) ResolveDetailed(ctx context.Context, app *models.Applicati
 	// 3. Load Project Scope Variables (overwrites team)
 	if projectID != "" && r.sharedRepo != nil {
 		projVars, err := r.sharedRepo.ListByScope(ctx, models.ScopeProject, projectID)
-		if err == nil {
-			for _, v := range projVars {
-				resolvedMap[v.Key] = models.ResolvedEnvVar{
-					Key:      v.Key,
-					Value:    v.Value,
-					IsSecret: v.IsSecret,
-					Source:   "project",
-				}
+		if err != nil {
+			return nil, fmt.Errorf("gagal memuat project shared env vars: %w", err)
+		}
+		for _, v := range projVars {
+			resolvedMap[v.Key] = models.ResolvedEnvVar{
+				Key:      v.Key,
+				Value:    v.Value,
+				IsSecret: v.IsSecret,
+				Source:   "project",
 			}
 		}
 	}
@@ -91,14 +94,15 @@ func (r *EnvResolver) ResolveDetailed(ctx context.Context, app *models.Applicati
 	// 4. Load Application Scope Variables (overwrites project and team)
 	if app.ID != "" && r.appEnvRepo != nil {
 		appVars, err := r.appEnvRepo.GetByApplicationIDWithContext(ctx, app.ID)
-		if err == nil {
-			for _, v := range appVars {
-				resolvedMap[v.Key] = models.ResolvedEnvVar{
-					Key:      v.Key,
-					Value:    v.Value,
-					IsSecret: v.IsSecret,
-					Source:   "app",
-				}
+		if err != nil {
+			return nil, fmt.Errorf("gagal memuat application env vars: %w", err)
+		}
+		for _, v := range appVars {
+			resolvedMap[v.Key] = models.ResolvedEnvVar{
+				Key:      v.Key,
+				Value:    v.Value,
+				IsSecret: v.IsSecret,
+				Source:   "app",
 			}
 		}
 	}

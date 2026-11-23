@@ -3,12 +3,14 @@ package mcp_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 
 	labuhmcp "github.com/akordium-id/get-labuh/internal/mcp"
+	"github.com/akordium-id/get-labuh/internal/middleware"
 )
 
 func dummyAuthMiddleware(validKey string) func(http.Handler) http.Handler {
@@ -41,4 +43,20 @@ func TestMCPTransportHTTP_AuthRejectionAndAllow(t *testing.T) {
 	wPostUnauth := httptest.NewRecorder()
 	r.ServeHTTP(wPostUnauth, reqPostUnauth)
 	assert.Equal(t, http.StatusUnauthorized, wPostUnauth.Code)
+}
+
+func TestMCPTransportHTTP_CSRFBypass(t *testing.T) {
+	mcpServer := labuhmcp.NewServer(labuhmcp.ServerDeps{})
+
+	r := chi.NewRouter()
+	r.Use(middleware.CSRFProtectionMiddleware)
+	mcpServer.MountHTTP(r, dummyAuthMiddleware("secret-api-key"))
+
+	// POST to /mcp/message with auth header and no CSRF cookie/header
+	// It must NOT be rejected by CSRFProtectionMiddleware (which would return 403)
+	req := httptest.NewRequest(http.MethodPost, "/mcp/message", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer secret-api-key")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.NotEqual(t, http.StatusForbidden, w.Code)
 }

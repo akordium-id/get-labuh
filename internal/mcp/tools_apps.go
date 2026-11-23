@@ -153,7 +153,21 @@ func (s *MCPServer) handleGetApplication(ctx context.Context, req mcp.CallToolRe
 		return mcp.NewToolResultError(fmt.Sprintf("Aplikasi dengan ID '%s' tidak ditemukan", appID)), nil
 	}
 
-	b, _ := json.MarshalIndent(app, "", "  ")
+	sanitized := *app
+	if sanitized.GitToken != nil {
+		masked := "••••••••"
+		sanitized.GitToken = &masked
+	}
+	if sanitized.WebhookSecret != nil {
+		masked := "••••••••"
+		sanitized.WebhookSecret = &masked
+	}
+	if sanitized.BasicAuthPassword != nil {
+		masked := "••••••••"
+		sanitized.BasicAuthPassword = &masked
+	}
+
+	b, _ := json.MarshalIndent(&sanitized, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil
 }
 
@@ -242,6 +256,9 @@ func (s *MCPServer) handleGetApplicationLogs(ctx context.Context, req mcp.CallTo
 	if t, ok := req.Params.Arguments["tail"].(float64); ok && t > 0 {
 		tailLines = int(t)
 	}
+	if tailLines > 2000 {
+		tailLines = 2000
+	}
 
 	client := s.getDockerClient(ctx, app.ServerID)
 	if client == nil {
@@ -266,8 +283,8 @@ func (s *MCPServer) handleGetApplicationLogs(ctx context.Context, req mcp.CallTo
 }
 
 func (s *MCPServer) handleRollbackApplication(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if s.deps.AppRepo == nil || s.deps.DeployRepo == nil {
-		return mcp.NewToolResultError("Layanan aplikasi atau deployment tidak tersedia"), nil
+	if s.deps.AppRepo == nil || s.deps.DeployRepo == nil || s.deps.DeployWorker == nil {
+		return mcp.NewToolResultError("Layanan aplikasi atau deployment tidak lengkap"), nil
 	}
 
 	appID, _ := req.Params.Arguments["id"].(string)
@@ -280,10 +297,51 @@ func (s *MCPServer) handleRollbackApplication(ctx context.Context, req mcp.CallT
 		return mcp.NewToolResultError(fmt.Sprintf("Aplikasi dengan ID '%s' tidak ditemukan", appID)), nil
 	}
 
+	prevDeployment, err := s.deps.DeployRepo.GetPreviousSuccessfulWithContext(ctx, appID)
+	if err != nil || prevDeployment == nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Tidak ditemukan deployment sukses sebelumnya untuk rollback aplikasi '%s'", app.Name)), nil
+	}
+
+	commitMsg := "Rollback to " + prevDeployment.ID[:8]
+	if prevDeployment.CommitMessage != nil && *prevDeployment.CommitMessage != "" {
+		commitMsg = fmt.Sprintf("Rollback to: %s", *prevDeployment.CommitMessage)
+	}
+
+	rollbackDep, err := s.deps.DeployRepo.CreateWithContext(ctx, models.CreateDeploymentInput{
+		ApplicationID: appID,
+		CommitHash:    prevDeployment.CommitHash,
+		CommitMessage: &commitMsg,
+		ImageName:     prevDeployment.ImageName,
+	})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Gagal membuat deployment rollback: %v", err)), nil
+	}
+
+	_ = s.deps.DeployRepo.MarkStartedWithContext(ctx, rollbackDep.ID)
+	_ = s.deps.DeployRepo.UpdateStatusWithContext(ctx, rollbackDep.ID, models.DeployStatusDeploying)
+	_ = s.deps.AppRepo.UpdateStatus(app.ID, models.AppStatusBuilding)
+
+	job, err := worker.BuildDeploymentJobWithResolver(ctx, app, rollbackDep.ID, s.deps.EnvResolver)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Gagal mempersiapkan job rollback: %v", err)), nil
+	}
+
+	if prevDeployment.ImageName != nil && *prevDeployment.ImageName != "" {
+		job.DockerImage = *prevDeployment.ImageName
+		job.SourceType = string(models.SourceTypeDockerImage)
+	}
+
+	if err := s.deps.DeployWorker.Enqueue(job); err != nil {
+		_ = s.deps.DeployRepo.UpdateStatusWithContext(ctx, rollbackDep.ID, models.DeployStatusFailed)
+		return mcp.NewToolResultError(fmt.Sprintf("Gagal mengantrekan job rollback: %v", err)), nil
+	}
+
 	res := map[string]interface{}{
 		"status":         "rollback_initiated",
 		"application_id": appID,
-		"message":        fmt.Sprintf("Rollback untuk aplikasi '%s' telah diproses", app.Name),
+		"deployment_id":  rollbackDep.ID,
+		"target_image":   prevDeployment.ImageName,
+		"message":        fmt.Sprintf("Rollback untuk aplikasi '%s' berhasil dimasukkan ke antrean", app.Name),
 	}
 	b, _ := json.MarshalIndent(res, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil

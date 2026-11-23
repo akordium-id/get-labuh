@@ -139,6 +139,33 @@ func (r *ServiceRepo) GetByEnvironmentIDWithContext(ctx context.Context, envID s
 	return dbServices, nil
 }
 
+func (r *ServiceRepo) GetAllWithContext(ctx context.Context) ([]*models.DatabaseService, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, environment_id, name, slug, engine, version, username, password, database_name, port, container_id, container_name, status, connection_string, cpu_limit, memory_limit, memory_reservation, created_at, updated_at
+		 FROM database_services ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dbServices []*models.DatabaseService
+	for rows.Next() {
+		dbService := &models.DatabaseService{}
+		err := rows.Scan(&dbService.ID, &dbService.EnvironmentID, &dbService.Name, &dbService.Slug, &dbService.Engine, &dbService.Version, &dbService.Username, &dbService.Password, &dbService.DatabaseName, &dbService.Port, &dbService.ContainerID, &dbService.ContainerName, &dbService.Status, &dbService.ConnectionString, &dbService.CPULimit, &dbService.MemoryLimit, &dbService.MemoryReservation, &dbService.CreatedAt, &dbService.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		dbServices = append(dbServices, dbService)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return dbServices, nil
+}
+
 func (r *ServiceRepo) GetByEnvironmentID(envID string) ([]*models.DatabaseService, error) {
 	return r.GetByEnvironmentIDWithContext(context.Background(), envID)
 }
