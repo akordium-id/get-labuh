@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,8 @@ import (
 )
 
 // Handler menangani operasi HTTP untuk domain Applications.
+var volumeNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 type Handler struct {
 	appRepo       *Repo
 	envVarRepo    *EnvVarRepo
@@ -1008,7 +1011,25 @@ func (h *Handler) TeardownPRPreview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Delete database record
+	// 3. Remove Ephemeral Named Volumes for PR preview
+	if h.dockerClient != nil && previewApp.IsPreview && previewApp.PRNumber != nil {
+		vols, vErr := h.appRepo.GetVolumesByAppID(r.Context(), previewApp.ID)
+		if vErr == nil {
+			cleanSlug := previewApp.Slug
+			suffix := fmt.Sprintf("-pr-%d", *previewApp.PRNumber)
+			cleanSlug = strings.TrimSuffix(cleanSlug, suffix)
+			for _, v := range vols {
+				if v.VolumeType == models.VolumeTypeNamed {
+					volName := fmt.Sprintf("labuh-vol-app-%s-%s-pr-%d-%s", "prod", cleanSlug, *previewApp.PRNumber, v.Name)
+					if err := h.dockerClient.RemoveVolume(r.Context(), volName); err != nil {
+						slog.Warn("failed to remove docker volume during preview teardown", "error", err, "volume_name", volName)
+					}
+				}
+			}
+		}
+	}
+
+	// 4. Delete database record
 	if err := h.appRepo.DeleteWithContext(r.Context(), previewApp.ID); err != nil {
 		http.Error(w, "Failed to delete preview application: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -1087,13 +1108,50 @@ func (h *Handler) CreateVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !strings.HasPrefix(mountPath, "/") {
-		http.Error(w, "Mount path must be absolute (start with /)", http.StatusBadRequest)
+	if !volumeNameRegex.MatchString(name) {
+		http.Error(w, "Volume name must contain only alphanumeric characters, dashes, and underscores", http.StatusBadRequest)
 		return
 	}
 
 	if volType == "" {
 		volType = string(models.VolumeTypeNamed)
+	}
+
+	if volType != string(models.VolumeTypeNamed) && volType != string(models.VolumeTypeBind) {
+		http.Error(w, "Invalid volume type, must be 'named' or 'bind'", http.StatusBadRequest)
+		return
+	}
+
+	cleanMountPath, err := docker.ValidateContainerMountPath(mountPath)
+	if err != nil {
+		http.Error(w, "Invalid mount path: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Collision check terhadap volume yang sudah ada
+	existingVols, err := h.appRepo.GetVolumesByAppID(r.Context(), appID)
+	if err == nil {
+		for _, ev := range existingVols {
+			if ev.Name == name {
+				http.Error(w, "Volume name already in use for this application", http.StatusBadRequest)
+				return
+			}
+			if ev.MountPath == cleanMountPath {
+				http.Error(w, "Mount path already in use by another volume", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	// Collision check terhadap file mounts yang sudah ada
+	existingFiles, err := h.appRepo.GetFileMountsByAppID(r.Context(), appID)
+	if err == nil {
+		for _, ef := range existingFiles {
+			if ef.MountPath == cleanMountPath {
+				http.Error(w, "Mount path conflicts with an existing file mount", http.StatusBadRequest)
+				return
+			}
+		}
 	}
 
 	var hostPathPtr *string
@@ -1106,15 +1164,16 @@ func (h *Handler) CreateVolume(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid host path: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		hostPathPtr = &hostPath
+		cleanHostPath := strings.TrimSpace(hostPath)
+		hostPathPtr = &cleanHostPath
 	}
 
-	_, err := h.appRepo.CreateVolume(r.Context(), models.CreateAppVolumeInput{
+	_, err = h.appRepo.CreateVolume(r.Context(), models.CreateAppVolumeInput{
 		ApplicationID: appID,
 		Name:          name,
 		VolumeType:    models.VolumeType(volType),
 		HostPath:      hostPathPtr,
-		MountPath:     mountPath,
+		MountPath:     cleanMountPath,
 		IsReadOnly:    isReadOnly,
 	})
 	if err != nil {
@@ -1176,18 +1235,42 @@ func (h *Handler) CreateFileMount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Mount path is required", http.StatusBadRequest)
 		return
 	}
-	if !strings.HasPrefix(mountPath, "/") {
-		http.Error(w, "Mount path must be absolute (start with /)", http.StatusBadRequest)
+
+	cleanMountPath, err := docker.ValidateContainerMountPath(mountPath)
+	if err != nil {
+		http.Error(w, "Invalid mount path: "+err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// Collision check terhadap file mounts yang sudah ada
+	existingFiles, err := h.appRepo.GetFileMountsByAppID(r.Context(), appID)
+	if err == nil {
+		for _, ef := range existingFiles {
+			if ef.MountPath == cleanMountPath {
+				http.Error(w, "Mount path already in use by another file mount", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	// Collision check terhadap persistent volumes yang sudah ada
+	existingVols, err := h.appRepo.GetVolumesByAppID(r.Context(), appID)
+	if err == nil {
+		for _, ev := range existingVols {
+			if ev.MountPath == cleanMountPath {
+				http.Error(w, "Mount path conflicts with an existing persistent volume", http.StatusBadRequest)
+				return
+			}
+		}
 	}
 
 	if fileMode == "" {
 		fileMode = "0644"
 	}
 
-	_, err := h.appRepo.CreateFileMount(r.Context(), models.CreateAppFileMountInput{
+	_, err = h.appRepo.CreateFileMount(r.Context(), models.CreateAppFileMountInput{
 		ApplicationID: appID,
-		MountPath:     mountPath,
+		MountPath:     cleanMountPath,
 		Content:       content,
 		FileMode:      fileMode,
 		IsReadOnly:    isReadOnly,

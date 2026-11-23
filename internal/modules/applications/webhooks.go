@@ -681,6 +681,36 @@ func (h *WebhooksHandler) spawnOrUpdatePRPreview(ctx context.Context, parent *mo
 		}
 	}
 
+	// Kloning persistent volumes & file mounts dari induk
+	if h.appRepo != nil {
+		parentVols, err := h.appRepo.GetVolumesByAppID(ctx, parent.ID)
+		if err == nil {
+			for _, v := range parentVols {
+				_, _ = h.appRepo.CreateVolume(ctx, models.CreateAppVolumeInput{
+					ApplicationID: previewApp.ID,
+					Name:          v.Name,
+					VolumeType:    v.VolumeType,
+					HostPath:      v.HostPath,
+					MountPath:     v.MountPath,
+					IsReadOnly:    v.IsReadOnly,
+				})
+			}
+		}
+
+		parentFiles, err := h.appRepo.GetFileMountsByAppID(ctx, parent.ID)
+		if err == nil {
+			for _, f := range parentFiles {
+				_, _ = h.appRepo.CreateFileMount(ctx, models.CreateAppFileMountInput{
+					ApplicationID: previewApp.ID,
+					MountPath:     f.MountPath,
+					Content:       f.Content,
+					FileMode:      f.FileMode,
+					IsReadOnly:    f.IsReadOnly,
+				})
+			}
+		}
+	}
+
 	return previewApp, nil
 }
 
@@ -699,7 +729,25 @@ func (h *WebhooksHandler) teardownPreview(ctx context.Context, previewApp *model
 		}
 	}
 
-	// 3. Delete database record
+	// 3. Remove Ephemeral Named Volumes for PR preview
+	if h.dockerClient != nil && previewApp.IsPreview && previewApp.PRNumber != nil && h.appRepo != nil {
+		vols, vErr := h.appRepo.GetVolumesByAppID(ctx, previewApp.ID)
+		if vErr == nil {
+			cleanSlug := previewApp.Slug
+			suffix := fmt.Sprintf("-pr-%d", *previewApp.PRNumber)
+			cleanSlug = strings.TrimSuffix(cleanSlug, suffix)
+			for _, v := range vols {
+				if v.VolumeType == models.VolumeTypeNamed {
+					volName := fmt.Sprintf("labuh-vol-app-%s-%s-pr-%d-%s", "prod", cleanSlug, *previewApp.PRNumber, v.Name)
+					if err := h.dockerClient.RemoveVolume(ctx, volName); err != nil {
+						slog.Warn("failed to remove docker volume during preview teardown", "error", err, "volume_name", volName)
+					}
+				}
+			}
+		}
+	}
+
+	// 4. Delete database record
 	return h.appRepo.DeleteWithContext(ctx, previewApp.ID)
 }
 

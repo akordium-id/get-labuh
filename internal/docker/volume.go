@@ -71,11 +71,29 @@ func PrepareFileMounts(baseDir, appID string, mounts []*models.AppFileMount) ([]
 
 	if baseDir == "" {
 		baseDir = "/var/lib/labuh/app-files"
+		if os.Geteuid() != 0 {
+			if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+				baseDir = filepath.Join(homeDir, ".labuh", "app-files")
+			} else {
+				baseDir = "./.labuh/app-files"
+			}
+		}
 	}
 
 	appDir := filepath.Join(baseDir, appID)
 	if err := os.MkdirAll(appDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create file mount dir %s: %w", appDir, err)
+		if baseDir == "/var/lib/labuh/app-files" {
+			fallback := "./.labuh/app-files"
+			if homeDir, hErr := os.UserHomeDir(); hErr == nil && homeDir != "" {
+				fallback = filepath.Join(homeDir, ".labuh", "app-files")
+			}
+			appDir = filepath.Join(fallback, appID)
+			if fbErr := os.MkdirAll(appDir, 0755); fbErr != nil {
+				return nil, fmt.Errorf("failed to create file mount dir %s: %w", appDir, fbErr)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to create file mount dir %s: %w", appDir, err)
+		}
 	}
 
 	bindings := make([]VolumeBinding, 0, len(mounts))

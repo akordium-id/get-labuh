@@ -307,3 +307,64 @@ func TestPipeline_Volumes_Integration(t *testing.T) {
 	assert.Equal(t, models.DeployStatusSuccess, updatedDeploy.Status)
 }
 
+func TestPipeline_PRPreview_VolumeNaming(t *testing.T) {
+	db, err := database.Connect("file::memory:?cache=shared")
+	require.NoError(t, err)
+	defer db.Close()
+	require.NoError(t, database.RunAllMigrations(db))
+
+	appRepo := repo.NewApplicationRepo(db)
+	deployRepo := repo.NewDeploymentRepo(db)
+	settingRepo := repo.NewSettingRepo(db)
+	dockerClient, err := docker.NewClient()
+	require.NoError(t, err)
+	caddyClient := caddy.NewClient("http://localhost:2019", "")
+	pipeline := NewPipeline(dockerClient, caddyClient, settingRepo, appRepo, deployRepo)
+
+	prNum := 42
+	parentID := "parent-app-1"
+	previewApp, err := appRepo.Create(models.CreateApplicationInput{
+		EnvironmentID: "env-1",
+		Name:          "App Preview (PR #42)",
+		Slug:          "app-preview-pr-42",
+		SourceType:    models.SourceTypeDockerImage,
+		AppPort:       80,
+		IsPreview:     true,
+		PRNumber:      &prNum,
+		ParentAppID:   &parentID,
+	})
+	require.NoError(t, err)
+
+	_, err = appRepo.CreateVolume(context.Background(), models.CreateAppVolumeInput{
+		ApplicationID: previewApp.ID,
+		Name:          "data",
+		VolumeType:    models.VolumeTypeNamed,
+		MountPath:     "/app/data",
+		IsReadOnly:    false,
+	})
+	require.NoError(t, err)
+
+	logPath := "/tmp/labuh-test-logs/deploy-preview-vol.log"
+	deployment, err := deployRepo.Create(models.CreateDeploymentInput{
+		ApplicationID: previewApp.ID,
+		LogPath:       &logPath,
+	})
+	require.NoError(t, err)
+
+	job := DeploymentJob{
+		DeploymentID:  deployment.ID,
+		ApplicationID: previewApp.ID,
+		SourceType:    string(models.SourceTypeDockerImage),
+		DockerImage:   "nginx:alpine",
+		AppPort:       80,
+		LogPath:       logPath,
+	}
+
+	err = pipeline.Execute(context.Background(), job)
+	assert.NoError(t, err)
+
+	updatedDeploy, err := deployRepo.GetByID(deployment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.DeployStatusSuccess, updatedDeploy.Status)
+}
+

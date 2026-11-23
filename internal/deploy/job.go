@@ -421,9 +421,14 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		if vErr == nil {
 			for _, v := range appVols {
 				if v.VolumeType == models.VolumeTypeNamed {
-					volName := fmt.Sprintf("labuh-vol-app-%s-%s-%s", "prod", appSlug, v.Name)
+					cleanSlug := appSlug
+					var volName string
 					if app != nil && app.IsPreview && app.PRNumber != nil {
-						volName = fmt.Sprintf("labuh-vol-app-%s-%s-pr-%d-%s", "prod", appSlug, *app.PRNumber, v.Name)
+						suffix := fmt.Sprintf("-pr-%d", *app.PRNumber)
+						cleanSlug = strings.TrimSuffix(cleanSlug, suffix)
+						volName = fmt.Sprintf("labuh-vol-app-%s-%s-pr-%d-%s", "prod", cleanSlug, *app.PRNumber, v.Name)
+					} else {
+						volName = fmt.Sprintf("labuh-vol-app-%s-%s-%s", "prod", cleanSlug, v.Name)
 					}
 					_ = targetDockerClient.EnsureVolume(ctx, volName)
 					volumeBindings = append(volumeBindings, docker.VolumeBinding{
@@ -449,11 +454,13 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		appFiles, fErr := p.appRepo.GetFileMountsByAppID(ctx, job.ApplicationID)
 		if fErr == nil && len(appFiles) > 0 {
 			fileBindings, prepareErr := docker.PrepareFileMounts("", job.ApplicationID, appFiles)
-			if prepareErr == nil {
-				volumeBindings = append(volumeBindings, fileBindings...)
-			} else {
-				writeLog(activeLogWriter, fmt.Sprintf("Warning: failed to prepare file mounts: %v", prepareErr))
+			if prepareErr != nil {
+				errMsg := fmt.Sprintf("failed to prepare file mounts: %v", prepareErr)
+				writeLog(activeLogWriter, errMsg)
+				updateStep("deploy", models.DeployStatusFailed, errMsg)
+				return &DeployError{Step: "deploy", Cause: prepareErr, Output: errMsg}
 			}
+			volumeBindings = append(volumeBindings, fileBindings...)
 		}
 	}
 

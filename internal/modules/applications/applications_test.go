@@ -502,6 +502,23 @@ func TestApplications_PRPreviews(t *stdtesting.T) {
 		return "sha256=" + hex.EncodeToString(mac.Sum(nil))
 	}
 
+	// Buat parent volume dan file mount untuk verifikasi kloning ke preview app
+	_, err = mod.Repo.CreateVolume(context.Background(), models.CreateAppVolumeInput{
+		ApplicationID: app.ID,
+		Name:          "uploads",
+		VolumeType:    models.VolumeTypeNamed,
+		MountPath:     "/app/uploads",
+	})
+	require.NoError(t, err)
+
+	_, err = mod.Repo.CreateFileMount(context.Background(), models.CreateAppFileMountInput{
+		ApplicationID: app.ID,
+		MountPath:     "/app/config.json",
+		Content:       `{"env":"prod"}`,
+		FileMode:      "0644",
+	})
+	require.NoError(t, err)
+
 	// 1. Test Webhook GitHub: Pull Request Opened -> Spawn Preview App
 	ghPayload := `{
 		"action": "opened",
@@ -550,6 +567,19 @@ func TestApplications_PRPreviews(t *stdtesting.T) {
 	require.Len(t, previewVars, 1)
 	assert.Equal(t, "APP_KEY", previewVars[0].Key)
 	assert.Equal(t, "base64:secretkey123", previewVars[0].Value)
+
+	// Verifikasi persistent volumes & file mounts ter-clone ke preview app
+	previewVols, err := mod.Repo.GetVolumesByAppID(context.Background(), preview.ID)
+	require.NoError(t, err)
+	require.Len(t, previewVols, 1)
+	assert.Equal(t, "uploads", previewVols[0].Name)
+	assert.Equal(t, "/app/uploads", previewVols[0].MountPath)
+
+	previewFiles, err := mod.Repo.GetFileMountsByAppID(context.Background(), preview.ID)
+	require.NoError(t, err)
+	require.Len(t, previewFiles, 1)
+	assert.Equal(t, "/app/config.json", previewFiles[0].MountPath)
+	assert.Equal(t, `{"env":"prod"}`, previewFiles[0].Content)
 
 	// 2. Test Webhook GitHub: Pull Request Closed -> Teardown Preview App
 	ghClosePayload := `{
@@ -893,5 +923,91 @@ func TestVolumeHandlers(t *stdtesting.T) {
 	fms, err := mod.Repo.GetFileMountsByAppID(context.Background(), app.ID)
 	require.NoError(t, err)
 	require.Len(t, fms, 1)
+
+	// 4. Test Validations: Invalid volume name (spaces, special chars)
+	formBadName := url.Values{}
+	formBadName.Set("name", "my volume!")
+	formBadName.Set("volume_type", "named")
+	formBadName.Set("mount_path", "/app/my-vol")
+	reqBadName := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(formBadName.Encode()))
+	reqBadName.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recBadName := httptest.NewRecorder()
+	r.ServeHTTP(recBadName, reqBadName)
+	assert.Equal(t, http.StatusBadRequest, recBadName.Code)
+
+	// 5. Test Validations: Invalid volume type
+	formBadType := url.Values{}
+	formBadType.Set("name", "nfs-vol")
+	formBadType.Set("volume_type", "invalid-type")
+	formBadType.Set("mount_path", "/app/nfs")
+	reqBadType := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(formBadType.Encode()))
+	reqBadType.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recBadType := httptest.NewRecorder()
+	r.ServeHTTP(recBadType, reqBadType)
+	assert.Equal(t, http.StatusBadRequest, recBadType.Code)
+
+	// 6. Test Validations: Container root forbidden
+	formRoot := url.Values{}
+	formRoot.Set("name", "root-mount")
+	formRoot.Set("volume_type", "named")
+	formRoot.Set("mount_path", "/")
+	reqRoot := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(formRoot.Encode()))
+	reqRoot.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recRoot := httptest.NewRecorder()
+	r.ServeHTTP(recRoot, reqRoot)
+	assert.Equal(t, http.StatusBadRequest, recRoot.Code)
+
+	// 7. Test Collision: Duplicate volume name
+	formDupName := url.Values{}
+	formDupName.Set("name", "uploads")
+	formDupName.Set("volume_type", "named")
+	formDupName.Set("mount_path", "/app/uploads-new")
+	reqDupName := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(formDupName.Encode()))
+	reqDupName.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recDupName := httptest.NewRecorder()
+	r.ServeHTTP(recDupName, reqDupName)
+	assert.Equal(t, http.StatusBadRequest, recDupName.Code)
+
+	// 8. Test Collision: Duplicate volume mount path
+	formDupMount := url.Values{}
+	formDupMount.Set("name", "uploads-2")
+	formDupMount.Set("volume_type", "named")
+	formDupMount.Set("mount_path", "/app/uploads")
+	reqDupMount := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(formDupMount.Encode()))
+	reqDupMount.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recDupMount := httptest.NewRecorder()
+	r.ServeHTTP(recDupMount, reqDupMount)
+	assert.Equal(t, http.StatusBadRequest, recDupMount.Code)
+
+	// 9. Test Collision: Volume mount path collides with existing File Mount
+	formVolCollideFM := url.Values{}
+	formVolCollideFM.Set("name", "nginx-vol")
+	formVolCollideFM.Set("volume_type", "named")
+	formVolCollideFM.Set("mount_path", "/etc/nginx/nginx.conf")
+	reqVolCollideFM := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/volumes", strings.NewReader(formVolCollideFM.Encode()))
+	reqVolCollideFM.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recVolCollideFM := httptest.NewRecorder()
+	r.ServeHTTP(recVolCollideFM, reqVolCollideFM)
+	assert.Equal(t, http.StatusBadRequest, recVolCollideFM.Code)
+
+	// 10. Test Collision: File mount collides with existing Volume
+	formFMCollideVol := url.Values{}
+	formFMCollideVol.Set("mount_path", "/app/uploads")
+	formFMCollideVol.Set("content", "conflict")
+	reqFMCollideVol := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/file-mounts", strings.NewReader(formFMCollideVol.Encode()))
+	reqFMCollideVol.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recFMCollideVol := httptest.NewRecorder()
+	r.ServeHTTP(recFMCollideVol, reqFMCollideVol)
+	assert.Equal(t, http.StatusBadRequest, recFMCollideVol.Code)
+
+	// 11. Test Collision: File mount duplicate mount path
+	formFMDup := url.Values{}
+	formFMDup.Set("mount_path", "/etc/nginx/nginx.conf")
+	formFMDup.Set("content", "conflict2")
+	reqFMDup := httptest.NewRequest(http.MethodPost, "/applications/"+app.ID+"/file-mounts", strings.NewReader(formFMDup.Encode()))
+	reqFMDup.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recFMDup := httptest.NewRecorder()
+	r.ServeHTTP(recFMDup, reqFMDup)
+	assert.Equal(t, http.StatusBadRequest, recFMDup.Code)
 }
 

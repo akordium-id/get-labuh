@@ -47,6 +47,9 @@ func TestValidateHostPathSecurity(t *stdtesting.T) {
 		{name: "traversal to etc", path: "/var/myapp/../../etc/passwd", wantErr: true},
 		{name: "traversal to docker socket", path: "/opt/uploads/../../var/run/docker.sock", wantErr: true},
 		{name: "traversal to root", path: "/home/user/../../", wantErr: true},
+		{name: "docker lib folder", path: "/var/lib/docker", wantErr: true},
+		{name: "docker lib subpath", path: "/var/lib/docker/overlay2", wantErr: true},
+		{name: "labuh data folder", path: "/var/lib/labuh", wantErr: true},
 	}
 
 	for _, tc := range testCases {
@@ -60,3 +63,33 @@ func TestValidateHostPathSecurity(t *stdtesting.T) {
 		})
 	}
 }
+
+func TestValidateContainerMountPath(t *stdtesting.T) {
+	testCases := []struct {
+		name      string
+		mountPath string
+		expected  string
+		wantErr   bool
+	}{
+		{name: "valid path", mountPath: "/app/storage", expected: "/app/storage", wantErr: false},
+		{name: "uncleaned trailing slash", mountPath: "/app/storage/", expected: "/app/storage", wantErr: false},
+		{name: "uncleaned redundant slashes", mountPath: "/app//config/../config", expected: "/app/config", wantErr: false},
+		{name: "empty path", mountPath: "", wantErr: true},
+		{name: "whitespace only", mountPath: "   ", wantErr: true},
+		{name: "relative path", mountPath: "storage", wantErr: true},
+		{name: "container root forbidden", mountPath: "/", wantErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *stdtesting.T) {
+			clean, err := ValidateContainerMountPath(tc.mountPath)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected, clean)
+			}
+		})
+	}
+}
+
