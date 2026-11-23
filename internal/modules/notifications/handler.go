@@ -64,6 +64,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	discordURLVal := r.FormValue("discord_webhook_url")
 	botTokenVal := r.FormValue("telegram_bot_token")
 	chatIDVal := r.FormValue("telegram_chat_id")
+	webhookURLVal := r.FormValue("webhook_url")
+	webhookSecretVal := r.FormValue("webhook_secret")
 
 	var projectID *string
 	if projectIDVal != "" {
@@ -81,6 +83,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if chatIDVal != "" {
 		chatID = &chatIDVal
 	}
+	var webhookURL *string
+	if webhookURLVal != "" {
+		webhookURL = &webhookURLVal
+	}
+	var webhookSecret *string
+	if webhookSecretVal != "" {
+		webhookSecret = &webhookSecretVal
+	}
 
 	input := models.CreateNotificationChannelInput{
 		Name:              name,
@@ -90,10 +100,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		DiscordWebhookURL: discordURL,
 		TelegramBotToken:  botToken,
 		TelegramChatID:    chatID,
-		OnDeploySuccess:   r.FormValue("on_deploy_success") == "true",
-		OnDeployFailure:   r.FormValue("on_deploy_failure") == "true",
-		OnBackupSuccess:   r.FormValue("on_backup_success") == "true",
-		OnBackupFailure:   r.FormValue("on_backup_failure") == "true",
+		WebhookURL:        webhookURL,
+		WebhookSecret:     webhookSecret,
+		OnDeploySuccess:   r.FormValue("on_deploy_success") == "true" || r.FormValue("on_deploy_success") == "on",
+		OnDeployFailure:   r.FormValue("on_deploy_failure") == "true" || r.FormValue("on_deploy_failure") == "on",
+		OnBackupSuccess:   r.FormValue("on_backup_success") == "true" || r.FormValue("on_backup_success") == "on",
+		OnBackupFailure:   r.FormValue("on_backup_failure") == "true" || r.FormValue("on_backup_failure") == "on",
+		OnServerAlert:     r.FormValue("on_server_alert") == "true" || r.FormValue("on_server_alert") == "on",
 	}
 
 	if _, err := h.repo.Create(input); err != nil {

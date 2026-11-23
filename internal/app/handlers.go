@@ -22,6 +22,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/modules/notifications"
 	projectsmod "github.com/akordium-id/get-labuh/internal/modules/projects"
 	settingsmod "github.com/akordium-id/get-labuh/internal/modules/settings"
+	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/worker"
 )
 
@@ -42,6 +43,7 @@ type Container struct {
 	ProjectsMod          *projectsmod.Module
 	NotificationsMod     *notifications.Module
 	SettingsMod          *settingsmod.Module
+	HostMonitor          *observability.HostMonitor
 
 	APIAppHandler         *api.ApplicationsHandler
 	APIProjectsHandler    *api.ProjectsHandler
@@ -132,6 +134,10 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	}
 	settingsMod.Handler.SetDockerClient(dockerClient)
 
+	hostMonitor := observability.NewHostMonitor(settingsMod.SettingRepo, notificationsMod.Notifier, "/")
+	hostMonitor.Start()
+	settingsMod.SetNotifier(notificationsMod.Notifier)
+
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
 	terminalHandler := handler.NewTerminalHandler(dockerClient, appRepo, databaseRepo, composeRepo)
@@ -178,5 +184,6 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		ServerRepo:            serverRepo,
 		DeployWorker:          deployWorker,
 		BackupScheduler:       backupScheduler,
+		HostMonitor:           hostMonitor,
 	}, nil
 }

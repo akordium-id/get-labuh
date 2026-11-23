@@ -38,6 +38,11 @@ func New(db *sql.DB, backupPath string) *Module {
 	}
 }
 
+// SetNotifier menyetel service notifikasi alert ke handler settings.
+func (m *Module) SetNotifier(n AlertDispatcher) {
+	m.Handler.SetNotifier(n)
+}
+
 // RegisterRoutes mendaftarkan seluruh endpoint settings (Caddy, mode, audit logs, storage destinations, registries, backup, cleanup)
 func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/settings/mode", m.Handler.SwitchMode)
@@ -49,6 +54,10 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Get("/settings/cleanup", m.Handler.GetCleanup)
 	r.Post("/settings/cleanup", m.Handler.UpdateCleanupSettings)
 	r.Post("/settings/cleanup/run", m.Handler.RunCleanupNow)
+
+	r.Get("/settings/monitoring", m.Handler.MonitoringPage)
+	r.Post("/settings/monitoring", m.Handler.UpdateMonitoringSettings)
+	r.Post("/settings/monitoring/test", m.Handler.TestMonitoringAlert)
 
 	r.Get("/settings/audit-logs", m.Handler.AuditLogsPage)
 

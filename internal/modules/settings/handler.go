@@ -19,6 +19,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
+	"github.com/akordium-id/get-labuh/internal/observability"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	pagesettings "github.com/akordium-id/get-labuh/internal/web/pages/settings"
 )
@@ -35,12 +36,17 @@ func SetToast(w http.ResponseWriter, message string, toastType ToastType) {
 	w.Header().Set("HX-Trigger", fmt.Sprintf(`{"showToast":{"type":"%s","message":"%s"}}`, toastType, message))
 }
 
+type AlertDispatcher interface {
+	Dispatch(event models.NotificationEvent)
+}
+
 type Handler struct {
 	settingRepo      *SettingRepo
 	auditRepo        *AuditLogRepo
 	storageRepo      *StorageDestinationRepo
 	registryRepo     *RegistryRepo
 	dockerClient     *docker.Client
+	notifier         AlertDispatcher
 	backupPath       string
 	cleanupScheduler *CleanupScheduler
 }
@@ -566,4 +572,103 @@ func (h *Handler) TestRegistryConnection(w http.ResponseWriter, r *http.Request)
 	SetToast(w, "Koneksi ke Docker Registry berhasil!", ToastSuccess)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`<div class="text-emerald-600 text-xs font-semibold">✓ Autentikasi Docker Registry berhasil!</div>`))
+}
+
+func (h *Handler) SetNotifier(n AlertDispatcher) {
+	h.notifier = n
+}
+
+// MonitoringPage menampilkan visualisasi realtime metrik host server dan konfigurasi threshold alert.
+func (h *Handler) MonitoringPage(w http.ResponseWriter, r *http.Request) {
+	stats := observability.GetHostStats("")
+
+	diskWarn, _ := h.settingRepo.Get(r.Context(), "host_disk_warning_pct")
+	if diskWarn == "" {
+		diskWarn = "80"
+	}
+	diskCrit, _ := h.settingRepo.Get(r.Context(), "host_disk_critical_pct")
+	if diskCrit == "" {
+		diskCrit = "90"
+	}
+	ramWarn, _ := h.settingRepo.Get(r.Context(), "host_ram_warning_pct")
+	if ramWarn == "" {
+		ramWarn = "90"
+	}
+	cooldown, _ := h.settingRepo.Get(r.Context(), "host_alert_cooldown_minutes")
+	if cooldown == "" {
+		cooldown = "30"
+	}
+	enabled, _ := h.settingRepo.Get(r.Context(), "host_monitoring_enabled")
+	if enabled == "" {
+		enabled = "true"
+	}
+
+	settingsMap := map[string]string{
+		"host_monitoring_enabled":     enabled,
+		"host_disk_warning_pct":       diskWarn,
+		"host_disk_critical_pct":      diskCrit,
+		"host_ram_warning_pct":        ramWarn,
+		"host_alert_cooldown_minutes": cooldown,
+	}
+
+	templ.Handler(layouts.AppLayout(pagesettings.MonitoringPage(stats, settingsMap))).ServeHTTP(w, r)
+}
+
+// UpdateMonitoringSettings memperbarui ambang batas resource dan status aktif daemon monitoring.
+func (h *Handler) UpdateMonitoringSettings(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	enabled := "false"
+	if r.FormValue("host_monitoring_enabled") == "on" || r.FormValue("host_monitoring_enabled") == "true" {
+		enabled = "true"
+	}
+	_ = h.settingRepo.Set(r.Context(), "host_monitoring_enabled", enabled)
+
+	if diskWarn := strings.TrimSpace(r.FormValue("host_disk_warning_pct")); diskWarn != "" {
+		_ = h.settingRepo.Set(r.Context(), "host_disk_warning_pct", diskWarn)
+	}
+	if diskCrit := strings.TrimSpace(r.FormValue("host_disk_critical_pct")); diskCrit != "" {
+		_ = h.settingRepo.Set(r.Context(), "host_disk_critical_pct", diskCrit)
+	}
+	if ramWarn := strings.TrimSpace(r.FormValue("host_ram_warning_pct")); ramWarn != "" {
+		_ = h.settingRepo.Set(r.Context(), "host_ram_warning_pct", ramWarn)
+	}
+	if cooldown := strings.TrimSpace(r.FormValue("host_alert_cooldown_minutes")); cooldown != "" {
+		_ = h.settingRepo.Set(r.Context(), "host_alert_cooldown_minutes", cooldown)
+	}
+
+	SetToast(w, "Pengaturan host monitoring berhasil disimpan", ToastSuccess)
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/settings/monitoring")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/settings/monitoring", http.StatusSeeOther)
+}
+
+// TestMonitoringAlert memicu simulasi notifikasi alert untuk menguji konfigurasi channel notifikasi.
+func (h *Handler) TestMonitoringAlert(w http.ResponseWriter, r *http.Request) {
+	if h.notifier == nil {
+		SetToast(w, "Notifier service belum diinisialisasi", ToastError)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	event := models.NotificationEvent{
+		Title:       "🔔 Test Server Resource Alert",
+		Description: "Ini adalah notifikasi uji coba dari sistem Server Resource Monitoring get-labuh.",
+		Status:      "warning",
+		EventType:   models.EventServerAlertWarning,
+		Fields: map[string]string{
+			"Trigger":   "Manual Test via Settings UI",
+			"Timestamp": time.Now().Format("2006-01-02 15:04:05"),
+		},
+	}
+	h.notifier.Dispatch(event)
+
+	SetToast(w, "Notifikasi uji coba berhasil dikirim ke seluruh channel yang aktif!", ToastSuccess)
+	w.WriteHeader(http.StatusOK)
 }

@@ -9,7 +9,11 @@ package settings
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/akordium-id/get-labuh/internal/models"
+import (
+	"strconv"
+
+	"github.com/akordium-id/get-labuh/internal/models"
+)
 
 func NotificationsPage(channels []*models.NotificationChannel, projects []*models.Project) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -28,14 +32,14 @@ func NotificationsPage(channels []*models.NotificationChannel, projects []*model
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><div class=\"flex space-x-4 border-b border-gray-200 mb-6\"><a href=\"/settings/api-keys\" class=\"py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300\">API Keys</a> <a href=\"/settings/notifications\" class=\"py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600\">Notification Channels</a></div><div class=\"flex justify-between items-center mb-6\"><div><h1 class=\"text-3xl font-bold text-gray-900\">Notification Channels</h1><p class=\"text-gray-600 mt-1\">Kirim alert status deployment dan backup ke Discord Webhook atau Telegram Bot.</p></div></div><div class=\"grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8\"><!-- Daftar Channel yang Ada --><div class=\"lg:col-span-2 space-y-4\"><h2 class=\"text-xl font-bold text-gray-900\">Configured Channels (")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><div class=\"flex space-x-4 border-b border-gray-200 mb-6\"><a href=\"/settings/api-keys\" class=\"py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300\">API Keys</a> <a href=\"/settings/notifications\" class=\"py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600\">Notification Channels</a> <a href=\"/settings/registries\" class=\"py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300\">Docker Registries</a> <a href=\"/settings/monitoring\" class=\"py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300\">Server Monitoring</a></div><div class=\"flex justify-between items-center mb-6\"><div><h1 class=\"text-3xl font-bold text-gray-900\">Notification Channels</h1><p class=\"text-gray-600 mt-1\">Kirim alert status deployment, backup, dan server resource ke Discord, Telegram, atau Generic Webhook.</p></div></div><div class=\"grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8\"><!-- Daftar Channel yang Ada --><div class=\"lg:col-span-2 space-y-4\"><h2 class=\"text-xl font-bold text-gray-900\">Configured Channels (")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(string(rune('0' + len(channels))))
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(channels)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 22, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 28, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -46,7 +50,7 @@ func NotificationsPage(channels []*models.NotificationChannel, projects []*model
 			return templ_7745c5c3_Err
 		}
 		if len(channels) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"bg-white rounded-lg shadow border border-dashed border-gray-300 p-8 text-center\"><p class=\"text-gray-500 text-sm\">Belum ada channel notifikasi yang dikonfigurasi.</p><p class=\"text-gray-400 text-xs mt-1\">Tambahkan webhook Discord atau bot Telegram menggunakan form di samping.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"bg-white rounded-lg shadow border border-dashed border-gray-300 p-8 text-center\"><p class=\"text-gray-500 text-sm\">Belum ada channel notifikasi yang dikonfigurasi.</p><p class=\"text-gray-400 text-xs mt-1\">Tambahkan webhook Discord, bot Telegram, atau custom webhook menggunakan form di samping.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -59,7 +63,7 @@ func NotificationsPage(channels []*models.NotificationChannel, projects []*model
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(ch.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 34, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 40, Col: 62}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -74,160 +78,189 @@ func NotificationsPage(channels []*models.NotificationChannel, projects []*model
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else {
+			} else if ch.Type == "telegram" {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<span class=\"bg-sky-100 text-sky-800 text-xs font-semibold px-2.5 py-0.5 rounded\">Telegram</span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else if ch.Type == "webhook" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<span class=\"bg-violet-100 text-violet-800 text-xs font-semibold px-2.5 py-0.5 rounded\">Generic Webhook</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if ch.ProjectID == nil {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<span class=\"bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded\">Global (All Projects)</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<span class=\"bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded\">Global (All Projects)</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<span class=\"bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded\">Project Override</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<span class=\"bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded\">Project Override</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><div class=\"text-xs text-gray-500 mt-2 space-y-1\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div><div class=\"text-xs text-gray-500 mt-2 space-y-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if ch.Type == "discord" && ch.DiscordWebhookURL != nil {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<p class=\"font-mono text-gray-600 truncate max-w-md\">Webhook: ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<p class=\"font-mono text-gray-600 truncate max-w-md\">Webhook: ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(*ch.DiscordWebhookURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 49, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 57, Col: 95}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if ch.Type == "telegram" && ch.TelegramChatID != nil {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<p class=\"font-mono text-gray-600\">Chat ID: ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<p class=\"font-mono text-gray-600\">Chat ID: ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(*ch.TelegramChatID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 51, Col: 74}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 59, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</p>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else if ch.Type == "webhook" && ch.WebhookURL != nil {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<p class=\"font-mono text-gray-600 truncate max-w-md\">URL: ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var6 string
+				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(*ch.WebhookURL)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 61, Col: 84}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flex gap-2 flex-wrap pt-1\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"flex gap-2 flex-wrap pt-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if ch.OnDeploySuccess {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<span class=\"bg-green-50 text-green-700 text-[11px] px-2 py-0.5 rounded border border-green-200\">Deploy Sukses</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"bg-green-50 text-green-700 text-[11px] px-2 py-0.5 rounded border border-green-200\">Deploy Sukses</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if ch.OnDeployFailure {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<span class=\"bg-red-50 text-red-700 text-[11px] px-2 py-0.5 rounded border border-red-200\">Deploy Gagal</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"bg-red-50 text-red-700 text-[11px] px-2 py-0.5 rounded border border-red-200\">Deploy Gagal</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if ch.OnBackupSuccess {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<span class=\"bg-emerald-50 text-emerald-700 text-[11px] px-2 py-0.5 rounded border border-emerald-200\">Backup Sukses</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<span class=\"bg-emerald-50 text-emerald-700 text-[11px] px-2 py-0.5 rounded border border-emerald-200\">Backup Sukses</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if ch.OnBackupFailure {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"bg-rose-50 text-rose-700 text-[11px] px-2 py-0.5 rounded border border-rose-200\">Backup Gagal</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<span class=\"bg-rose-50 text-rose-700 text-[11px] px-2 py-0.5 rounded border border-rose-200\">Backup Gagal</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div></div></div><div class=\"flex items-center gap-2\"><form action=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
+			if ch.OnServerAlert {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<span class=\"bg-amber-50 text-amber-700 text-[11px] px-2 py-0.5 rounded border border-amber-200\">Server Alert</span>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/settings/notifications/" + ch.ID + "/test")).ResolveURL(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 71, Col: 82}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded font-medium border border-gray-300\">Send Test</button></form><form action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div></div></div><div class=\"flex items-center gap-2\"><form action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/settings/notifications/" + ch.ID + "/delete")).ResolveURL(ctx)
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/settings/notifications/" + ch.ID + "/test")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 76, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 84, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" method=\"post\" class=\"inline\" onsubmit=\"return confirm('Hapus channel notifikasi ini?')\"><button type=\"submit\" class=\"text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded font-medium border border-red-200\">Delete</button></form></div></div></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div><!-- Form Tambah Channel Baru --><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\" x-data=\"{ channelType: 'discord' }\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Add Channel</h2><form action=\"/settings/notifications\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Nama Channel</label> <input type=\"text\" name=\"name\" placeholder=\"Tim DevOps Discord\" required class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Channel Type</label> <select name=\"type\" x-model=\"channelType\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white\"><option value=\"discord\">Discord Webhook</option> <option value=\"telegram\">Telegram Bot</option></select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Scope Notifikasi</label> <select name=\"project_id\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white\"><option value=\"\">Global (Semua Project & Database)</option> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		for _, p := range projects {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<option value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" method=\"post\" class=\"inline\"><button type=\"submit\" class=\"text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded font-medium border border-gray-300\">Send Test</button></form><form action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
-			templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.ID).Resolve(ctx)
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/settings/notifications/" + ch.ID + "/delete")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 109, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 89, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\">Project: ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 109, Col: 48}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\" method=\"post\" class=\"inline\" onsubmit=\"return confirm('Hapus channel notifikasi ini?')\"><button type=\"submit\" class=\"text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded font-medium border border-red-200\">Delete</button></form></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</select></div><!-- Field Discord --><div x-show=\"channelType === 'discord'\"><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Discord Webhook URL</label> <input type=\"url\" name=\"discord_webhook_url\" placeholder=\"https://discord.com/api/webhooks/...\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"></div><!-- Fields Telegram --><div x-show=\"channelType === 'telegram'\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Telegram Bot Token</label> <input type=\"text\" name=\"telegram_bot_token\" placeholder=\"123456789:ABCdefGhIJKlmNoPQRstuVWXyz\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Telegram Chat ID</label> <input type=\"text\" name=\"telegram_chat_id\" placeholder=\"-1001234567890 atau @channel_name\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"></div></div><!-- Event Toggles --><div class=\"pt-2 border-t border-gray-100\"><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2\">Triggers</label><div class=\"space-y-1.5\"><label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_deploy_success\" value=\"true\" checked class=\"mr-2\"> Deploy Sukses</label> <label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_deploy_failure\" value=\"true\" checked class=\"mr-2\"> Deploy Gagal</label> <label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_backup_success\" value=\"true\" checked class=\"mr-2\"> Backup Database Sukses</label> <label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_backup_failure\" value=\"true\" checked class=\"mr-2\"> Backup Database Gagal</label></div></div><button type=\"submit\" class=\"w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm mt-3\">Simpan Channel</button></form></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div><!-- Form Tambah Channel Baru --><div class=\"bg-white rounded-lg shadow border border-gray-200 p-6\" x-data=\"{ channelType: 'discord' }\"><h2 class=\"text-xl font-bold text-gray-900 mb-4\">Add Channel</h2><form action=\"/settings/notifications\" method=\"post\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Nama Channel</label> <input type=\"text\" name=\"name\" placeholder=\"Tim DevOps Alert\" required class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm\"></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Channel Type</label> <select name=\"type\" x-model=\"channelType\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white\"><option value=\"discord\">Discord Webhook</option> <option value=\"telegram\">Telegram Bot</option> <option value=\"webhook\">Generic Webhook (HTTP POST)</option></select></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Scope Notifikasi</label> <select name=\"project_id\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white\"><option value=\"\">Global (Semua Project & Server)</option> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, p := range projects {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.ID).Resolve(ctx)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 123, Col: 28}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\">Project: ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/settings/notifications.templ`, Line: 123, Col: 48}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</select></div><!-- Field Discord --><div x-show=\"channelType === 'discord'\"><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Discord Webhook URL</label> <input type=\"url\" name=\"discord_webhook_url\" placeholder=\"https://discord.com/api/webhooks/...\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"></div><!-- Fields Telegram --><div x-show=\"channelType === 'telegram'\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Telegram Bot Token</label> <input type=\"text\" name=\"telegram_bot_token\" placeholder=\"123456789:ABCdefGhIJKlmNoPQRstuVWXyz\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Telegram Chat ID</label> <input type=\"text\" name=\"telegram_chat_id\" placeholder=\"-1001234567890 atau @channel_name\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"></div></div><!-- Fields Generic Webhook --><div x-show=\"channelType === 'webhook'\" class=\"space-y-3\"><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Webhook Endpoint URL</label> <input type=\"url\" name=\"webhook_url\" placeholder=\"https://api.opsgenie.com/v1/json/labuh atau Slack URL\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"></div><div><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider\">Secret / Bearer Token (Opsional)</label> <input type=\"password\" name=\"webhook_secret\" placeholder=\"Optional token / auth header\" class=\"mt-1 block w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono\"> <span class=\"text-[10px] text-gray-400 mt-0.5 block\">Dilewatkan via header <code>Authorization: Bearer &lt;token&gt;</code> dan <code>X-Webhook-Secret</code>.</span></div></div><!-- Event Toggles --><div class=\"pt-2 border-t border-gray-100\"><label class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2\">Triggers</label><div class=\"space-y-1.5\"><label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_deploy_success\" value=\"true\" checked class=\"mr-2\"> Deploy Sukses</label> <label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_deploy_failure\" value=\"true\" checked class=\"mr-2\"> Deploy Gagal</label> <label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_backup_success\" value=\"true\" checked class=\"mr-2\"> Backup Sukses</label> <label class=\"flex items-center text-xs text-gray-700\"><input type=\"checkbox\" name=\"on_backup_failure\" value=\"true\" checked class=\"mr-2\"> Backup Gagal</label> <label class=\"flex items-center text-xs text-gray-700 font-semibold text-amber-900\"><input type=\"checkbox\" name=\"on_server_alert\" value=\"true\" checked class=\"mr-2 text-amber-600 focus:ring-amber-500\"> Server Resource Alerts (Disk / RAM / Crash)</label></div></div><button type=\"submit\" class=\"w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded text-sm transition-colors mt-4\">Add Channel</button></form></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
