@@ -320,9 +320,27 @@ func (c *Client) WaitForHealthCustom(ctx context.Context, containerID string, ap
 				return fmt.Errorf("healthcheck timed out after %v", maxDuration)
 			}
 
-			running, err := c.IsContainerRunning(ctx, containerID)
-			if err != nil || !running {
-				return fmt.Errorf("container stopped or exited unexpectedly: %v", err)
+			insp, inspErr := c.InspectContainer(ctx, containerID)
+			if inspErr != nil {
+				return fmt.Errorf("failed to inspect container: %w", inspErr)
+			}
+			if insp == nil || insp.State == nil {
+				return fmt.Errorf("container state not available")
+			}
+
+			// Fail fast if container crashed, restarting, or exited prematurely
+			if !insp.State.Running || insp.State.Restarting || insp.State.Status == "restarting" || insp.State.Status == "exited" || insp.State.Status == "dead" {
+				return fmt.Errorf("container stopped or exited prematurely (status: %s, exit code: %d, error: %s)", insp.State.Status, insp.State.ExitCode, insp.State.Error)
+			}
+
+			// Native Docker healthcheck if defined in the image
+			if insp.State.Health != nil {
+				if insp.State.Health.Status == "healthy" {
+					return nil
+				}
+				if insp.State.Health.Status == "unhealthy" {
+					return fmt.Errorf("container health check reported unhealthy")
+				}
 			}
 
 			// Try to connect to container IP if port is provided
@@ -332,7 +350,7 @@ func (c *Client) WaitForHealthCustom(ctx context.Context, containerID string, ap
 					portsToTry := []int{appPort}
 
 					// Inspect container to check actual exposed ports (e.g. 80 for nginx)
-					if insp, inspErr := c.InspectContainer(ctx, containerID); inspErr == nil && insp != nil && insp.Config != nil {
+					if insp.Config != nil {
 						for p := range insp.Config.ExposedPorts {
 							if p.Int() > 0 && p.Int() != appPort {
 								portsToTry = append(portsToTry, p.Int())
@@ -355,21 +373,14 @@ func (c *Client) WaitForHealthCustom(ctx context.Context, containerID string, ap
 							}
 						}
 
-						// 2. Fallback to TCP dial
-						conn, tcpErr := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, checkPort), 1*time.Second)
-						if tcpErr == nil {
-							_ = conn.Close()
-							return nil
+						// 2. Fallback to TCP dial only if path is root
+						if path == "/" {
+							conn, tcpErr := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, checkPort), 1*time.Second)
+							if tcpErr == nil {
+								_ = conn.Close()
+								return nil
+							}
 						}
-					}
-				}
-			}
-
-			// If container has been continuously running for at least 3 seconds without exiting, consider healthy
-			if insp, inspErr := c.InspectContainer(ctx, containerID); inspErr == nil && insp != nil && insp.State != nil && insp.State.Running {
-				if startedAt, err := time.Parse(time.RFC3339Nano, insp.State.StartedAt); err == nil {
-					if time.Since(startedAt) >= 3*time.Second {
-						return nil
 					}
 				}
 			}

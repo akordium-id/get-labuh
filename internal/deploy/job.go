@@ -48,6 +48,10 @@ type ComposeJob struct {
 	LogPath            string
 }
 
+type RegistryProvider interface {
+	GetByID(ctx context.Context, id string) (*models.DockerRegistry, error)
+}
+
 type Pipeline struct {
 	dockerClient *docker.Client
 	dockerPool   *docker.ClientPool
@@ -55,6 +59,7 @@ type Pipeline struct {
 	settingRepo  *repo.SettingRepo
 	appRepo      *repo.ApplicationRepo
 	deployRepo   *repo.DeploymentRepo
+	registryRepo RegistryProvider
 }
 
 func NewPipeline(dockerClient *docker.Client, caddyClient *caddy.Client, settingRepo *repo.SettingRepo, appRepo *repo.ApplicationRepo, deployRepo *repo.DeploymentRepo) *Pipeline {
@@ -69,6 +74,10 @@ func NewPipeline(dockerClient *docker.Client, caddyClient *caddy.Client, setting
 
 func (p *Pipeline) SetDockerPool(pool *docker.ClientPool) {
 	p.dockerPool = pool
+}
+
+func (p *Pipeline) SetRegistryRepo(r RegistryProvider) {
+	p.registryRepo = r
 }
 
 func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
@@ -120,6 +129,11 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		}
 		targetDockerClient = cli
 		writeLog(activeLogWriter, "Successfully connected to remote Docker daemon via SSH tunnel.")
+	}
+
+	var app *models.Application
+	if p.appRepo != nil {
+		app, _ = p.appRepo.GetByID(job.ApplicationID)
 	}
 
 	var imageName string
@@ -334,7 +348,23 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		pullCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 		defer cancel()
 
-		if err := p.dockerClient.PullImage(pullCtx, job.DockerImage); err != nil {
+		var regAuth *docker.RegistryAuth
+		if app != nil && app.DockerRegistryID != nil && *app.DockerRegistryID != "" && p.registryRepo != nil {
+			reg, rErr := p.registryRepo.GetByID(pullCtx, *app.DockerRegistryID)
+			if rErr == nil && reg != nil {
+				writeLog(activeLogWriter, fmt.Sprintf("Authenticating with Docker Registry: %s (%s)...", reg.Name, reg.ServerAddress))
+				regAuth = &docker.RegistryAuth{
+					Username:      reg.Username,
+					Password:      reg.Password,
+					ServerAddress: reg.ServerAddress,
+					Email:         reg.Email,
+				}
+			} else {
+				writeLog(activeLogWriter, fmt.Sprintf("Warning: could not retrieve docker registry (%s): %v", *app.DockerRegistryID, rErr))
+			}
+		}
+
+		if err := targetDockerClient.PullImageWithAuth(pullCtx, job.DockerImage, regAuth); err != nil {
 			errMsg := fmt.Sprintf("failed to pull image: %v", err)
 			writeLog(activeLogWriter, errMsg)
 			updateStep("push", models.DeployStatusFailed, errMsg)
@@ -365,43 +395,38 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 	var healthcheckTimeout = 30 * time.Second
 	var routeOpts caddy.RouteOptions
 	var preDeploymentCommand, postDeploymentCommand string
-	var app *models.Application
 
-	if p.appRepo != nil {
-		var err error
-		app, err = p.appRepo.GetByID(job.ApplicationID)
-		if err == nil && app != nil {
-			appSlug = app.Slug
-			if app.CustomDomain != nil && *app.CustomDomain != "" {
-				customDomain = app.CustomDomain
-			}
-			if appPort <= 0 {
-				appPort = app.AppPort
-			}
-			if app.ContainerID != nil {
-				oldContainerID = *app.ContainerID
-			}
-			if app.HealthcheckPath != nil && *app.HealthcheckPath != "" {
-				healthcheckPath = *app.HealthcheckPath
-			}
-			if app.HealthcheckTimeout != nil && *app.HealthcheckTimeout > 0 {
-				healthcheckTimeout = time.Duration(*app.HealthcheckTimeout) * time.Second
-			}
-			if app.BasicAuthUser != nil && *app.BasicAuthUser != "" && app.BasicAuthPassword != nil && *app.BasicAuthPassword != "" {
-				routeOpts.BasicAuthUser = *app.BasicAuthUser
-				routeOpts.BasicAuthPassword = *app.BasicAuthPassword
-			}
-			if app.PreDeploymentCommand != nil {
-				preDeploymentCommand = strings.TrimSpace(*app.PreDeploymentCommand)
-			}
-			if app.PostDeploymentCommand != nil {
-				postDeploymentCommand = strings.TrimSpace(*app.PostDeploymentCommand)
-			}
-			resLimits = docker.ContainerResourceLimits{
-				CPULimit:          app.CPULimit,
-				MemoryLimit:       app.MemoryLimit,
-				MemoryReservation: app.MemoryReservation,
-			}
+	if app != nil {
+		appSlug = app.Slug
+		if app.CustomDomain != nil && *app.CustomDomain != "" {
+			customDomain = app.CustomDomain
+		}
+		if appPort <= 0 {
+			appPort = app.AppPort
+		}
+		if app.ContainerID != nil {
+			oldContainerID = *app.ContainerID
+		}
+		if app.HealthcheckPath != nil && *app.HealthcheckPath != "" {
+			healthcheckPath = *app.HealthcheckPath
+		}
+		if app.HealthcheckTimeout != nil && *app.HealthcheckTimeout > 0 {
+			healthcheckTimeout = time.Duration(*app.HealthcheckTimeout) * time.Second
+		}
+		if app.BasicAuthUser != nil && *app.BasicAuthUser != "" && app.BasicAuthPassword != nil && *app.BasicAuthPassword != "" {
+			routeOpts.BasicAuthUser = *app.BasicAuthUser
+			routeOpts.BasicAuthPassword = *app.BasicAuthPassword
+		}
+		if app.PreDeploymentCommand != nil {
+			preDeploymentCommand = strings.TrimSpace(*app.PreDeploymentCommand)
+		}
+		if app.PostDeploymentCommand != nil {
+			postDeploymentCommand = strings.TrimSpace(*app.PostDeploymentCommand)
+		}
+		resLimits = docker.ContainerResourceLimits{
+			CPULimit:          app.CPULimit,
+			MemoryLimit:       app.MemoryLimit,
+			MemoryReservation: app.MemoryReservation,
 		}
 	}
 
@@ -541,10 +566,12 @@ func (p *Pipeline) Execute(ctx context.Context, job DeploymentJob) error {
 		}
 	}
 
-	// Zero-Downtime Cleanup: Stop and remove old container only after candidate is healthy and live
+	// Zero-Downtime Cleanup: Drain in-flight connections on old container, then stop and remove
 	if oldContainerID != "" && oldContainerID != candidateContainerID {
+		writeLog(activeLogWriter, fmt.Sprintf("Draining in-flight connections on previous container (%s) for 5s...", oldContainerID))
+		time.Sleep(5 * time.Second)
 		writeLog(activeLogWriter, fmt.Sprintf("Stopping previous container (%s)...", oldContainerID))
-		_ = targetDockerClient.StopContainer(ctx, oldContainerID, 10)
+		_ = targetDockerClient.StopContainer(ctx, oldContainerID, 15)
 		_ = targetDockerClient.RemoveContainer(ctx, oldContainerID)
 		writeLog(activeLogWriter, "Previous container stopped and cleaned up")
 	}
