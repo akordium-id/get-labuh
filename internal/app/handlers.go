@@ -129,6 +129,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		settingsMod.CleanupScheduler.SetDockerClient(dockerClient)
 		settingsMod.CleanupScheduler.Start()
 	}
+	settingsMod.Handler.SetDockerClient(dockerClient)
 
 	monitoringHandler := handler.NewMonitoringHandler(appRepo, databaseRepo, dockerClient)
 	templatesHandler := handler.NewTemplatesHandler(templateRepo, appRepo, projectRepo, deployRepo, envVarRepo)
@@ -140,6 +141,7 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	deployWorker.SetMaxConcurrent(3)
 	deployWorker.SetWorkerCount(1)
 	deployWorker.SetNotifier(notificationsMod.Notifier, projectRepo)
+	deployWorker.SetRegistryRepo(settingsMod.RegistryRepo)
 	deployWorker.Start(dockerClient, caddyClient, settingRepo, appRepo, deployRepo, dockerPool)
 
 	applicationsMod.SetDeployWorker(deployWorker)

@@ -17,6 +17,7 @@ import (
 
 	"github.com/akordium-id/get-labuh/internal/backup"
 	"github.com/akordium-id/get-labuh/internal/database"
+	"github.com/akordium-id/get-labuh/internal/docker"
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/web/layouts"
 	pagesettings "github.com/akordium-id/get-labuh/internal/web/pages/settings"
@@ -38,6 +39,8 @@ type Handler struct {
 	settingRepo      *SettingRepo
 	auditRepo        *AuditLogRepo
 	storageRepo      *StorageDestinationRepo
+	registryRepo     *RegistryRepo
+	dockerClient     *docker.Client
 	backupPath       string
 	cleanupScheduler *CleanupScheduler
 }
@@ -59,6 +62,14 @@ func NewHandler(
 		storageRepo: storageRepo,
 		backupPath:  backupPath,
 	}
+}
+
+func (h *Handler) SetRegistryRepo(r *RegistryRepo) {
+	h.registryRepo = r
+}
+
+func (h *Handler) SetDockerClient(c *docker.Client) {
+	h.dockerClient = c
 }
 
 func (h *Handler) SetCleanupScheduler(s *CleanupScheduler) {
@@ -422,4 +433,132 @@ func (h *Handler) RunCleanupNow(w http.ResponseWriter, r *http.Request) {
 		SetToast(w, "Cleanup scheduler is not initialized", ToastError)
 	}
 	http.Redirect(w, r, "/settings/cleanup", http.StatusFound)
+}
+
+// Docker Registries handlers
+func (h *Handler) RegistriesPage(w http.ResponseWriter, r *http.Request) {
+	if h.registryRepo == nil {
+		http.Error(w, "Registry repository not initialized", http.StatusInternalServerError)
+		return
+	}
+	registries, err := h.registryRepo.List(r.Context())
+	if err != nil {
+		http.Error(w, "Failed to load docker registries", http.StatusInternalServerError)
+		return
+	}
+
+	templ.Handler(layouts.AppLayout(pagesettings.RegistriesPage(registries))).ServeHTTP(w, r)
+}
+
+func (h *Handler) CreateRegistry(w http.ResponseWriter, r *http.Request) {
+	if h.registryRepo == nil {
+		http.Error(w, "Registry repository not initialized", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	serverAddress := strings.TrimSpace(r.FormValue("server_address"))
+	username := strings.TrimSpace(r.FormValue("username"))
+	password := strings.TrimSpace(r.FormValue("password"))
+	email := strings.TrimSpace(r.FormValue("email"))
+
+	if name == "" || serverAddress == "" || username == "" || password == "" {
+		http.Error(w, "Missing required fields (name, server_address, username, password)", http.StatusBadRequest)
+		return
+	}
+
+	input := models.CreateDockerRegistryInput{
+		Name:          name,
+		ServerAddress: serverAddress,
+		Username:      username,
+		Password:      password,
+		Email:         email,
+	}
+
+	reg, err := h.registryRepo.Create(r.Context(), input)
+	if err != nil {
+		http.Error(w, "Failed to create registry: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if h.auditRepo != nil {
+		_, _ = h.auditRepo.Create(r.Context(), models.CreateAuditLogInput{
+			Action:     "create_docker_registry",
+			Resource:   "docker_registries",
+			ResourceID: reg.ID,
+			IPAddress:  r.RemoteAddr,
+			UserAgent:  r.UserAgent(),
+		})
+	}
+
+	http.Redirect(w, r, "/settings/registries", http.StatusSeeOther)
+}
+
+func (h *Handler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
+	if h.registryRepo == nil {
+		http.Error(w, "Registry repository not initialized", http.StatusInternalServerError)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Missing id", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.registryRepo.Delete(r.Context(), id); err != nil {
+		http.Error(w, "Failed to delete registry: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if h.auditRepo != nil {
+		_, _ = h.auditRepo.Create(r.Context(), models.CreateAuditLogInput{
+			Action:     "delete_docker_registry",
+			Resource:   "docker_registries",
+			ResourceID: id,
+			IPAddress:  r.RemoteAddr,
+			UserAgent:  r.UserAgent(),
+		})
+	}
+
+	http.Redirect(w, r, "/settings/registries", http.StatusSeeOther)
+}
+
+func (h *Handler) TestRegistryConnection(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	serverAddress := strings.TrimSpace(r.FormValue("server_address"))
+	username := strings.TrimSpace(r.FormValue("username"))
+	password := strings.TrimSpace(r.FormValue("password"))
+	email := strings.TrimSpace(r.FormValue("email"))
+
+	if serverAddress == "" || username == "" || password == "" {
+		http.Error(w, "Missing required credentials for connection test", http.StatusBadRequest)
+		return
+	}
+
+	if h.dockerClient != nil {
+		auth := &docker.RegistryAuth{
+			Username:      username,
+			Password:      password,
+			ServerAddress: serverAddress,
+			Email:         email,
+		}
+		if err := h.dockerClient.VerifyRegistryAuth(r.Context(), auth); err != nil {
+			SetToast(w, "Registry authentication failed: "+err.Error(), ToastError)
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(fmt.Sprintf(`<div class="text-rose-600 text-xs font-semibold">Gagal: %v</div>`, err)))
+			return
+		}
+	}
+
+	SetToast(w, "Koneksi ke Docker Registry berhasil!", ToastSuccess)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`<div class="text-emerald-600 text-xs font-semibold">✓ Autentikasi Docker Registry berhasil!</div>`))
 }

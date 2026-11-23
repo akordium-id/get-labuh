@@ -31,6 +31,7 @@ type DeployWorker struct {
 	notifier      EventNotifier
 	envRepo       *repo.ProjectRepo
 	gitbotClient  *gitbot.Client
+	registryRepo  deploy.RegistryProvider
 	stopOnce      sync.Once
 }
 
@@ -49,6 +50,11 @@ func NewDeployWorker(bufferSize int) *DeployWorker {
 // SetGitBotClient menyetel gitbot client khusus (berguna untuk testing).
 func (w *DeployWorker) SetGitBotClient(c *gitbot.Client) {
 	w.gitbotClient = c
+}
+
+// SetRegistryRepo menyetel provider registry docker untuk autentikasi image private.
+func (w *DeployWorker) SetRegistryRepo(r deploy.RegistryProvider) {
+	w.registryRepo = r
 }
 
 func (w *DeployWorker) SetNotifier(n EventNotifier, envRepo *repo.ProjectRepo) {
@@ -74,6 +80,12 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 	if dockerPool != nil {
 		pipeline.SetDockerPool(dockerPool)
 	}
+	if w.gitbotClient != nil {
+		pipeline.SetGitBotClient(w.gitbotClient)
+	}
+	if w.registryRepo != nil {
+		pipeline.SetRegistryRepo(w.registryRepo)
+	}
 
 	if w.semaphore == nil {
 		w.semaphore = make(chan struct{}, w.maxConcurrent)
@@ -90,19 +102,21 @@ func (w *DeployWorker) Start(dockerClient *docker.Client, caddyClient *caddy.Cli
 					w.semaphore <- struct{}{}
 					jobCtx, cancel := context.WithTimeout(w.ctx, 30*time.Minute)
 					deployJob := deploy.DeploymentJob{
-						DeploymentID:   job.DeploymentID,
-						ApplicationID:  job.ApplicationID,
-						SourceType:     job.SourceType,
-						RepositoryURL:  job.RepositoryURL,
-						Branch:         job.Branch,
-						DockerfilePath: job.DockerfilePath,
-						BuildPath:      job.BuildPath,
-						DockerImage:    job.DockerImage,
-						AppPort:        job.AppPort,
-						EnvVars:        job.EnvVars,
-						LogPath:        job.LogPath,
-						Priority:       job.Priority,
-						ServerID:       job.ServerID,
+						DeploymentID:     job.DeploymentID,
+						ApplicationID:    job.ApplicationID,
+						SourceType:       job.SourceType,
+						RepositoryURL:    job.RepositoryURL,
+						Branch:           job.Branch,
+						DockerfilePath:   job.DockerfilePath,
+						BuildPath:        job.BuildPath,
+						DockerImage:      job.DockerImage,
+						DockerRegistryID: job.DockerRegistryID,
+						CommitHash:       job.CommitHash,
+						AppPort:          job.AppPort,
+						EnvVars:          job.EnvVars,
+						LogPath:          job.LogPath,
+						Priority:         job.Priority,
+						ServerID:         job.ServerID,
 					}
 					err := pipeline.Execute(jobCtx, deployJob)
 					cancel()
