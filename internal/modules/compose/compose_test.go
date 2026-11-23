@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	stdtesting "testing"
+	"time"
 
 	"github.com/akordium-id/get-labuh/internal/database"
 	"github.com/akordium-id/get-labuh/internal/models"
@@ -72,6 +73,43 @@ func TestComposeHandler_CRUD(t *stdtesting.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, withDomain.CustomDomain)
 	assert.Equal(t, "wp.example.com", *withDomain.CustomDomain)
+
+	// Update YAML and Parsed Services
+	rawYAML := `
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+`
+	parsedServices := []models.ComposeServiceDef{
+		{
+			Name:  "web",
+			Image: "nginx:alpine",
+			Ports: []string{"80:80"},
+		},
+	}
+	err = mod.Repo.UpdateYAMLWithContext(context.Background(), app.ID, rawYAML, parsedServices)
+	assert.NoError(t, err)
+
+	withYAML, err := mod.Repo.GetByIDWithContext(context.Background(), app.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, rawYAML, withYAML.RawYAML)
+	assert.Len(t, withYAML.ParsedServices, 1)
+	assert.Equal(t, "web", withYAML.ParsedServices[0].Name)
+
+	// Update Deployment Status
+	now := time.Now()
+	errMsg := "some deploy error"
+	err = mod.Repo.UpdateDeploymentStatusWithContext(context.Background(), app.ID, models.ComposeStatusFailed, &now, &errMsg)
+	assert.NoError(t, err)
+
+	withDeployStatus, err := mod.Repo.GetByIDWithContext(context.Background(), app.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, models.ComposeStatusFailed, withDeployStatus.Status)
+	assert.NotNil(t, withDeployStatus.LastDeployedAt)
+	assert.NotNil(t, withDeployStatus.ErrorMessage)
+	assert.Equal(t, "some deploy error", *withDeployStatus.ErrorMessage)
 
 	// Delete
 	err = mod.Repo.DeleteWithContext(context.Background(), app.ID)

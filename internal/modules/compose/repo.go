@@ -3,11 +3,13 @@ package compose
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/akordium-id/get-labuh/internal/models"
 	"github.com/akordium-id/get-labuh/internal/modules/projects"
-	"github.com/google/uuid"
 )
 
 // Repo mengelola operasi basis data untuk aplikasi berbasis Docker Compose.
@@ -28,6 +30,8 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateCompose
 		ComposeFilePath:    input.ComposeFilePath,
 		ComposeProjectName: input.ComposeProjectName,
 		CustomDomain:       input.CustomDomain,
+		RawYAML:            input.RawYAML,
+		ParsedServices:     []models.ComposeServiceDef{},
 		Status:             models.ComposeStatusIdle,
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
@@ -40,10 +44,22 @@ func (r *Repo) CreateWithContext(ctx context.Context, input models.CreateCompose
 		compose.ComposeFilePath = "docker-compose.yml"
 	}
 
+	parsedJSON := "[]"
+	if len(compose.ParsedServices) > 0 {
+		if b, err := json.Marshal(compose.ParsedServices); err == nil {
+			parsedJSON = string(b)
+		}
+	}
+
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO compose_applications (id, environment_id, name, slug, compose_file_path, compose_project_name, custom_domain, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		compose.ID, compose.EnvironmentID, compose.Name, compose.Slug, compose.ComposeFilePath, compose.ComposeProjectName, compose.CustomDomain, compose.Status, compose.CreatedAt, compose.UpdatedAt,
+		`INSERT INTO compose_applications (
+			id, environment_id, name, slug, compose_file_path, compose_project_name, 
+			custom_domain, raw_yaml, parsed_services, last_deployed_at, error_message, 
+			status, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		compose.ID, compose.EnvironmentID, compose.Name, compose.Slug, compose.ComposeFilePath, compose.ComposeProjectName,
+		compose.CustomDomain, compose.RawYAML, parsedJSON, compose.LastDeployedAt, compose.ErrorMessage,
+		compose.Status, compose.CreatedAt, compose.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -56,18 +72,48 @@ func (r *Repo) Create(input models.CreateComposeApplicationInput) (*models.Compo
 	return r.CreateWithContext(context.Background(), input)
 }
 
-func (r *Repo) GetByIDWithContext(ctx context.Context, id string) (*models.ComposeApplication, error) {
+func (r *Repo) scanRow(scanner interface{ Scan(dest ...interface{}) error }) (*models.ComposeApplication, error) {
 	compose := &models.ComposeApplication{}
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, environment_id, name, slug, compose_file_path, compose_project_name, custom_domain, status, created_at, updated_at
-		 FROM compose_applications WHERE id = ?`,
-		id,
-	).Scan(&compose.ID, &compose.EnvironmentID, &compose.Name, &compose.Slug, &compose.ComposeFilePath, &compose.ComposeProjectName, &compose.CustomDomain, &compose.Status, &compose.CreatedAt, &compose.UpdatedAt)
+	var parsedJSON string
+	err := scanner.Scan(
+		&compose.ID,
+		&compose.EnvironmentID,
+		&compose.Name,
+		&compose.Slug,
+		&compose.ComposeFilePath,
+		&compose.ComposeProjectName,
+		&compose.CustomDomain,
+		&compose.RawYAML,
+		&parsedJSON,
+		&compose.LastDeployedAt,
+		&compose.ErrorMessage,
+		&compose.Status,
+		&compose.CreatedAt,
+		&compose.UpdatedAt,
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	if parsedJSON != "" {
+		_ = json.Unmarshal([]byte(parsedJSON), &compose.ParsedServices)
+	}
+	if compose.ParsedServices == nil {
+		compose.ParsedServices = []models.ComposeServiceDef{}
+	}
+
 	return compose, nil
+}
+
+func (r *Repo) GetByIDWithContext(ctx context.Context, id string) (*models.ComposeApplication, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT id, environment_id, name, slug, compose_file_path, compose_project_name, 
+		        custom_domain, raw_yaml, parsed_services, last_deployed_at, error_message, 
+		        status, created_at, updated_at
+		 FROM compose_applications WHERE id = ?`,
+		id,
+	)
+	return r.scanRow(row)
 }
 
 func (r *Repo) GetByID(id string) (*models.ComposeApplication, error) {
@@ -75,17 +121,14 @@ func (r *Repo) GetByID(id string) (*models.ComposeApplication, error) {
 }
 
 func (r *Repo) GetBySlugWithContext(ctx context.Context, envID, slug string) (*models.ComposeApplication, error) {
-	compose := &models.ComposeApplication{}
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, environment_id, name, slug, compose_file_path, compose_project_name, custom_domain, status, created_at, updated_at
+	row := r.db.QueryRowContext(ctx,
+		`SELECT id, environment_id, name, slug, compose_file_path, compose_project_name, 
+		        custom_domain, raw_yaml, parsed_services, last_deployed_at, error_message, 
+		        status, created_at, updated_at
 		 FROM compose_applications WHERE environment_id = ? AND slug = ?`,
 		envID, slug,
-	).Scan(&compose.ID, &compose.EnvironmentID, &compose.Name, &compose.Slug, &compose.ComposeFilePath, &compose.ComposeProjectName, &compose.CustomDomain, &compose.Status, &compose.CreatedAt, &compose.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	return compose, nil
+	)
+	return r.scanRow(row)
 }
 
 func (r *Repo) GetBySlug(envID, slug string) (*models.ComposeApplication, error) {
@@ -94,7 +137,9 @@ func (r *Repo) GetBySlug(envID, slug string) (*models.ComposeApplication, error)
 
 func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) ([]*models.ComposeApplication, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, environment_id, name, slug, compose_file_path, compose_project_name, custom_domain, status, created_at, updated_at
+		`SELECT id, environment_id, name, slug, compose_file_path, compose_project_name, 
+		        custom_domain, raw_yaml, parsed_services, last_deployed_at, error_message, 
+		        status, created_at, updated_at
 		 FROM compose_applications WHERE environment_id = ? ORDER BY created_at DESC`,
 		envID,
 	)
@@ -105,8 +150,7 @@ func (r *Repo) GetByEnvironmentIDWithContext(ctx context.Context, envID string) 
 
 	var composes []*models.ComposeApplication
 	for rows.Next() {
-		compose := &models.ComposeApplication{}
-		err := rows.Scan(&compose.ID, &compose.EnvironmentID, &compose.Name, &compose.Slug, &compose.ComposeFilePath, &compose.ComposeProjectName, &compose.CustomDomain, &compose.Status, &compose.CreatedAt, &compose.UpdatedAt)
+		compose, err := r.scanRow(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -134,6 +178,29 @@ func (r *Repo) UpdateStatusWithContext(ctx context.Context, id string, status mo
 
 func (r *Repo) UpdateStatus(id string, status models.ComposeStatus) error {
 	return r.UpdateStatusWithContext(context.Background(), id, status)
+}
+
+func (r *Repo) UpdateYAMLWithContext(ctx context.Context, id string, rawYAML string, parsedServices []models.ComposeServiceDef) error {
+	parsedJSON := "[]"
+	if len(parsedServices) > 0 {
+		if b, err := json.Marshal(parsedServices); err == nil {
+			parsedJSON = string(b)
+		}
+	}
+
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE compose_applications SET raw_yaml = ?, parsed_services = ?, updated_at = ? WHERE id = ?`,
+		rawYAML, parsedJSON, time.Now(), id,
+	)
+	return err
+}
+
+func (r *Repo) UpdateDeploymentStatusWithContext(ctx context.Context, id string, status models.ComposeStatus, lastDeployedAt *time.Time, errMsg *string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE compose_applications SET status = ?, last_deployed_at = ?, error_message = ?, updated_at = ? WHERE id = ?`,
+		status, lastDeployedAt, errMsg, time.Now(), id,
+	)
+	return err
 }
 
 func (r *Repo) UpdateCustomDomainWithContext(ctx context.Context, id string, customDomain *string) error {
