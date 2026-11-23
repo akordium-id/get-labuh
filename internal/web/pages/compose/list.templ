@@ -1,49 +1,91 @@
 package compose
 
 import (
+	"fmt"
+	"strings"
+	"time"
+
 	"github.com/akordium-id/get-labuh/internal/models"
 )
 
 templ ComposeListPage(composes []*models.ComposeApplication) {
 	<div>
 		<div class="flex justify-between items-center mb-6">
-			<h1 class="text-3xl font-bold text-gray-900">Compose Applications</h1>
-			<a href="/projects/create" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">New Compose App</a>
+			<div>
+				<h1 class="text-3xl font-bold text-gray-900">Docker Compose Applications</h1>
+				<p class="text-gray-600 mt-1">Kelola stack aplikasi multi-container berbasis Docker Compose</p>
+			</div>
+			<a href="compose-apps/new" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium">New Compose Stack</a>
 		</div>
+
 		<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
 			<table class="min-w-full divide-y divide-gray-200">
 				<thead class="bg-gray-50">
 					<tr>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Compose File</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Stack</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
 						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Terakhir Deploy</th>
+						<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
 					</tr>
 				</thead>
 				<tbody class="bg-white divide-y divide-gray-200">
 					if len(composes) == 0 {
 						<tr>
-							<td colspan="4" class="px-6 py-4 text-center text-gray-500">No compose applications yet</td>
+							<td colspan="6" class="px-6 py-8 text-center text-gray-500">
+								Belum ada aplikasi Docker Compose yang dibuat.
+							</td>
 						</tr>
-					} else {
-						for _, c := range composes {
-							<tr>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<div class="text-sm font-medium text-gray-900">{ c.Name }</div>
-									<div class="text-sm text-gray-500">{ c.Slug }</div>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ c.ComposeFilePath }</td>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-										{ c.Status }
+					}
+					for _, c := range composes {
+						<tr class="hover:bg-gray-50">
+							<td class="px-6 py-4 whitespace-nowrap">
+								<a href={ templ.SafeURL("/compose-apps/" + c.ID) } class="text-blue-600 font-semibold hover:underline">
+									{ c.Name }
+								</a>
+								<div class="text-xs text-gray-400 font-mono">{ c.Slug }</div>
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+								if len(c.ParsedServices) > 0 {
+									<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+										{ fmt.Sprintf("%d service", len(c.ParsedServices)) }
 									</span>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-									<a href={ templ.SafeURL("/compose-apps/" + c.ID) } class="text-blue-600 hover:text-blue-900 mr-3">View</a>
-									<a href={ templ.SafeURL("/compose-apps/" + c.ID + "/deploy") } class="text-green-600 hover:text-green-900 mr-3">Deploy</a>
-								</td>
-							</tr>
-						}
+								} else {
+									<span class="text-gray-400 text-xs">-</span>
+								}
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap">
+								if c.Status == models.ComposeStatusRunning {
+									<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">● Running</span>
+								} else if c.Status == models.ComposeStatusBuilding {
+									<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">▲ Building</span>
+								} else if c.Status == models.ComposeStatusFailed {
+									<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">✕ Failed</span>
+								} else {
+									<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">○ { string(c.Status) }</span>
+								}
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+								if c.CustomDomain != nil && *c.CustomDomain != "" {
+									<a href={ templ.SafeURL("https://" + *c.CustomDomain) } target="_blank" class="text-blue-600 hover:underline">
+										{ *c.CustomDomain }
+									</a>
+								} else {
+									<span class="text-gray-400">-</span>
+								}
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+								if c.LastDeployedAt != nil {
+									{ c.LastDeployedAt.Format("02 Jan 2006 15:04") }
+								} else {
+									<span class="text-gray-400">-</span>
+								}
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+								<a href={ templ.SafeURL("/compose-apps/" + c.ID) } class="text-blue-600 hover:text-blue-900 mr-3">Detail</a>
+							</td>
+						</tr>
 					}
 				</tbody>
 			</table>
@@ -51,101 +93,291 @@ templ ComposeListPage(composes []*models.ComposeApplication) {
 	</div>
 }
 
-templ ComposeDetailPage(composeApp *models.ComposeApplication) {
-	<div>
-		<div class="flex justify-between items-center mb-6">
+templ ComposeDetailPage(composeApp *models.ComposeApplication, runtimes []models.ComposeServiceRuntime) {
+	<div x-data="{ activeTab: 'services', logModalOpen: false, currentLogService: '', logContent: 'Memuat log...' }">
+		<!-- Header -->
+		<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
 			<div>
-				<h1 class="text-3xl font-bold text-gray-900">{ composeApp.Name }</h1>
-				<p class="text-gray-600 mt-1">{ composeApp.Slug }</p>
+				<div class="flex items-center gap-3">
+					<h1 class="text-3xl font-bold text-gray-900">{ composeApp.Name }</h1>
+					if composeApp.Status == models.ComposeStatusRunning {
+						<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">● Running</span>
+					} else if composeApp.Status == models.ComposeStatusBuilding {
+						<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 animate-pulse">▲ Building</span>
+					} else if composeApp.Status == models.ComposeStatusFailed {
+						<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">✕ Failed</span>
+					} else {
+						<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">○ { string(composeApp.Status) }</span>
+					}
+				</div>
+				<p class="text-gray-500 text-sm mt-1 font-mono">Slug: { composeApp.Slug } | File: { composeApp.ComposeFilePath }</p>
+				if composeApp.LastDeployedAt != nil {
+					<p class="text-gray-400 text-xs mt-0.5">Terakhir deploy: { composeApp.LastDeployedAt.Format(time.RFC822) }</p>
+				}
 			</div>
 			<div class="flex gap-2">
-				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/start") } method="post" class="inline">
-					<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Start</button>
+				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/deploy") } method="post">
+					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-1 shadow-sm">
+						🚀 Deploy / Up
+					</button>
 				</form>
-				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/stop") } method="post" class="inline">
-					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Stop</button>
+				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/stop") } method="post">
+					<button type="submit" class="bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-md hover:bg-red-100 text-sm font-medium">
+						⏹ Stop / Down
+					</button>
 				</form>
-				<a href={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/deploy") } class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Deploy</a>
 			</div>
 		</div>
 
-		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-			<h2 class="text-xl font-bold text-gray-900 mb-4">Compose Info</h2>
-			<dl class="space-y-3">
-				<div class="flex justify-between">
-					<dt class="text-gray-600">Status</dt>
-					<dd class="text-gray-900">{ composeApp.Status }</dd>
+		<!-- Error Banner if any -->
+		if composeApp.ErrorMessage != nil && *composeApp.ErrorMessage != "" {
+			<div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+				<div class="font-bold flex items-center gap-2 mb-1">
+					<span>⚠️ Deployment Error Terakhir:</span>
 				</div>
-				<div class="flex justify-between">
-					<dt class="text-gray-600">Compose File</dt>
-					<dd class="text-gray-900 font-mono text-sm">{ composeApp.ComposeFilePath }</dd>
-				</div>
-				if composeApp.ComposeProjectName != nil {
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Project Name</dt>
-						<dd class="text-gray-900 font-mono text-sm">{ *composeApp.ComposeProjectName }</dd>
-					</div>
-				}
-			</dl>
+				<pre class="bg-red-100/50 p-2 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto">{ *composeApp.ErrorMessage }</pre>
+			</div>
+		}
+
+		<!-- Tabs Header -->
+		<div class="border-b border-gray-200 mb-6">
+			<nav class="-mb-px flex space-x-8" aria-label="Tabs">
+				<button 
+					type="button"
+					@click="activeTab = 'services'"
+					:class="activeTab === 'services' ? 'border-blue-500 text-blue-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+					class="whitespace-nowrap py-3 px-1 border-b-2 text-sm">
+					🧩 Services Breakdown ({ fmt.Sprintf("%d", len(runtimes)) })
+				</button>
+				<button 
+					type="button"
+					@click="activeTab = 'yaml'"
+					:class="activeTab === 'yaml' ? 'border-blue-500 text-blue-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+					class="whitespace-nowrap py-3 px-1 border-b-2 text-sm">
+					📝 Compose YAML Editor
+				</button>
+				<button 
+					type="button"
+					@click="activeTab = 'domain'"
+					:class="activeTab === 'domain' ? 'border-blue-500 text-blue-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+					class="whitespace-nowrap py-3 px-1 border-b-2 text-sm">
+					🌐 Custom Domain & Routing
+				</button>
+			</nav>
 		</div>
 
-		<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
-			<h2 class="text-xl font-bold text-gray-900 mb-4">Custom Domain</h2>
-			if composeApp.CustomDomain != nil && *composeApp.CustomDomain != "" {
-				<dl class="space-y-3 mb-4">
-					<div class="flex justify-between">
-						<dt class="text-gray-600">Domain</dt>
-						<dd class="text-gray-900">{ *composeApp.CustomDomain }</dd>
-					</div>
-					<div class="flex justify-between">
-						<dt class="text-gray-600">HTTPS</dt>
-						<dd class="text-green-600">Enabled (via Caddy)</dd>
-					</div>
-				</dl>
-				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain/remove") } method="post" class="inline">
-					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Remove Domain</button>
-				</form>
+		<!-- Tab 1: Services Breakdown Grid -->
+		<div x-show="activeTab === 'services'" class="space-y-6">
+			if len(runtimes) == 0 {
+				<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+					<p class="text-gray-500 mb-4">Belum ada service yang terdefinisi atau terinspeksi.</p>
+					<button type="button" @click="activeTab = 'yaml'" class="text-blue-600 font-medium hover:underline">
+						Buka Compose YAML Editor untuk menambahkan service →
+					</button>
+				</div>
 			} else {
-				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain") } method="post" class="space-y-4">
-					<div>
-						<label class="block text-sm font-medium text-gray-700">Custom Domain</label>
-						<input type="text" name="custom_domain" placeholder="example.com" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2" required>
-					</div>
-					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Set Domain</button>
-				</form>
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+					for _, svc := range runtimes {
+						<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5 flex flex-col justify-between hover:shadow-md transition">
+							<div>
+								<div class="flex justify-between items-start mb-3">
+									<h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+										<span>{ svc.Name }</span>
+									</h3>
+									if svc.Status == "running" {
+										<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+											● { svc.Status }
+										</span>
+									} else if svc.Status == "not_created" {
+										<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+											○ not created
+										</span>
+									} else {
+										<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+											✕ { svc.Status }
+										</span>
+									}
+								</div>
+
+								<div class="space-y-2 text-xs text-gray-600 mb-4">
+									if svc.Definition.Image != "" {
+										<div>
+											<span class="font-medium text-gray-500">Image:</span>
+											<span class="font-mono ml-1 text-gray-800">{ svc.Definition.Image }</span>
+										</div>
+									}
+									if svc.Definition.BuildPath != "" {
+										<div>
+											<span class="font-medium text-gray-500">Build:</span>
+											<span class="font-mono ml-1 text-gray-800">{ svc.Definition.BuildPath }</span>
+										</div>
+									}
+									if len(svc.Definition.Ports) > 0 {
+										<div>
+											<span class="font-medium text-gray-500">Ports:</span>
+											<span class="font-mono ml-1 text-blue-600">{ strings.Join(svc.Definition.Ports, ", ") }</span>
+										</div>
+									}
+									if svc.ContainerID != "" {
+										<div>
+											<span class="font-medium text-gray-500">Container ID:</span>
+											<span class="font-mono ml-1 text-gray-700">{ svc.ContainerID[:12] }</span>
+										</div>
+									}
+									if svc.Health != "" {
+										<div>
+											<span class="font-medium text-gray-500">Health:</span>
+											<span class="ml-1 font-semibold text-green-700">{ svc.Health }</span>
+										</div>
+									}
+								</div>
+							</div>
+
+							<div class="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+								<button 
+									type="button" 
+									@click={ fmt.Sprintf("currentLogService = '%s'; logModalOpen = true; logContent = 'Mengambil log service...'; fetch('/compose-apps/%s/services/%s/logs').then(r => r.text()).then(t => logContent = t)", svc.Name, composeApp.ID, svc.Name) }
+									class="text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded font-medium transition">
+									📜 Logs
+								</button>
+								<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/services/" + svc.Name + "/restart") } method="post">
+									<button type="submit" class="text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded font-medium transition">
+										🔄 Restart
+									</button>
+								</form>
+							</div>
+						</div>
+					}
+				</div>
 			}
+		</div>
+
+		<!-- Tab 2: Compose YAML Editor -->
+		<div x-show="activeTab === 'yaml'" class="space-y-4">
+			<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+				<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/yaml") } method="post" class="space-y-4">
+					<div class="flex justify-between items-center">
+						<label class="block text-sm font-semibold text-gray-800">
+							Docker Compose YAML Definition
+						</label>
+						<button 
+							type="button" 
+							hx-post={ "/compose-apps/" + composeApp.ID + "/validate" }
+							hx-target="#yaml-validation-box"
+							hx-include="[name='raw_yaml']"
+							class="text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-300 px-3 py-1.5 rounded">
+							🔍 Validate Syntax
+						</button>
+					</div>
+
+					<div id="yaml-validation-box"></div>
+
+					<textarea 
+						name="raw_yaml" 
+						rows="16" 
+						class="w-full font-mono text-sm bg-gray-900 text-gray-100 p-4 rounded-lg border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+						placeholder="version: '3.8'&#10;services:&#10;  web:&#10;    image: nginx:alpine&#10;    ports:&#10;      - '80:80'">{ composeApp.RawYAML }</textarea>
+
+					<div class="flex justify-between items-center pt-2">
+						<span class="text-xs text-gray-500">
+							Variabel lingkungan bersama (Project & Team) otomatis disuntikkan ke <code>.env</code> saat deployment.
+						</span>
+						<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md text-sm shadow-sm">
+							💾 Simpan Perubahan YAML
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- Tab 3: Custom Domain & Routing -->
+		<div x-show="activeTab === 'domain'" class="space-y-4">
+			<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+				<h2 class="text-lg font-bold text-gray-900 mb-4">Pengaturan Custom Domain (Caddy HTTPS)</h2>
+				if composeApp.CustomDomain != nil && *composeApp.CustomDomain != "" {
+					<dl class="space-y-3 mb-6">
+						<div class="flex justify-between py-2 border-b border-gray-100">
+							<dt class="text-gray-600 text-sm">Domain Publik</dt>
+							<dd class="text-blue-600 font-mono text-sm font-semibold">{ *composeApp.CustomDomain }</dd>
+						</div>
+						<div class="flex justify-between py-2 border-b border-gray-100">
+							<dt class="text-gray-600 text-sm">Sertifikat SSL / HTTPS</dt>
+							<dd class="text-green-600 text-sm font-medium">Otomatis Aktif via Caddy TLS</dd>
+						</div>
+					</dl>
+					<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain/remove") } method="post">
+						<button type="submit" class="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-md hover:bg-red-100 text-sm font-medium">
+							Hapus Custom Domain
+						</button>
+					</form>
+				} else {
+					<form action={ templ.SafeURL("/compose-apps/" + composeApp.ID + "/domain") } method="post" class="space-y-4 max-w-lg">
+						<div>
+							<label class="block text-sm font-medium text-gray-700">Custom Domain</label>
+							<input type="text" name="custom_domain" placeholder="stack.domainklien.com" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm" required>
+							<p class="text-xs text-gray-500 mt-1">Arahkan DNS CNAME/A record ke IP server get-labuh ini.</p>
+						</div>
+						<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium">
+							Pasang Domain
+						</button>
+					</form>
+				}
+			</div>
+		</div>
+
+		<!-- Log Modal -->
+		<div x-show="logModalOpen" class="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4" style="display: none;">
+			<div class="bg-gray-900 border border-gray-800 text-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+				<div class="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-950">
+					<div class="flex items-center gap-2">
+						<span class="text-xs font-mono text-gray-400">Log Service:</span>
+						<span class="text-sm font-bold text-blue-400 font-mono" x-text="currentLogService"></span>
+					</div>
+					<button type="button" @click="logModalOpen = false" class="text-gray-400 hover:text-white text-lg">✕</button>
+				</div>
+				<pre class="p-5 font-mono text-xs text-gray-200 overflow-y-auto flex-1 whitespace-pre-wrap" x-text="logContent"></pre>
+				<div class="px-5 py-3 border-t border-gray-800 bg-gray-950 flex justify-end">
+					<button type="button" @click="logModalOpen = false" class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs text-white rounded font-medium">
+						Tutup
+					</button>
+				</div>
+			</div>
 		</div>
 	</div>
 }
 
 templ ComposeCreatePage() {
 	<div>
-		<h1 class="text-3xl font-bold text-gray-900 mb-6">New Compose Application</h1>
-		<div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-			<form action="/compose-apps" method="post" class="space-y-4">
-				<div>
-					<label class="block text-sm font-medium text-gray-700">Name</label>
-					<input type="text" name="name" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+		<h1 class="text-3xl font-bold text-gray-900 mb-6">Aplikasi Docker Compose Baru</h1>
+		<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-3xl">
+			<form action="" method="post" class="space-y-4">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div>
+						<label class="block text-sm font-medium text-gray-700">Nama Stack</label>
+						<input type="text" name="name" required placeholder="Contoh: WordPress Stack" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-gray-700">Slug (Opsional)</label>
+						<input type="text" name="slug" placeholder="wordpress-stack" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+					</div>
 				</div>
+
 				<div>
-					<label class="block text-sm font-medium text-gray-700">Slug</label>
-					<input type="text" name="slug" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+					<label class="block text-sm font-medium text-gray-700">Docker Compose YAML (Dapat diubah nanti)</label>
+					<textarea 
+						name="raw_yaml" 
+						rows="10" 
+						class="mt-1 block w-full font-mono text-xs bg-gray-900 text-gray-100 p-3 rounded-md border border-gray-700"
+						placeholder="version: '3.8'&#10;services:&#10;  app:&#10;    image: nginx:alpine&#10;    ports:&#10;      - '80:80'"></textarea>
 				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700">Compose File Path</label>
-					<input type="text" name="compose_file_path" value="docker-compose.yml" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700">Compose Project Name</label>
-					<input type="text" name="compose_project_name" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700">Custom Domain</label>
-					<input type="text" name="custom_domain" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
-				</div>
-				<div class="flex gap-2">
-					<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Create</button>
-					<a href="/projects" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancel</a>
+
+				<div class="flex gap-2 pt-4">
+					<button type="submit" class="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 text-sm font-medium">
+						Simpan & Lanjutkan
+					</button>
+					<a href="compose-apps" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 text-sm font-medium">
+						Batal
+					</a>
 				</div>
 			</form>
 		</div>

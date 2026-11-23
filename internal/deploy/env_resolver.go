@@ -141,3 +141,25 @@ func (r *EnvResolver) ResolveForApplication(ctx context.Context, app *models.App
 
 	return result, nil
 }
+
+// ResolveForEnvironment menyelesaikan variabel bersama tingkat Team & Project untuk environment tertentu.
+func (r *EnvResolver) ResolveForEnvironment(ctx context.Context, environmentID string) ([]models.AppEnvVar, error) {
+	fakeApp := &models.Application{
+		EnvironmentID: environmentID,
+	}
+	detailed, err := r.ResolveDetailed(ctx, fakeApp)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]models.AppEnvVar, 0, len(detailed))
+	for _, d := range detailed {
+		result = append(result, models.AppEnvVar{
+			Key:      d.Key,
+			Value:    d.Value,
+			IsSecret: d.IsSecret,
+		})
+	}
+
+	return result, nil
+}

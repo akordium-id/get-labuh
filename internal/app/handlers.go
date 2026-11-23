@@ -9,6 +9,7 @@ import (
 	"github.com/akordium-id/get-labuh/internal/auth"
 	"github.com/akordium-id/get-labuh/internal/backup"
 	"github.com/akordium-id/get-labuh/internal/caddy"
+	composeengine "github.com/akordium-id/get-labuh/internal/compose"
 	"github.com/akordium-id/get-labuh/internal/database/repo"
 	"github.com/akordium-id/get-labuh/internal/deploy"
 	"github.com/akordium-id/get-labuh/internal/docker"
@@ -152,6 +153,10 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 	sharedEnvRepo := repo.NewSharedEnvVarRepo(db)
 	projectsMod.SetSharedEnvRepo(sharedEnvRepo)
 	envResolver := deploy.NewEnvResolver(sharedEnvRepo, envVarRepo, db)
+
+	composeOrch := composeengine.NewOrchestrator("", dockerClient)
+	composeMod.SetOrchestrator(composeOrch)
+	composeMod.SetEnvResolver(envResolver)
 
 	deployWorker := worker.NewDeployWorker(10)
 	deployWorker.SetMaxConcurrent(3)
