@@ -498,6 +498,94 @@ func (c *Client) ExecStream(ctx context.Context, containerID string, cmd []strin
 	return nil
 }
 
+// ExecStreamWithStdin menjalankan command di dalam container dengan stdin streaming, dan mengalirkan stdout secara langsung ke writer.
+func (c *Client) ExecStreamWithStdin(
+	ctx context.Context,
+	containerID string,
+	cmd []string,
+	env []string,
+	stdin io.Reader,
+	stdout io.Writer,
+) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+
+	execConfig := container.ExecOptions{
+		Cmd:          cmd,
+		Env:          env,
+		AttachStdin:  stdin != nil,
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execCreateResp, err := c.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create exec instance: %w", err)
+	}
+
+	attachResp, err := c.cli.ContainerExecAttach(ctx, execCreateResp.ID, container.ExecAttachOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to attach exec instance: %w", err)
+	}
+	defer attachResp.Close()
+
+	if stdout == nil {
+		stdout = io.Discard
+	}
+
+	var stderrBuf bytes.Buffer
+	errWriter := io.MultiWriter(stdout, &stderrBuf)
+
+	// Stream stdin ke connection jika ada
+	if stdin != nil {
+		go func() {
+			_, _ = io.Copy(attachResp.Conn, stdin)
+			_ = attachResp.CloseWrite()
+		}()
+	}
+
+	_, err = stdcopy.StdCopy(stdout, errWriter, attachResp.Reader)
+	if err != nil {
+		return fmt.Errorf("failed during exec stream copy: %w", err)
+	}
+
+	inspectResp, err := c.cli.ContainerExecInspect(ctx, execCreateResp.ID)
+	if err != nil {
+		return fmt.Errorf("failed to inspect exec exit code: %w", err)
+	}
+
+	if inspectResp.ExitCode != 0 {
+		return fmt.Errorf("command exited with code %d: %s", inspectResp.ExitCode, strings.TrimSpace(stderrBuf.String()))
+	}
+
+	return nil
+}
+
+// CopyFromContainer mengunduh archive tar stream dari path di dalam container.
+func (c *Client) CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, error) {
+	if c.cli == nil {
+		return nil, fmt.Errorf("docker client not initialized")
+	}
+	stream, _, err := c.cli.CopyFromContainer(ctx, containerID, srcPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to copy from container %s (%s): %w", containerID, srcPath, err)
+	}
+	return stream, nil
+}
+
+// CopyToContainer mengekstrak tar archive stream ke path tujuan di dalam container.
+func (c *Client) CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+	err := c.cli.CopyToContainer(ctx, containerID, dstPath, content, container.CopyToContainerOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to copy to container %s (%s): %w", containerID, dstPath, err)
+	}
+	return nil
+}
+
 // ExecCommand menjalankan perintah shell di dalam container dan mengembalikan stdout + stderr sebagai string gabungan.
 func (c *Client) ExecCommand(ctx context.Context, containerID, command string, env []string) (string, error) {
 	if c.cli == nil {
