@@ -161,6 +161,10 @@ type ContainerResourceLimits struct {
 }
 
 func (c *Client) RunContainerWithCustomName(ctx context.Context, appID, containerName, imageName string, appPort int, envVars []struct{ Key, Value string }, limits ...ContainerResourceLimits) (string, error) {
+	return c.RunContainerWithVolumes(ctx, appID, containerName, imageName, appPort, envVars, nil, limits...)
+}
+
+func (c *Client) RunContainerWithVolumes(ctx context.Context, appID, containerName, imageName string, appPort int, envVars []struct{ Key, Value string }, bindings []VolumeBinding, limits ...ContainerResourceLimits) (string, error) {
 	if c.cli == nil {
 		return "", fmt.Errorf("docker client not initialized")
 	}
@@ -180,10 +184,16 @@ func (c *Client) RunContainerWithCustomName(ctx context.Context, appID, containe
 		Env:   envs,
 	}
 
+	binds := make([]string, 0, len(bindings))
+	for _, b := range bindings {
+		binds = append(binds, b.ToBindString())
+	}
+
 	hostCfg := &container.HostConfig{
 		RestartPolicy: container.RestartPolicy{
 			Name: "unless-stopped",
 		},
+		Binds: binds,
 	}
 
 	if len(limits) > 0 {
