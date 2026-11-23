@@ -446,6 +446,9 @@ func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 
 	mode := strings.TrimSpace(r.FormValue("mode"))
 	if mode == "" {
+		mode = strings.TrimSpace(r.FormValue("restore_mode"))
+	}
+	if mode == "" {
 		mode = "in_place"
 	}
 	if mode != "in_place" && mode != "new_database" {
@@ -468,6 +471,9 @@ func (h *Handler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 
 	if mode == "new_database" {
 		newName := strings.TrimSpace(r.FormValue("new_name"))
+		if newName == "" {
+			newName = strings.TrimSpace(r.FormValue("new_database_name"))
+		}
 		if newName == "" {
 			newName = fmt.Sprintf("%s-restored", currentDB.Name)
 		}
