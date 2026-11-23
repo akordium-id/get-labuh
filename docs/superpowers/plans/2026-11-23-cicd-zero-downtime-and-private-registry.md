@@ -290,25 +290,25 @@ git commit -m "feat(applications): support flexible ci/cd webhook payloads and d
   - `POST /settings/registries/{id}/delete`
   - `POST /settings/registries/test`
 
-- [ ] **Step 1: Write handler tests in `registries_handler_test.go`**
+- [x] **Step 1: Write handler tests in `registries_handler_test.go`**
 
 Test registry listing, creation with form values, test connection, and deletion.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./internal/modules/settings -run TestRegistriesHandler`
 Expected: FAIL
 
-- [ ] **Step 3: Implement handlers and register routes in `module.go`**
+- [x] **Step 3: Implement handlers and register routes in `module.go`**
 
 Add registry handlers to `internal/modules/settings/handler.go` and wire them into `RegisterRoutes` in `module.go`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./internal/modules/settings -run TestRegistriesHandler`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/modules/settings/handler.go internal/modules/settings/module.go internal/modules/settings/registries_handler_test.go
@@ -325,20 +325,20 @@ git commit -m "feat(settings): add docker registries management handlers and rou
 - Modify: `internal/modules/applications/handler.go` (pass registries list to detail view)
 - Generate: `templ generate`
 
-- [ ] **Step 1: Create `registries.templ`**
+- [x] **Step 1: Create `registries.templ`**
 
 Build clean UI with list of configured registries, Add Registry form, connection test button, and delete confirmation.
 
-- [ ] **Step 2: Update `applications/list.templ`**
+- [x] **Step 2: Update `applications/list.templ`**
 
 Add Docker Registry selection dropdown in Application Configuration / Docker Image card.
 
-- [ ] **Step 3: Run `templ generate` and verify build**
+- [x] **Step 3: Run `templ generate` and verify build**
 
 Run: `templ generate && go test -v ./internal/web/...`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/web/pages/settings/registries.templ internal/web/pages/settings/registries_templ.go internal/web/pages/applications/list.templ internal/web/pages/applications/list_templ.go internal/modules/applications/handler.go
@@ -352,7 +352,7 @@ git commit -m "feat(ui): add docker registries page and application registry sel
 **Files:**
 - Create: `internal/testing/cicd_zerodowntime_registry_test.go`
 
-- [ ] **Step 1: Write end-to-end integration tests**
+- [x] **Step 1: Write end-to-end integration tests**
 
 Simulate:
 - Webhook trigger with dynamic `image_tag`.
@@ -361,12 +361,12 @@ Simulate:
 - Verification that old container is drained and cleaned up without dropping requests.
 - Commit status notification sent to mock Git server.
 
-- [ ] **Step 2: Run all tests in the repository**
+- [x] **Step 2: Run all tests in the repository**
 
 Run: `go test -v ./...`
 Expected: ALL PACKAGES PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add internal/testing/cicd_zerodowntime_registry_test.go
