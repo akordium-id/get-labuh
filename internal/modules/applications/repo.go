@@ -531,6 +531,20 @@ func (r *Repo) UpdateDockerRegistryID(id string, registryID *string) error {
 	return r.UpdateDockerRegistryIDWithContext(context.Background(), id, registryID)
 }
 
+// UpdateDockerImageWithContext memperbarui docker image aplikasi dengan context.
+func (r *Repo) UpdateDockerImageWithContext(ctx context.Context, id, dockerImage string) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE applications SET docker_image = ?, updated_at = ? WHERE id = ?`,
+		dockerImage, time.Now(), id,
+	)
+	return err
+}
+
+func (r *Repo) UpdateDockerImage(id, dockerImage string) error {
+	return r.UpdateDockerImageWithContext(context.Background(), id, dockerImage)
+}
+
 // UpdateLifecycleCommandsWithContext memperbarui pre dan post deployment command aplikasi.
 func (r *Repo) UpdateLifecycleCommandsWithContext(ctx context.Context, id string, preCmd, postCmd *string) error {
 	_, err := r.db.ExecContext(

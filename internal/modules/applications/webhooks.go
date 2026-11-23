@@ -121,8 +121,37 @@ type gitlabWebhookPayload struct {
 
 type genericWebhookPayload struct {
 	Branch        string `json:"branch"`
+	Commit        string `json:"commit"`
 	CommitHash    string `json:"commit_hash"`
+	SHA           string `json:"sha"`
 	CommitMessage string `json:"commit_message"`
+	Message       string `json:"message"`
+	ImageTag      string `json:"image_tag"`
+	Image         string `json:"image"`
+}
+
+func (p *genericWebhookPayload) GetCommitHash() string {
+	if p.CommitHash != "" {
+		return p.CommitHash
+	}
+	if p.Commit != "" {
+		return p.Commit
+	}
+	return p.SHA
+}
+
+func (p *genericWebhookPayload) GetCommitMessage() string {
+	if p.CommitMessage != "" {
+		return p.CommitMessage
+	}
+	return p.Message
+}
+
+func (p *genericWebhookPayload) GetImageTag() string {
+	if p.ImageTag != "" {
+		return p.ImageTag
+	}
+	return p.Image
 }
 
 // Deploy menangani webhook universal dengan auto deteksi provider.
@@ -374,6 +403,15 @@ func (h *WebhooksHandler) handleGeneric(w http.ResponseWriter, r *http.Request, 
 		_ = json.Unmarshal(bodyBytes, &payload)
 	}
 
+	commitHash := payload.GetCommitHash()
+	commitMsg := payload.GetCommitMessage()
+	imageTag := payload.GetImageTag()
+
+	if imageTag != "" && app.SourceType == models.SourceTypeDockerImage {
+		_ = h.appRepo.UpdateDockerImageWithContext(r.Context(), app.ID, imageTag)
+		app.DockerImage = &imageTag
+	}
+
 	targetBranch := "main"
 	if app.Branch != nil && *app.Branch != "" {
 		targetBranch = *app.Branch
@@ -390,7 +428,7 @@ func (h *WebhooksHandler) handleGeneric(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	h.dispatchDeployment(w, app, targetBranch, payload.CommitHash, payload.CommitMessage)
+	h.dispatchDeployment(w, app, targetBranch, commitHash, commitMsg)
 }
 
 func (h *WebhooksHandler) dispatchDeployment(w http.ResponseWriter, app *models.Application, branch, commitHash, commitMsg string) {
@@ -429,6 +467,9 @@ func (h *WebhooksHandler) dispatchDeployment(w http.ResponseWriter, app *models.
 		job.LogPath = logPath
 		if branch != "" {
 			job.Branch = branch
+		}
+		if commitHash != "" {
+			job.CommitHash = commitHash
 		}
 		_ = h.deployWorker.Enqueue(job)
 	}
