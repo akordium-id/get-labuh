@@ -1,6 +1,7 @@
 package applications
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/akordium-id/get-labuh/internal/models"
@@ -133,6 +134,15 @@ func formatHealthcheckTimeout(val *int) string {
 	return strconv.Itoa(*val)
 }
 
+func formatBytes(bytes int64) string {
+	if bytes < 1024 {
+		return formatInt(int(bytes)) + " B"
+	} else if bytes < 1024*1024 {
+		return formatInt(int(bytes/1024)) + " KB"
+	}
+	return formatInt(int(bytes/(1024*1024))) + " MB"
+}
+
 func getStrVal(val *string, defaultVal string) string {
 	if val == nil || *val == "" {
 		return defaultVal
@@ -140,8 +150,8 @@ func getStrVal(val *string, defaultVal string) string {
 	return *val
 }
 
-templ ApplicationDetailPage(app *models.Application, deployments []*models.Deployment, envVars []*models.AppEnvVar, cronJobs []*models.ApplicationCronJob, prPreviews []*models.Application, volumes []*models.AppVolume, fileMounts []*models.AppFileMount) {
-	<div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general' }"
+templ ApplicationDetailPage(app *models.Application, deployments []*models.Deployment, envVars []*models.AppEnvVar, cronJobs []*models.ApplicationCronJob, prPreviews []*models.Application, volumes []*models.AppVolume, fileMounts []*models.AppFileMount, backupConfig *models.AppBackupConfig, backups []*models.AppBackup, destinations []*models.StorageDestination) {
+	<div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general', restoreVolModalOpen: false, selectedVolBackupId: '', selectedVolBackupFile: '', isRestoringVol: false }"
 	     @hashchange.window="tab = window.location.hash ? window.location.hash.substring(1) : 'general'">
 		<!-- Header Summary & Quick Actions -->
 		<div class="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-6 border-b border-gray-200 gap-4">
@@ -758,6 +768,175 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 							</button>
 						</div>
 					</form>
+				</div>
+			</div>
+
+			<!-- CARD 3: APPLICATION VOLUME BACKUPS & SAFE RESTORE -->
+			<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+					<div>
+						<h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+							<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+							Volume Backups & Safe Restore
+						</h2>
+						<p class="text-xs text-gray-500 mt-0.5">Snapshot terkompresi (.tar.gz) mencakup semua direktori persistent volume dan file mounts ke disk lokal atau S3.</p>
+					</div>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/backups/create") } method="post" class="inline">
+						<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-xs flex items-center gap-1.5 transition-colors">
+							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+							Backup Volumes Now
+						</button>
+					</form>
+				</div>
+
+				<!-- Config Form -->
+				<div class="mb-6 p-4 bg-gray-50/60 border border-gray-200 rounded-xl">
+					<h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Automated Snapshot Schedule</h3>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/backups/config") } method="post" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1">Status Otomatis</label>
+							<label class="flex items-center gap-2 cursor-pointer mt-2">
+								<input type="checkbox" name="enabled" value="true"
+								       if backupConfig != nil && backupConfig.Enabled {
+								           checked
+								       }
+								       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+								<span class="text-xs text-gray-700 font-medium">Aktifkan Backup Otomatis</span>
+							</label>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1">Cron Expression</label>
+							<input type="text" name="cron_expression"
+							       value={ getStrVal(func() *string { if backupConfig != nil { return &backupConfig.CronExpression }; return nil }(), "0 3 * * *") }
+							       placeholder="0 3 * * *" class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-mono w-full"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1">Retention Count</label>
+							<input type="number" name="retention_count"
+							       value={ strconv.Itoa(func() int { if backupConfig != nil && backupConfig.RetentionCount > 0 { return backupConfig.RetentionCount }; return 7 }()) }
+							       min="1" max="100" class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-full"/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1">Storage Destination</label>
+							<select name="storage_destination_id" class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-full">
+								<option value="">Local Disk (/var/lib/labuh/backups/apps)</option>
+								for _, dest := range destinations {
+									<option value={ dest.ID }
+									        if backupConfig != nil && backupConfig.StorageDestinationID != nil && *backupConfig.StorageDestinationID == dest.ID {
+									            selected
+									        }>
+										{ dest.Name } ({ dest.Bucket })
+									</option>
+								}
+							</select>
+						</div>
+						<div class="md:col-span-4 flex justify-end pt-1">
+							<button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-xs transition-colors">
+								Simpan Jadwal Backup
+							</button>
+						</div>
+					</form>
+				</div>
+
+				<!-- Snapshot History Table -->
+				<h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Snapshot History ({ strconv.Itoa(len(backups)) })</h3>
+				if len(backups) == 0 {
+					<div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-8 text-center text-gray-500 text-sm">
+						Belum ada snapshot backup untuk aplikasi ini. Klik <strong class="text-gray-700">Backup Volumes Now</strong> di atas untuk membuat snapshot pertama.
+					</div>
+				} else {
+					<div class="overflow-x-auto border border-gray-200 rounded-xl shadow-xs">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Filename</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Size</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Storage</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+									<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
+									<th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-600 uppercase">Action</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200 text-sm">
+								for _, b := range backups {
+									<tr class="hover:bg-gray-50 transition-colors">
+										<td class="px-4 py-3 font-mono text-xs text-gray-900">{ b.Filename }</td>
+										<td class="px-4 py-3 text-gray-600 text-xs font-mono">{ formatBytes(b.FileSize) }</td>
+										<td class="px-4 py-3 text-xs">
+											if b.StorageType == "s3" {
+												<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium border border-indigo-200">S3 / R2</span>
+											} else {
+												<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200">Local Disk</span>
+											}
+										</td>
+										<td class="px-4 py-3">
+											if b.Status == "completed" {
+												<span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">Completed</span>
+											} else if b.Status == "pending" {
+												<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded">Pending</span>
+											} else {
+												<span class="bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded">Failed</span>
+											}
+										</td>
+										<td class="px-4 py-3 text-xs text-gray-500">{ b.CreatedAt.Format("2006-01-02 15:04:05") }</td>
+										<td class="px-4 py-3 text-right text-xs">
+											if b.Status == "completed" {
+												<button type="button"
+												        @click={ fmt.Sprintf("restoreVolModalOpen = true; selectedVolBackupId = '%s'; selectedVolBackupFile = '%s'", b.ID, b.Filename) }
+												        class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">
+													Safe Restore
+												</button>
+											}
+											<a href={ templ.SafeURL("/applications/" + app.ID + "/backups/" + b.ID + "/download") } class="text-blue-600 hover:text-blue-900 font-medium mr-3">Download</a>
+											<form action={ templ.SafeURL("/applications/" + app.ID + "/backups/" + b.ID + "/delete") } method="post" class="inline" onsubmit="return confirm('Hapus snapshot backup ini?')">
+												<button type="submit" class="text-rose-600 hover:text-rose-900 font-medium">Delete</button>
+											</form>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+
+				<!-- Modal Safe Restore Volume -->
+				<div x-show="restoreVolModalOpen" style="display: none;" class="relative z-50">
+					<div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" @click="if(!isRestoringVol) restoreVolModalOpen = false"></div>
+					<div class="fixed inset-0 z-10 overflow-y-auto flex items-center justify-center p-4">
+						<div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100" @click.away="if(!isRestoringVol) restoreVolModalOpen = false">
+							<div class="flex items-center justify-between pb-3 border-b border-gray-100">
+								<div class="flex items-center gap-2">
+									<span class="text-xl">⚠️</span>
+									<h3 class="font-bold text-lg text-gray-900">Safe Restore Volume Snapshot</h3>
+								</div>
+								<button type="button" @click="restoreVolModalOpen = false" :disabled="isRestoringVol" class="text-gray-400 hover:text-gray-600 text-lg font-bold">×</button>
+							</div>
+
+							<form action="#"
+							      method="post"
+							      @submit={ fmt.Sprintf("$el.action = '/applications/%s/backups/' + selectedVolBackupId + '/restore'; isRestoringVol = true", app.ID) }
+							      class="mt-4 space-y-4">
+								<div class="bg-rose-50 border border-rose-200 rounded-xl p-3.5 text-xs text-rose-800 space-y-2">
+									<p class="font-bold">Konfirmasi Safe Restore:</p>
+									<p>1. Kontainer aplikasi akan <strong>dihentikan sementara (stop)</strong> secara aman.</p>
+									<p>2. Data volume dari snapshot <span class="font-mono font-bold text-gray-900" x-text="selectedVolBackupFile"></span> akan diekstrak menimpa direktori volume container saat ini.</p>
+									<p>3. Kontainer aplikasi akan <strong>di-start kembali otomatis</strong>.</p>
+								</div>
+
+								<div class="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+									<button type="button" @click="restoreVolModalOpen = false" :disabled="isRestoringVol"
+									        class="px-3.5 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 rounded-lg">
+										Batal
+									</button>
+									<button type="submit" :disabled="isRestoringVol"
+									        class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 disabled:opacity-75">
+										<span x-show="isRestoringVol" class="inline-block animate-spin rounded-full border-2 border-t-transparent border-white h-3.5 w-3.5 mr-1"></span>
+										<span x-text="isRestoringVol ? 'Sedang Safe Restore...' : 'Konfirmasi & Restore'"></span>
+									</button>
+								</div>
+							</form>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>

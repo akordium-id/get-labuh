@@ -110,6 +110,11 @@ func BuildContainer(db *sql.DB, cfg Config) (*Container, error) {
 		return backup.NewS3ClientFromDestination(dest)
 	})
 
+	appVolumeBackupRunner := backup.NewAppVolumeBackupRunner(dockerClient, applicationsMod.Repo, storageRepo, cfg.BackupDir+"/apps")
+	appVolumeBackupRunner.SetNotifier(notificationsMod.Notifier, projectRepo)
+	applicationsMod.SetVolumeBackupRunner(appVolumeBackupRunner)
+	applicationsMod.SetStorageProvider(settingsMod.StorageRepo)
+
 	backupScheduler := backup.NewBackupScheduler(databaseBackupRunner)
 	backupScheduler.Start()
 

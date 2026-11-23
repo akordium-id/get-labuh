@@ -79,6 +79,11 @@ func (m *Module) SetVolumeBackupRunner(r VolumeBackupRunner) {
 	m.Handler.SetVolumeBackupRunner(r)
 }
 
+// SetStorageProvider menyetel storage provider dependency.
+func (m *Module) SetStorageProvider(s StorageProvider) {
+	m.Handler.SetStorageProvider(s)
+}
+
 // SetCaddyClient menyetel caddy client.
 func (m *Module) SetCaddyClient(c *caddy.Client) {
 	m.Handler.SetCaddyClient(c)

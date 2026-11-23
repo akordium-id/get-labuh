@@ -32,6 +32,10 @@ type VolumeBackupRunner interface {
 	RestoreAppVolume(ctx context.Context, backupID string) error
 }
 
+type StorageProvider interface {
+	List(ctx context.Context) ([]*models.StorageDestination, error)
+}
+
 type Handler struct {
 	appRepo            *Repo
 	envVarRepo         *EnvVarRepo
@@ -44,6 +48,7 @@ type Handler struct {
 	cronRepo           *CronJobRepo
 	cronScheduler      *CronScheduler
 	volumeBackupRunner VolumeBackupRunner
+	storageRepo        StorageProvider
 }
 
 // NewHandler membuat instance baru Handler applications.
@@ -234,8 +239,14 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	volumes, _ := h.appRepo.GetVolumesByAppID(r.Context(), id)
 	fileMounts, _ := h.appRepo.GetFileMountsByAppID(r.Context(), id)
+	backupConfig, _ := h.appRepo.GetBackupConfigWithContext(r.Context(), id)
+	backups, _ := h.appRepo.ListBackupsByAppIDWithContext(r.Context(), id)
+	var destinations []*models.StorageDestination
+	if h.storageRepo != nil {
+		destinations, _ = h.storageRepo.List(r.Context())
+	}
 
-	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs, prPreviews, volumes, fileMounts))).ServeHTTP(w, r)
+	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs, prPreviews, volumes, fileMounts, backupConfig, backups, destinations))).ServeHTTP(w, r)
 }
 
 // Start menjalankan kontainer aplikasi.
@@ -1354,6 +1365,11 @@ func (h *Handler) DeleteFileMount(w http.ResponseWriter, r *http.Request) {
 // SetVolumeBackupRunner menyetel volume backup runner dependency.
 func (h *Handler) SetVolumeBackupRunner(runner VolumeBackupRunner) {
 	h.volumeBackupRunner = runner
+}
+
+// SetStorageProvider menyetel storage provider dependency.
+func (h *Handler) SetStorageProvider(s StorageProvider) {
+	h.storageRepo = s
 }
 
 // UpdateBackupConfig menyimpan konfigurasi backup volume aplikasi.
