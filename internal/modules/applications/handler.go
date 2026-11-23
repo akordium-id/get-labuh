@@ -37,6 +37,11 @@ type StorageProvider interface {
 	GetByID(ctx context.Context, id string) (*models.StorageDestination, error)
 }
 
+type RegistryProvider interface {
+	List(ctx context.Context) ([]*models.DockerRegistry, error)
+	GetByID(ctx context.Context, id string) (*models.DockerRegistry, error)
+}
+
 type S3Deleter interface {
 	DeleteObject(ctx context.Context, key string) error
 }
@@ -56,6 +61,7 @@ type Handler struct {
 	cronScheduler      *CronScheduler
 	volumeBackupRunner VolumeBackupRunner
 	storageRepo        StorageProvider
+	registryRepo       RegistryProvider
 	s3ClientFactory    S3ClientFactory
 }
 
@@ -167,6 +173,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	branch := r.FormValue("branch")
 	dockerImage := r.FormValue("docker_image")
 	serverID := strings.TrimSpace(r.FormValue("server_id"))
+	dockerRegistryID := strings.TrimSpace(r.FormValue("docker_registry_id"))
 	appPort, _ := strconv.Atoi(r.FormValue("app_port"))
 	if appPort == 0 {
 		appPort = 8080
@@ -190,17 +197,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if serverID != "" {
 		serverIDPtr = &serverID
 	}
+	var dockerRegistryIDPtr *string
+	if dockerRegistryID != "" {
+		dockerRegistryIDPtr = &dockerRegistryID
+	}
 
 	_, err := h.appRepo.CreateWithContext(r.Context(), models.CreateApplicationInput{
-		EnvironmentID: envID,
-		Name:          name,
-		Slug:          slug,
-		SourceType:    models.SourceType(sourceType),
-		RepositoryURL: repoURLPtr,
-		Branch:        branchPtr,
-		DockerImage:   dockerImagePtr,
-		AppPort:       appPort,
-		ServerID:      serverIDPtr,
+		EnvironmentID:    envID,
+		Name:             name,
+		Slug:             slug,
+		SourceType:       models.SourceType(sourceType),
+		RepositoryURL:    repoURLPtr,
+		Branch:           branchPtr,
+		DockerImage:      dockerImagePtr,
+		AppPort:          appPort,
+		ServerID:         serverIDPtr,
+		DockerRegistryID: dockerRegistryIDPtr,
 	})
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -254,7 +266,14 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		destinations, _ = h.storageRepo.List(r.Context())
 	}
 
-	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs, prPreviews, volumes, fileMounts, backupConfig, backups, destinations))).ServeHTTP(w, r)
+	var registries []*models.DockerRegistry
+	if h.registryRepo != nil {
+		if regs, err := h.registryRepo.List(r.Context()); err == nil {
+			registries = regs
+		}
+	}
+
+	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs, prPreviews, volumes, fileMounts, backupConfig, backups, destinations, registries))).ServeHTTP(w, r)
 }
 
 // Start menjalankan kontainer aplikasi.
@@ -1112,6 +1131,48 @@ func (h *Handler) UpdateLifecycleCommands(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, "/applications/"+id+"#advanced", http.StatusFound)
 }
 
+// UpdateRegistryConfig memperbarui Docker Registry ID dan Docker Image untuk aplikasi.
+func (h *Handler) UpdateRegistryConfig(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.appRepo.GetByIDWithContext(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	var regIDPtr *string
+	if regID := strings.TrimSpace(r.FormValue("docker_registry_id")); regID != "" {
+		regIDPtr = &regID
+	}
+
+	if err := h.appRepo.UpdateDockerRegistryIDWithContext(r.Context(), id, regIDPtr); err != nil {
+		http.Error(w, "Failed to update docker registry: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if dockerImage := strings.TrimSpace(r.FormValue("docker_image")); dockerImage != "" {
+		_ = h.appRepo.UpdateDockerImageWithContext(r.Context(), id, dockerImage)
+	}
+
+	setToast(w, "Konfigurasi Docker registry berhasil disimpan", "success")
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/applications/"+id)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+id, http.StatusFound)
+}
+
 // CreateVolume menambahkan konfigurasi persistent volume untuk aplikasi.
 func (h *Handler) CreateVolume(w http.ResponseWriter, r *http.Request) {
 	appID := chi.URLParam(r, "id")
@@ -1378,6 +1439,11 @@ func (h *Handler) SetVolumeBackupRunner(runner VolumeBackupRunner) {
 // SetStorageProvider menyetel storage provider dependency.
 func (h *Handler) SetStorageProvider(s StorageProvider) {
 	h.storageRepo = s
+}
+
+// SetRegistryRepo menyetel registry provider dependency.
+func (h *Handler) SetRegistryRepo(r RegistryProvider) {
+	h.registryRepo = r
 }
 
 // SetS3ClientFactory menyetel S3 client factory dependency.

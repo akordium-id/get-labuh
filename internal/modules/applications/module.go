@@ -84,6 +84,11 @@ func (m *Module) SetStorageProvider(s StorageProvider) {
 	m.Handler.SetStorageProvider(s)
 }
 
+// SetRegistryRepo menyetel registry provider dependency.
+func (m *Module) SetRegistryRepo(r RegistryProvider) {
+	m.Handler.SetRegistryRepo(r)
+}
+
 // SetS3ClientFactory menyetel S3 client factory.
 func (m *Module) SetS3ClientFactory(f S3ClientFactory) {
 	m.Handler.SetS3ClientFactory(f)
@@ -114,6 +119,7 @@ func (m *Module) RegisterRoutes(r chi.Router) {
 	r.Post("/applications/{id}/resources", m.Handler.UpdateResourceLimits)
 	r.Post("/applications/{id}/healthcheck", m.Handler.UpdateHealthcheck)
 	r.Post("/applications/{id}/basic-auth", m.Handler.UpdateBasicAuth)
+	r.Post("/applications/{id}/registry", m.Handler.UpdateRegistryConfig)
 	r.Post("/applications/{id}/webhook/regenerate", m.Handler.RegenerateWebhookSecret)
 	r.Get("/applications/{id}/status", m.Handler.Status)
 	r.Get("/applications/{id}/stats", m.Monitoring.Stats)
