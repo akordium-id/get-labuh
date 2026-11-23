@@ -2,6 +2,8 @@ package docker
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,9 +13,34 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 )
+
+type RegistryAuth struct {
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+	ServerAddress string `json:"serveraddress"`
+	Email         string `json:"email,omitempty"`
+}
+
+func (a *RegistryAuth) EncodeBase64() (string, error) {
+	if a == nil {
+		return "", nil
+	}
+	authConfig := registry.AuthConfig{
+		Username:      a.Username,
+		Password:      a.Password,
+		ServerAddress: a.ServerAddress,
+		Email:         a.Email,
+	}
+	buf, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(buf), nil
+}
 
 type Client struct {
 	cli *client.Client
@@ -43,14 +70,32 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 func (c *Client) PullImage(ctx context.Context, imageRef string) error {
+	return c.PullImageWithAuth(ctx, imageRef, nil)
+}
+
+func (c *Client) PullImageWithAuth(ctx context.Context, imageRef string, auth *RegistryAuth) error {
 	if c.cli == nil {
 		return fmt.Errorf("docker client not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	slog.Info("pulling docker image", "image", imageRef)
-	reader, err := c.cli.ImagePull(ctx, imageRef, image.PullOptions{})
+	server := "default"
+	if auth != nil && auth.ServerAddress != "" {
+		server = auth.ServerAddress
+	}
+	slog.Info("pulling docker image", "image", imageRef, "registry", server)
+
+	opts := image.PullOptions{}
+	if auth != nil {
+		encoded, err := auth.EncodeBase64()
+		if err != nil {
+			return fmt.Errorf("failed to encode registry auth: %w", err)
+		}
+		opts.RegistryAuth = encoded
+	}
+
+	reader, err := c.cli.ImagePull(ctx, imageRef, opts)
 	if err != nil {
 		return fmt.Errorf("pull image error: %w", err)
 	}
@@ -58,6 +103,31 @@ func (c *Client) PullImage(ctx context.Context, imageRef string) error {
 
 	// Drain reader to ensure pull completes
 	_, _ = io.Copy(io.Discard, reader)
+	return nil
+}
+
+func (c *Client) VerifyRegistryAuth(ctx context.Context, auth *RegistryAuth) error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized")
+	}
+	if auth == nil {
+		return fmt.Errorf("registry auth cannot be nil")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	authConfig := registry.AuthConfig{
+		Username:      auth.Username,
+		Password:      auth.Password,
+		ServerAddress: auth.ServerAddress,
+		Email:         auth.Email,
+	}
+
+	_, err := c.cli.RegistryLogin(ctx, authConfig)
+	if err != nil {
+		return fmt.Errorf("registry authentication failed: %w", err)
+	}
 	return nil
 }
 
