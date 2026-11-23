@@ -220,7 +220,10 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		prPreviews = previews
 	}
 
-	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs, prPreviews))).ServeHTTP(w, r)
+	volumes, _ := h.appRepo.GetVolumesByAppID(r.Context(), id)
+	fileMounts, _ := h.appRepo.GetFileMountsByAppID(r.Context(), id)
+
+	templ.Handler(layouts.AppLayout(webapp.ApplicationDetailPage(app, deployments, envVars, cronJobs, prPreviews, volumes, fileMounts))).ServeHTTP(w, r)
 }
 
 // Start menjalankan kontainer aplikasi.

@@ -140,7 +140,7 @@ func getStrVal(val *string, defaultVal string) string {
 	return *val
 }
 
-templ ApplicationDetailPage(app *models.Application, deployments []*models.Deployment, envVars []*models.AppEnvVar, cronJobs []*models.ApplicationCronJob, prPreviews []*models.Application) {
+templ ApplicationDetailPage(app *models.Application, deployments []*models.Deployment, envVars []*models.AppEnvVar, cronJobs []*models.ApplicationCronJob, prPreviews []*models.Application, volumes []*models.AppVolume, fileMounts []*models.AppFileMount) {
 	<div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general' }"
 	     @hashchange.window="tab = window.location.hash ? window.location.hash.substring(1) : 'general'">
 		<!-- Header Summary & Quick Actions -->
@@ -225,6 +225,15 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
 					<span>Deployments</span>
 					<span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-gray-100 text-gray-600 font-mono">{ formatInt(len(deployments)) }</span>
+				</a>
+				<a href="#storage" @click="tab = 'storage'"
+				   :class="tab === 'storage' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
+				   class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm rounded-t-lg transition-all whitespace-nowrap">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+					<span>Storage</span>
+					if len(volumes) + len(fileMounts) > 0 {
+						<span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-purple-100 text-purple-700 font-mono">{ formatInt(len(volumes) + len(fileMounts)) }</span>
+					}
 				</a>
 				<a href="#cron" @click="tab = 'cron'"
 				   :class="tab === 'cron' ? 'border-blue-600 text-blue-600 font-semibold bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium'"
@@ -549,6 +558,207 @@ templ ApplicationDetailPage(app *models.Application, deployments []*models.Deplo
 						</table>
 					</div>
 				}
+			</div>
+		</div>
+
+		<!-- TAB: STORAGE & VOLUMES -->
+		<div x-show="tab === 'storage'" class="space-y-6">
+			<!-- CARD 1: PERSISTENT VOLUMES -->
+			<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+				<div class="flex justify-between items-center mb-4">
+					<div>
+						<h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+							<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+							Persistent Volumes
+						</h2>
+						<p class="text-xs text-gray-500 mt-0.5">Simpan data aplikasi (upload media, SQLite, cache) secara permanen lintas redeployment.</p>
+					</div>
+				</div>
+
+				<!-- Table of Volumes -->
+				if len(volumes) == 0 {
+					<div class="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+						<svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+						<p class="text-sm font-medium text-gray-900">Belum ada persistent volume</p>
+						<p class="text-xs text-gray-500 mt-1">Tambahkan volume named Docker atau host bind mount menggunakan form di bawah.</p>
+					</div>
+				} else {
+					<div class="overflow-x-auto border border-gray-100 rounded-lg mb-6">
+						<table class="w-full text-left text-xs">
+							<thead class="bg-gray-50/80 text-gray-600 font-semibold border-b border-gray-100">
+								<tr>
+									<th class="py-2.5 px-3">Name</th>
+									<th class="py-2.5 px-3">Type</th>
+									<th class="py-2.5 px-3">Mount Path (Container)</th>
+									<th class="py-2.5 px-3">Host Path / Volume</th>
+									<th class="py-2.5 px-3">Mode</th>
+									<th class="py-2.5 px-3 text-right">Aksi</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-100">
+								for _, v := range volumes {
+									<tr class="hover:bg-gray-50/50">
+										<td class="py-2 px-3 font-semibold text-gray-900">{ v.Name }</td>
+										<td class="py-2 px-3">
+											if v.VolumeType == models.VolumeTypeNamed {
+												<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800">Named</span>
+											} else {
+												<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">Bind</span>
+											}
+										</td>
+										<td class="py-2 px-3 font-mono text-gray-700">{ v.MountPath }</td>
+										<td class="py-2 px-3 font-mono text-gray-500 text-[11px]">
+											if v.VolumeType == models.VolumeTypeBind && v.HostPath != nil {
+												{ *v.HostPath }
+											} else {
+												<span class="text-gray-400 italic">labuh-vol-app-...-{ v.Name }</span>
+											}
+										</td>
+										<td class="py-2 px-3">
+											if v.IsReadOnly {
+												<span class="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-mono">ro</span>
+											} else {
+												<span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px] font-mono">rw</span>
+											}
+										</td>
+										<td class="py-2 px-3 text-right">
+											<form action={ templ.SafeURL("/applications/" + app.ID + "/volumes/" + v.ID + "/delete") } method="post" class="inline"
+											      onsubmit="return confirm('Apakah Anda yakin ingin menghapus volume ini dari aplikasi?')">
+												<button type="submit" class="text-rose-600 hover:text-rose-800 font-semibold text-[11px]">Hapus</button>
+											</form>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+
+				<!-- Add Volume Form -->
+				<div class="mt-6 pt-4 border-t border-gray-100" x-data="{ volType: 'named' }">
+					<h3 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Tambah Persistent Volume</h3>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/volumes") } method="post" class="space-y-4">
+						<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+							<div>
+								<label class="block text-xs font-medium text-gray-700 mb-1">Nama Identifier</label>
+								<input type="text" name="name" required placeholder="uploads" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"/>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-gray-700 mb-1">Tipe Volume</label>
+								<select name="volume_type" x-model="volType" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+									<option value="named">Docker Named Volume (Aman & Otomatis)</option>
+									<option value="bind">Host Path Bind Mount (Direktori Host)</option>
+								</select>
+							</div>
+							<div x-show="volType === 'bind'">
+								<label class="block text-xs font-medium text-gray-700 mb-1">Host Path</label>
+								<input type="text" name="host_path" placeholder="/opt/myapp/storage" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"/>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-gray-700 mb-1">Mount Path (Container)</label>
+								<input type="text" name="mount_path" required placeholder="/app/storage" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"/>
+							</div>
+						</div>
+						<div class="flex items-center justify-between pt-1">
+							<label class="flex items-center gap-2 cursor-pointer">
+								<input type="checkbox" name="is_read_only" value="true" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"/>
+								<span class="text-xs text-gray-600 font-medium">Mount sebagai Read-Only (ro)</span>
+							</label>
+							<button type="submit" class="bg-indigo-600 text-white text-xs px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 font-semibold shadow-xs transition-colors">
+								+ Tambah Volume
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+
+			<!-- CARD 2: FILE MOUNTS (CONFIG INJECTION) -->
+			<div class="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+				<div class="flex justify-between items-center mb-4">
+					<div>
+						<h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+							<svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+							File Mounts (Config Editor)
+						</h2>
+						<p class="text-xs text-gray-500 mt-0.5">Injeksi file konfigurasi (nginx.conf, php.ini, config.json) langsung ke dalam container saat startup.</p>
+					</div>
+				</div>
+
+				<!-- Table of File Mounts -->
+				if len(fileMounts) == 0 {
+					<div class="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+						<svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+						<p class="text-sm font-medium text-gray-900">Belum ada file mount</p>
+						<p class="text-xs text-gray-500 mt-1">Gunakan form di bawah untuk membuat file konfigurasi kustom di container.</p>
+					</div>
+				} else {
+					<div class="space-y-4 mb-6">
+						for _, fm := range fileMounts {
+							<div class="border border-gray-200 rounded-lg p-4 bg-gray-50/30" x-data="{ editing: false }">
+								<div class="flex items-center justify-between">
+									<div class="flex items-center gap-2">
+										<span class="font-mono text-xs font-bold text-gray-800">{ fm.MountPath }</span>
+										<span class="text-[10px] px-1.5 py-0.2 rounded bg-gray-100 text-gray-600 font-mono">mode: { fm.FileMode }</span>
+										if fm.IsReadOnly {
+											<span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 font-mono">ro</span>
+										} else {
+											<span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-mono">rw</span>
+										}
+									</div>
+									<div class="flex items-center gap-3">
+										<button type="button" @click="editing = !editing" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">
+											<span x-text="editing ? 'Tutup Editor' : 'Edit Konten'"></span>
+										</button>
+										<form action={ templ.SafeURL("/applications/" + app.ID + "/file-mounts/" + fm.ID + "/delete") } method="post" class="inline"
+										      onsubmit="return confirm('Apakah Anda yakin ingin menghapus file mount ini?')">
+											<button type="submit" class="text-rose-600 hover:text-rose-800 font-semibold text-xs">Hapus</button>
+										</form>
+									</div>
+								</div>
+								<div x-show="editing" class="mt-3 pt-3 border-t border-gray-200">
+									<form action={ templ.SafeURL("/applications/" + app.ID + "/file-mounts/" + fm.ID + "/update") } method="post">
+										<textarea name="content" rows="6" class="w-full font-mono text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-gray-900 text-gray-100 p-3">{ fm.Content }</textarea>
+										<div class="flex justify-end mt-2">
+											<button type="submit" class="bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-semibold shadow-xs">
+												Simpan Perubahan
+											</button>
+										</div>
+									</form>
+								</div>
+							</div>
+						}
+					</div>
+				}
+
+				<!-- Add File Mount Form -->
+				<div class="mt-6 pt-4 border-t border-gray-100">
+					<h3 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Tambah File Mount Baru</h3>
+					<form action={ templ.SafeURL("/applications/" + app.ID + "/file-mounts") } method="post" class="space-y-4">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div>
+								<label class="block text-xs font-medium text-gray-700 mb-1">Mount Path (Container)</label>
+								<input type="text" name="mount_path" required placeholder="/etc/nginx/nginx.conf" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"/>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-gray-700 mb-1">File Mode (Permissions)</label>
+								<input type="text" name="file_mode" placeholder="0644" value="0644" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"/>
+							</div>
+						</div>
+						<div>
+							<label class="block text-xs font-medium text-gray-700 mb-1">Konten File (Config)</label>
+							<textarea name="content" rows="6" placeholder="# Paste konfigurasi Anda di sini..." class="w-full font-mono text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-gray-900 text-gray-100 p-3"></textarea>
+						</div>
+						<div class="flex items-center justify-between pt-1">
+							<label class="flex items-center gap-2 cursor-pointer">
+								<input type="checkbox" name="is_read_only" value="true" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"/>
+								<span class="text-xs text-gray-600 font-medium">Mount sebagai Read-Only (ro)</span>
+							</label>
+							<button type="submit" class="bg-indigo-600 text-white text-xs px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 font-semibold shadow-xs transition-colors">
+								+ Buat File Mount
+							</button>
+						</div>
+					</form>
+				</div>
 			</div>
 		</div>
 
