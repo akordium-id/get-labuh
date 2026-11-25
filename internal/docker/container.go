@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -596,16 +597,50 @@ func (c *Client) CopyFromContainer(ctx context.Context, containerID, srcPath str
 	return stream, nil
 }
 
-// CopyToContainer mengekstrak tar archive stream ke path tujuan di dalam container.
+// CopyToContainer mengekstrak uncompressed tar archive stream ke path tujuan di dalam container.
+// Archive terkompresi (gzip/xz/bzip2/zstd) ditolak agar Docker daemon tidak menjalankan binary dekompresi eksternal.
 func (c *Client) CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader) error {
 	if c.cli == nil {
 		return fmt.Errorf("docker client not initialized")
 	}
-	err := c.cli.CopyToContainer(ctx, containerID, dstPath, content, container.CopyToContainerOptions{})
+	safeContent, err := ensureUncompressedArchive(content)
+	if err != nil {
+		return err
+	}
+	err = c.cli.CopyToContainer(ctx, containerID, dstPath, safeContent, container.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to copy to container %s (%s): %w", containerID, dstPath, err)
 	}
 	return nil
+}
+
+// ensureUncompressedArchive memverifikasi stream tidak diawali magic bytes format kompresi.
+func ensureUncompressedArchive(content io.Reader) (io.Reader, error) {
+	if content == nil {
+		return nil, fmt.Errorf("archive content cannot be nil")
+	}
+	br := bufio.NewReader(content)
+	header, err := br.Peek(6)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("failed to inspect archive header: %w", err)
+	}
+
+	compressedSignatures := []struct {
+		name  string
+		magic []byte
+	}{
+		{name: "gzip", magic: []byte{0x1f, 0x8b}},
+		{name: "xz", magic: []byte{0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00}},
+		{name: "bzip2", magic: []byte{0x42, 0x5a, 0x68}},
+		{name: "zstd", magic: []byte{0x28, 0xb5, 0x2f, 0xfd}},
+	}
+	for _, sig := range compressedSignatures {
+		if bytes.HasPrefix(header, sig.magic) {
+			return nil, fmt.Errorf("compressed %s archives are not allowed in CopyToContainer; decompress before uploading", sig.name)
+		}
+	}
+
+	return br, nil
 }
 
 // ExecCommand menjalankan perintah shell di dalam container dan mengembalikan stdout + stderr sebagai string gabungan.
