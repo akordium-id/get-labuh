@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	stdtesting "testing"
 
@@ -78,4 +80,24 @@ func TestCopyToContainer_RejectsCompressedArchives(t *stdtesting.T) {
 		require.NoError(t, err)
 		assert.Equal(t, rawTar, got)
 	})
+}
+
+func TestCopyToContainer_RejectsRunningContainer(t *stdtesting.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"Id":"c1","State":{"Running":true}}`))
+	}))
+	defer srv.Close()
+
+	cli, err := client.NewClientWithOpts(
+		client.WithHost(srv.URL),
+		client.WithHTTPClient(srv.Client()),
+		client.WithVersion("1.45"),
+	)
+	require.NoError(t, err)
+
+	c := &Client{cli: cli}
+	err = c.CopyToContainer(context.Background(), "c1", "/", bytes.NewReader([]byte("ustar-test-payload")))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to copy archive into running container c1")
 }

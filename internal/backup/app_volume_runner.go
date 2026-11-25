@@ -312,8 +312,10 @@ func (r *AppVolumeBackupRunner) RestoreAppVolume(ctx context.Context, backupID s
 		return fmt.Errorf("docker client not available")
 	}
 
-	// Safe Restore: Stop container sementara
-	_ = r.dockerClient.StopContainer(ctx, *app.ContainerID, 10)
+	// Safe Restore: Stop container sementara (wajib berhasil agar tidak terjadi TOCTOU mount race saat CopyToContainer)
+	if err := r.dockerClient.StopContainer(ctx, *app.ContainerID, 10); err != nil {
+		return fmt.Errorf("failed to stop container before volume restore: %w", err)
+	}
 	// Garansi pemulihan: Container selalu dinyalakan kembali menggunakan detached context agar tidak gagal saat caller context canceled/timeout
 	defer func() {
 		restartCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)

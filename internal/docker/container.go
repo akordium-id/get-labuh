@@ -598,7 +598,8 @@ func (c *Client) CopyFromContainer(ctx context.Context, containerID, srcPath str
 }
 
 // CopyToContainer mengekstrak uncompressed tar archive stream ke path tujuan di dalam container.
-// Archive terkompresi (gzip/xz/bzip2/zstd) ditolak agar Docker daemon tidak menjalankan binary dekompresi eksternal.
+// Archive terkompresi (gzip/xz/bzip2/zstd) dan container yang masih running ditolak untuk mencegah
+// eksekusi binary dekompresi eksternal maupun TOCTOU symlink race pada bind-mount (CVE-2026-42306).
 func (c *Client) CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader) error {
 	if c.cli == nil {
 		return fmt.Errorf("docker client not initialized")
@@ -606,6 +607,13 @@ func (c *Client) CopyToContainer(ctx context.Context, containerID, dstPath strin
 	safeContent, err := ensureUncompressedArchive(content)
 	if err != nil {
 		return err
+	}
+	running, err := c.IsContainerRunning(ctx, containerID)
+	if err != nil {
+		return fmt.Errorf("failed to verify container state before copy (%s): %w", containerID, err)
+	}
+	if running {
+		return fmt.Errorf("refusing to copy archive into running container %s: stop the container first", containerID)
 	}
 	err = c.cli.CopyToContainer(ctx, containerID, dstPath, safeContent, container.CopyToContainerOptions{})
 	if err != nil {
